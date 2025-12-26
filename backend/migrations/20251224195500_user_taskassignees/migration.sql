@@ -1,0 +1,2 @@
+-- No-op migration to align Prisma schema (User.taskAssignees relation)
+-- Table relationships already exist via TaskAssignee.userId FK.

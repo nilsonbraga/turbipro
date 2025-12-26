@@ -1,0 +1,9 @@
+node_modules
+dist
+.env
+.DS_Store
+*.log
+npm-debug.log*
+pnpm-lock.yaml
+backend/node_modules
+backend/dist

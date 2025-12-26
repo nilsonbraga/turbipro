@@ -1,0 +1,5 @@
+.is-exporting,
+.is-exporting * {
+  animation: none !important;
+  transition: none !important;
+}
