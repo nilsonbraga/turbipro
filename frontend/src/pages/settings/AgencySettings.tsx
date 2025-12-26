@@ -78,6 +78,71 @@ export default function AgencySettings() {
     }
   };
 
+  const saveAgencyFavicon = async (dataUrl: string | null) => {
+    if (!agency?.id) return;
+    const key = `agency_favicon_${agency.id}`;
+    // find existing setting
+    const search = new URLSearchParams({
+      where: JSON.stringify({ settingKey: key }),
+      take: '1',
+    });
+    const existing = await apiFetch<{ data: any[] }>(`/api/platformSetting?${search.toString()}`);
+    const record = existing.data?.[0];
+    const payload = {
+      settingKey: key,
+      settingValue: dataUrl,
+      updatedAt: new Date().toISOString(),
+    };
+    if (record) {
+      await apiFetch(`/api/platformSetting/${record.id}`, {
+        method: 'PUT',
+        body: JSON.stringify(payload),
+      });
+    } else {
+      await apiFetch(`/api/platformSetting`, {
+        method: 'POST',
+        body: JSON.stringify(payload),
+      });
+    }
+  };
+
+  const handleFaviconUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !agency?.id) return;
+    setIsUploadingFavicon(true);
+    try {
+      const toBase64 = () =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+      const dataUrl = await toBase64();
+      await saveAgencyFavicon(dataUrl);
+      setAgencyFavicon(dataUrl);
+      toast({ title: 'Favicon atualizado!' });
+      await refreshProfile();
+    } catch (error: any) {
+      toast({ title: 'Erro ao enviar favicon', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsUploadingFavicon(false);
+      if (faviconInputRef.current) faviconInputRef.current.value = '';
+    }
+  };
+
+  const handleRemoveFavicon = async () => {
+    if (!agency?.id) return;
+    try {
+      await saveAgencyFavicon(null);
+      setAgencyFavicon('');
+      toast({ title: 'Favicon removido!' });
+      await refreshProfile();
+    } catch (error: any) {
+      toast({ title: 'Erro ao remover favicon', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const handleRemoveLogo = async () => {
     if (!agency?.id) return;
     
@@ -211,6 +276,7 @@ export default function AgencySettings() {
                 A logo será exibida no PDF das propostas
               </p>
             </div>
+
             
             <div className="flex items-center gap-4">
               {agencyLogo ? (

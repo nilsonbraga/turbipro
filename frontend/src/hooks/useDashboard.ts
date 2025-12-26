@@ -1,4 +1,5 @@
-import { useQuery } from '@tanstack/react-query';
+import { useMemo } from 'react';
+import { useQuery, keepPreviousData } from '@tanstack/react-query';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiFetch } from '@/lib/api';
 
@@ -39,20 +40,35 @@ const toQueryString = (params: Record<string, unknown>) => {
   const search = new URLSearchParams();
   Object.entries(params).forEach(([key, value]) => {
     if (value === undefined || value === null) return;
-    if (typeof value === 'string') {
-      search.set(key, value);
-    } else {
-      search.set(key, JSON.stringify(value));
-    }
+    if (typeof value === 'string') search.set(key, value);
+    else search.set(key, JSON.stringify(value));
   });
   return search.toString();
 };
+
+function calcCommission(value: number, commissionType: string | null, commissionValue: number | null) {
+  const v = value || 0;
+  const c = commissionValue || 0;
+  if ((commissionType || '').toLowerCase() === 'percentage') return (v * c) / 100;
+  return c;
+}
 
 export function useDashboard(filters: DashboardFilters = {}) {
   const { isSuperAdmin, profile } = useAuth();
   const userAgencyId = profile?.agency_id;
 
-  // Fetch agencies for filter (super admin only)
+  // Normaliza filtros para chave estável (evita queryKey “oscilar” por referência)
+  const normalizedFilters = useMemo(
+    () => ({
+      agencyId: filters.agencyId ?? null,
+      clientId: filters.clientId ?? null,
+      year: filters.year ?? null,
+      month: filters.month ?? null,
+    }),
+    [filters.agencyId, filters.clientId, filters.year, filters.month]
+  );
+
+  // Agencies (somente super admin)
   const agenciesQuery = useQuery({
     queryKey: ['dashboard-agencies'],
     queryFn: async () => {
@@ -61,24 +77,24 @@ export function useDashboard(filters: DashboardFilters = {}) {
         orderBy: { name: 'asc' },
         select: { id: true, name: true },
       });
-
       const { data } = await apiFetch<{ data: AgencyOption[] }>(`/api/agency?${query}`);
-      return data;
+      return data ?? [];
     },
     enabled: isSuperAdmin,
+    placeholderData: keepPreviousData,
+    staleTime: 5 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 
-  // Fetch clients for filter
+  // Clients
   const clientsQuery = useQuery({
-    queryKey: ['dashboard-clients', filters.agencyId, userAgencyId, isSuperAdmin],
+    queryKey: ['dashboard-clients', normalizedFilters.agencyId, userAgencyId, isSuperAdmin],
     queryFn: async () => {
       const where: Record<string, unknown> = {};
 
-      if (!isSuperAdmin && userAgencyId) {
-        where.agencyId = userAgencyId;
-      } else if (filters.agencyId) {
-        where.agencyId = filters.agencyId;
-      }
+      if (!isSuperAdmin && userAgencyId) where.agencyId = userAgencyId;
+      else if (filters.agencyId) where.agencyId = filters.agencyId;
 
       const query = toQueryString({
         where,
@@ -87,29 +103,28 @@ export function useDashboard(filters: DashboardFilters = {}) {
       });
 
       const { data } = await apiFetch<{ data: ClientOption[] }>(`/api/client?${query}`);
-      return data;
+      return data ?? [];
     },
+    placeholderData: keepPreviousData,
+    staleTime: 2 * 60 * 1000,
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 
-  // Fetch proposals with pipeline stages to determine closed status
+  // Proposals
   const proposalsQuery = useQuery({
-    queryKey: ['dashboard-proposals', filters, userAgencyId, isSuperAdmin],
+    queryKey: ['dashboard-proposals', normalizedFilters, userAgencyId, isSuperAdmin],
     queryFn: async () => {
       const where: Record<string, unknown> = {};
 
-      // Filter by agency
-      if (!isSuperAdmin && userAgencyId) {
-        where.agencyId = userAgencyId;
-      } else if (filters.agencyId) {
-        where.agencyId = filters.agencyId;
-      }
+      // agência
+      if (!isSuperAdmin && userAgencyId) where.agencyId = userAgencyId;
+      else if (filters.agencyId) where.agencyId = filters.agencyId;
 
-      // Filter by client
-      if (filters.clientId) {
-        where.clientId = filters.clientId;
-      }
+      // cliente
+      if (filters.clientId) where.clientId = filters.clientId;
 
-      // Filter by year/month
+      // ano/mês
       if (filters.year && filters.month) {
         const startDate = new Date(filters.year, filters.month - 1, 1);
         const endDate = new Date(filters.year, filters.month, 0);
@@ -130,17 +145,18 @@ export function useDashboard(filters: DashboardFilters = {}) {
       });
 
       const { data } = await apiFetch<{ data: ProposalWithRelations[] }>(`/api/proposal?${query}`);
-      return data;
+      return data ?? [];
     },
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 
-  // Fetch proposal services for revenue calculation
+  // Services (depende de proposals)
   const servicesQuery = useQuery({
-    queryKey: ['dashboard-services', filters, userAgencyId, isSuperAdmin],
+    queryKey: ['dashboard-services', normalizedFilters, userAgencyId, isSuperAdmin],
     queryFn: async () => {
-      // First get the proposal IDs based on filters
-      const proposalIds = proposalsQuery.data?.map(p => p.id) || [];
-      
+      const proposalIds = proposalsQuery.data?.map((p) => p.id) || [];
       if (proposalIds.length === 0) return [];
 
       const query = toQueryString({
@@ -149,138 +165,131 @@ export function useDashboard(filters: DashboardFilters = {}) {
       });
 
       const { data } = await apiFetch<{ data: ProposalServiceWithPartner[] }>(`/api/proposalService?${query}`);
-      return data;
+      return data ?? [];
     },
-    enabled: !!proposalsQuery.data,
+    enabled: (proposalsQuery.data?.length ?? 0) > 0,
+    placeholderData: keepPreviousData,
+    refetchOnWindowFocus: false,
+    retry: 1,
   });
 
-  // Calculate metrics - Only count revenue/profit from CLOSED proposals (using pipeline_stages.is_closed)
-  const proposals = proposalsQuery.data || [];
-  const services = servicesQuery.data || [];
-  
-  // Check if proposal is closed by looking at pipeline_stages.is_closed flag
-  const closedProposals = proposals.filter(p => {
-    const stage = p.stage;
-    return stage?.isClosed === true;
-  });
-  
-  // Calculate revenue from services of closed proposals
-  const closedProposalIds = closedProposals.map(p => p.id);
-  const closedServices = services.filter(s => closedProposalIds.includes(s.proposalId));
-  
-  const totalRevenue = closedServices.reduce((sum, s) => sum + (s.value || 0), 0);
-  // Commission is calculated from each service
-  const totalCommission = closedServices.reduce((sum, s) => {
-    const serviceValue = s.value || 0;
-    const serviceComm = (s as any).commissionType === 'percentage'
-      ? (serviceValue * (s.commissionValue || 0)) / 100
-      : (s.commissionValue || 0);
-    return sum + serviceComm;
-  }, 0);
-  
-  const totalProposals = proposals.length;
-  const closedCount = closedProposals.length;
-  const lostCount = proposals.filter(p => {
-    const stage = p.stage;
-    return stage?.isLost === true;
-  }).length;
-  const conversionRate = totalProposals > 0 ? Math.round((closedCount / totalProposals) * 100) : 0;
+  const proposals = proposalsQuery.data ?? [];
+  const services = servicesQuery.data ?? [];
 
-  // Proposals by stage
-  const proposalsByStage = proposals.reduce((acc, p) => {
-    const stage = p.stage;
-    const stageName = stage?.name || 'Sem etapa';
-    if (!acc[stageName]) {
-      acc[stageName] = { count: 0, value: 0 };
-    }
-    acc[stageName].count++;
-    // Get services value for this proposal
-    const proposalServices = services.filter(s => s.proposalId === p.id);
-    const proposalValue = proposalServices.reduce((sum, s) => sum + (s.value || 0), 0);
-    acc[stageName].value += proposalValue;
-    return acc;
-  }, {} as Record<string, { count: number; value: number }>);
+  // métricas calculadas SEM criar hooks condicionais
+  const metrics = useMemo(() => {
+    // closed proposals
+    const closedProposals = proposals.filter((p) => p.stage?.isClosed === true);
+    const closedProposalIds = new Set(closedProposals.map((p) => p.id));
 
-  // Top clients by revenue (from closed proposals only)
-  const clientRevenue = closedProposals.reduce((acc, p) => {
-    const clientName = p.client?.name || 'Sem cliente';
-    const proposalServices = closedServices.filter(s => s.proposalId === p.id);
-    const revenue = proposalServices.reduce((sum, s) => sum + (s.value || 0), 0);
-    if (!acc[clientName]) acc[clientName] = 0;
-    acc[clientName] += revenue;
-    return acc;
-  }, {} as Record<string, number>);
+    const closedServices = services.filter((s) => closedProposalIds.has(s.proposalId));
 
-  const topClients = Object.entries(clientRevenue)
-    .map(([name, revenue]) => ({ name, revenue }))
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5);
+    const totalRevenue = closedServices.reduce((sum, s) => sum + (s.value || 0), 0);
 
-  // Top partners by revenue (from closed proposals only)
-  const partnerRevenue = closedServices.reduce((acc, s) => {
-    const partnerName = s.partner?.name || 'Sem parceiro';
-    if (!acc[partnerName]) acc[partnerName] = 0;
-    acc[partnerName] += s.value || 0;
-    return acc;
-  }, {} as Record<string, number>);
-
-  const topPartners = Object.entries(partnerRevenue)
-    .map(([name, revenue]) => ({ name, revenue }))
-    .sort((a, b) => b.revenue - a.revenue)
-    .slice(0, 5);
-
-  // Monthly revenue (last 6 months) - only from closed proposals
-  const revenueByMonth = [];
-  const now = new Date();
-  for (let i = 5; i >= 0; i--) {
-    const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
-    const monthName = date.toLocaleDateString('pt-BR', { month: 'short' });
-    const monthProposals = closedProposals.filter(p => {
-      const pDate = new Date(p.createdAt || '');
-      return pDate.getMonth() === date.getMonth() && pDate.getFullYear() === date.getFullYear();
-    });
-    const monthProposalIds = monthProposals.map(p => p.id);
-    const monthServices = closedServices.filter(s => monthProposalIds.includes(s.proposalId));
-    const revenue = monthServices.reduce((sum, s) => sum + (s.value || 0), 0);
-    const commission = monthServices.reduce((sum, s) => {
-      const serviceValue = s.value || 0;
-      const serviceComm = (s as any).commissionType === 'percentage'
-        ? (serviceValue * (s.commissionValue || 0)) / 100
-        : (s.commissionValue || 0);
-      return sum + serviceComm;
+    const totalCommission = closedServices.reduce((sum, s) => {
+      const v = s.value || 0;
+      return sum + calcCommission(v, s.commissionType, s.commissionValue);
     }, 0);
-    revenueByMonth.push({
-      month: monthName,
-      revenue,
-      profit: commission,
-    });
-  }
+
+    const totalProposals = proposals.length;
+    const closedCount = closedProposals.length;
+    const lostCount = proposals.filter((p) => p.stage?.isLost === true).length;
+    const conversionRate = totalProposals > 0 ? Math.round((closedCount / totalProposals) * 100) : 0;
+
+    // Propostas por estágio (count e value = volume de serviços)
+    const byStage: Record<string, { count: number; value: number }> = {};
+    for (const p of proposals) {
+      const stageName = p.stage?.name || 'Sem etapa';
+      const sumValue = services
+        .filter((s) => s.proposalId === p.id)
+        .reduce((acc, s) => acc + (s.value || 0), 0);
+      if (!byStage[stageName]) {
+        byStage[stageName] = { count: 0, value: 0 };
+      }
+      byStage[stageName].count += 1;
+      byStage[stageName].value += sumValue;
+    }
+
+    const proposalsByStage = Object.entries(byStage).map(([stage, data]) => ({
+      stage,
+      count: data.count,
+      value: data.value,
+    }));
+
+    // Top clients (somente fechados)
+    const clientRevenue: Record<string, number> = {};
+    for (const p of closedProposals) {
+      const name = p.client?.name || 'Sem cliente';
+      const rev = closedServices
+        .filter((s) => s.proposalId === p.id)
+        .reduce((acc, s) => acc + (s.value || 0), 0);
+      clientRevenue[name] = (clientRevenue[name] || 0) + rev;
+    }
+
+    const topClients = Object.entries(clientRevenue)
+      .map(([name, revenue]) => ({ name, revenue }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    // Top partners (somente fechados)
+    const partnerRevenue: Record<string, number> = {};
+    for (const s of closedServices) {
+      const name = s.partner?.name || 'Sem parceiro';
+      partnerRevenue[name] = (partnerRevenue[name] || 0) + (s.value || 0);
+    }
+
+    const topPartners = Object.entries(partnerRevenue)
+      .map(([name, revenue]) => ({ name, revenue }))
+      .sort((a, b) => b.revenue - a.revenue)
+      .slice(0, 5);
+
+    // Receita por mês (últimos 6 meses) - somente fechados
+    const revenueByMonth: Array<{ month: string; revenue: number; profit: number }> = [];
+    const now = new Date();
+
+    for (let i = 5; i >= 0; i--) {
+      const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
+      const monthName = date.toLocaleDateString('pt-BR', { month: 'short' });
+
+      const monthClosed = closedProposals.filter((p) => {
+        const d = new Date(p.createdAt || '');
+        return d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear();
+      });
+
+      const ids = new Set(monthClosed.map((p) => p.id));
+      const monthServices = closedServices.filter((s) => ids.has(s.proposalId));
+
+      const revenue = monthServices.reduce((sum, s) => sum + (s.value || 0), 0);
+      const profit = monthServices.reduce((sum, s) => sum + calcCommission(s.value || 0, s.commissionType, s.commissionValue), 0);
+
+      revenueByMonth.push({ month: monthName, revenue, profit });
+    }
+
+    return {
+      totalRevenue,
+      totalProfit: totalCommission,
+      totalProposals,
+      conversionRate,
+      proposalsByStage,
+      topClients,
+      topPartners,
+      revenueByMonth,
+    };
+  }, [proposals, services]);
+
+  // estados
+  const isInitialLoading =
+    (proposalsQuery.isPending && (proposalsQuery.data?.length ?? 0) === 0) ||
+    (servicesQuery.isPending && (servicesQuery.data?.length ?? 0) === 0);
+
+  // refresh “de verdade” = proposals/services refetch
+  const isRefreshing = proposalsQuery.isFetching || servicesQuery.isFetching;
 
   return {
-    // Data for filters
-    agencies: agenciesQuery.data || [],
-    clients: clientsQuery.data || [],
-    
-    // Metrics
-    metrics: {
-      totalRevenue,
-      totalProfit: totalCommission, // Profit is now the commission
-      totalCommission,
-      totalProposals,
-      closedCount,
-      lostCount,
-      conversionRate,
-      proposalsByStage: Object.entries(proposalsByStage).map(([stage, data]) => ({
-        stage,
-        count: data.count,
-        value: data.value,
-      })),
-      topClients,
-    topPartners,
-    revenueByMonth,
-  },
-  
-  // Loading states
-  isLoading: proposalsQuery.isLoading || servicesQuery.isLoading || agenciesQuery.isLoading || clientsQuery.isLoading,
+    agencies: agenciesQuery.data ?? [],
+    clients: clientsQuery.data ?? [],
+    metrics,
+    isLoading: isInitialLoading,
+    isFetching: isRefreshing,
   };
 }

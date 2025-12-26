@@ -1,30 +1,42 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TrendingUp, TrendingDown, DollarSign, FileText, Target, Users, Filter } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from 'recharts';
+import {
+  TrendingUp,
+  DollarSign,
+  FileText,
+  Target,
+  Users,
+  Filter,
+  ShieldCheck,
+  Compass,
+  Activity,
+  Moon,
+  Sun,
+  User,
+} from 'lucide-react';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { useDashboard, DashboardFilters } from '@/hooks/useDashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
+import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
+import { usePipelineStages } from '@/hooks/usePipelineStages';
 
-const formatCurrency = (value: number) => {
-  return new Intl.NumberFormat('pt-BR', {
-    style: 'currency',
-    currency: 'BRL',
-  }).format(value);
-};
+const formatCurrency = (value: number) =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
 
 const STAGE_COLORS: Record<string, string> = {
-  'Novo': 'hsl(var(--chart-1))',
-  'Contato': 'hsl(var(--chart-2))',
-  'Proposta': 'hsl(var(--chart-3))',
-  'Negociação': 'hsl(var(--chart-4))',
-  'Fechado': 'hsl(var(--chart-5))',
-  'Perdido': 'hsl(var(--muted))',
+  Novo: 'hsl(var(--chart-1))',
+  Contato: 'hsl(var(--chart-2))',
+  Proposta: 'hsl(var(--chart-3))',
+  Negociação: 'hsl(var(--chart-4))',
+  Fechado: 'hsl(var(--chart-5))',
+  Perdido: 'hsl(var(--muted))',
 };
 
 const currentYear = new Date().getFullYear();
 const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
+
 const months = [
   { value: 1, label: 'Janeiro' },
   { value: 2, label: 'Fevereiro' },
@@ -40,309 +52,631 @@ const months = [
   { value: 12, label: 'Dezembro' },
 ];
 
-export default function Dashboard() {
-  const { isSuperAdmin } = useAuth();
-  const [filters, setFilters] = useState<DashboardFilters>({});
-  
-  const { agencies, clients, metrics, isLoading } = useDashboard(filters);
+const GREEN_PALETTE = ['#6EE7B7', '#34D399', '#10B981', '#065F46', '#111827', '#1F2937'];
 
-  const updateFilter = (key: keyof DashboardFilters, value: string | number | undefined) => {
-    setFilters(prev => ({ ...prev, [key]: value }));
+function FullPageSkeleton() {
+  return (
+    <div className="space-y-6">
+      <div className="flex items-center justify-between">
+        <div>
+          <Skeleton className="h-8 w-40" />
+          <Skeleton className="h-4 w-56 mt-2" />
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {[...Array(4)].map((_, i) => (
+          <Card key={i}>
+            <CardContent className="p-6">
+              <Skeleton className="h-20 w-full" />
+            </CardContent>
+          </Card>
+        ))}
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-[2fr,1fr] gap-6">
+        <Card>
+          <CardContent className="p-6">
+            <Skeleton className="h-[320px] w-full" />
+          </CardContent>
+        </Card>
+        <Card>
+          <CardContent className="p-6">
+            <Skeleton className="h-[320px] w-full" />
+          </CardContent>
+        </Card>
+      </div>
+    </div>
+  );
+}
+
+function RefreshOverlay({ show, isDark }: { show: boolean; isDark: boolean }) {
+  if (!show) return null;
+  return (
+    <div className="absolute inset-0 z-30 rounded-2xl bg-black/10 backdrop-blur-[2px] flex items-start justify-end p-4 pointer-events-none">
+      <div
+        className={`rounded-full px-3 py-2 text-sm flex items-center gap-2 border ${
+          isDark ? 'bg-white/10 text-white border-white/10' : 'bg-white/80 text-slate-900 border-slate-200'
+        }`}
+      >
+        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+        Atualizando dados...
+      </div>
+    </div>
+  );
+}
+
+export default function Dashboard() {
+  const { isSuperAdmin, profile } = useAuth();
+  const [filters, setFilters] = useState<DashboardFilters>({});
+  const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+
+  const { agencies, clients, metrics, isLoading, isFetching } = useDashboard(filters);
+  const { stages: pipelineStages } = usePipelineStages();
+  const displayMetrics = metrics ?? {
+    revenueByMonth: [],
+    proposalsByStage: [],
+    totalProposals: 0,
+    totalRevenue: 0,
+    totalProfit: 0,
+    conversionRate: 0,
+    topClients: [],
+    topPartners: [],
   };
 
-  if (isLoading) {
+  const isDark = theme === 'dark';
+  const surfaceCard = isDark ? 'bg-white/5 border-emerald-500/20' : 'bg-white border-slate-200';
+  const subtleCard = isDark ? 'bg-black/20 border-emerald-500/10' : 'bg-emerald-50 border-emerald-100';
+  const textMuted = isDark ? 'text-emerald-100/70' : 'text-slate-500';
+  const textStrong = isDark ? 'text-white' : 'text-slate-900';
+
+  // Hooks SEMPRE rodam (mesmo com loading)
+  const sellerSummary = useMemo(() => {
+    const name = profile?.name || profile?.full_name || 'Você';
+    return [
+      {
+        name,
+        proposals: metrics?.totalProposals || 0,
+        revenue: metrics?.totalRevenue || 0,
+        profit: metrics?.totalProfit || 0,
+        conversion: metrics?.conversionRate || 0,
+        isMe: true,
+      },
+    ];
+  }, [metrics, profile?.full_name, profile?.name]);
+
+  const updateFilter = (key: keyof DashboardFilters, value: string | number | undefined) => {
+    setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // Full skeleton só quando realmente não tem dado útil ainda
+  const showFullSkeleton = isLoading || !metrics;
+
+  // Refresh overlay quando já tem tela e está refetching
+  const showRefreshing = isFetching && !showFullSkeleton;
+  const LIGHT_PIPELINE_COLORS = ['#16a34a', '#22c55e', '#0ea5e9', '#f59e0b', '#10b981', '#047857'];
+  const revenueData = displayMetrics?.revenueByMonth || [];
+  const colorForStage = (stage: string, index: number) => {
+    if (isDark) return STAGE_COLORS[stage] || GREEN_PALETTE[index % GREEN_PALETTE.length];
+    return LIGHT_PIPELINE_COLORS[index % LIGHT_PIPELINE_COLORS.length];
+  };
+  const pipelineData = useMemo(() => {
+    if (!metrics) return [];
+    const counts = new Map<string, number>();
+    (displayMetrics?.proposalsByStage || []).forEach((p) => counts.set(p.stage, p.count));
+    if (pipelineStages.length > 0) {
+      return pipelineStages.map((s, idx) => ({
+        stage: s.name,
+        count: counts.get(s.name) ?? 0,
+        color: s.color || colorForStage(s.name, idx),
+      }));
+    }
+    // fallback to known default stages if no pipelineStages hook returned
+    const fallbackStages = ['Novo', 'Contato', 'Proposta', 'Negociação', 'Fechado', 'Perdido'];
+    return fallbackStages.map((stage, idx) => ({
+      stage,
+      count: counts.get(stage) ?? 0,
+      color: colorForStage(stage, idx),
+    }));
+  }, [metrics, displayMetrics?.proposalsByStage, pipelineStages]);
+
+  const pipelineCountMap = useMemo(() => {
+    const map = new Map<string, number>();
+    pipelineData.forEach((p) => map.set(p.stage, p.count));
+    return map;
+  }, [pipelineData]);
+
+  const pipelineStageLabel = (props: any) => {
+    const { x = 0, y = 0, width = 0, height = 0, payload, value } = props || {};
+    if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') return null;
+    const stage = typeof value === 'string' ? value : String(payload?.stage ?? '');
+    const count = pipelineCountMap.get(stage) ?? 0;
+    const stageColor = pipelineData.find((p) => p.stage === stage)?.color || colorForStage(stage, 0);
+    const hasBar = count > 0;
+    const color = hasBar ? '#ffffff' : stageColor;
+    const centerY = y + height / 2;
     return (
-      <div className="p-6 space-y-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-            <p className="text-muted-foreground">Visão geral do seu negócio</p>
-          </div>
-        </div>
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-          {[...Array(4)].map((_, i) => (
-            <Card key={i}>
-              <CardContent className="p-6">
-                <Skeleton className="h-20 w-full" />
-              </CardContent>
-            </Card>
-          ))}
-        </div>
-      </div>
+      <text x={x + 8} y={centerY} dy={0} fill={color} fontSize={12} fontWeight={700} dominantBaseline="central" textAnchor="start">
+        {stage}
+      </text>
     );
-  }
+  };
+
+  const pipelineCountLabel = (props: any) => {
+    const { x, y, width, height, value } = props || {};
+    if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') return null;
+    if (typeof value !== 'number' || value === 0) return null;
+    const centerY = y + height / 2;
+    return (
+      <text x={x + width - 8} y={centerY} dy={0} fill="#ffffff" fontSize={12} textAnchor="end" dominantBaseline="central">
+        {value}
+      </text>
+    );
+  };
+
+  const pipelineLabelRenderer = (props: any) => {
+    const { x, y, width, value, payload } = props || {};
+    if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number') return null;
+    const stage = String(payload?.stage ?? '');
+    const count = typeof value === 'number' ? value : 0;
+    const stageColor = pipelineData.find((p) => p.stage === stage)?.color || colorForStage(stage, 0);
+    const stageFill = count === 0 ? stageColor : '#ffffff';
+    const textY = y + 4;
+    return (
+      <g>
+        <text x={x + 8} y={textY} dy={0} fill={stageFill} fontSize={12}>
+          {stage}
+        </text>
+        {count > 0 && (
+          <text x={x + width - 8} y={textY} dy={0} fill="#ffffff" fontSize={12} textAnchor="end">
+            {count}
+          </text>
+        )}
+      </g>
+    );
+  };
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h1 className="text-2xl font-bold text-foreground">Dashboard</h1>
-          <p className="text-muted-foreground">Visão geral do seu negócio</p>
-        </div>
-        
-        {/* Filters */}
-        <div className="flex flex-wrap items-center gap-3">
-          <Filter className="w-4 h-4 text-muted-foreground" />
-          
-          {isSuperAdmin && (
-            <Select
-              value={filters.agencyId || 'all'}
-              onValueChange={(v) => updateFilter('agencyId', v === 'all' ? undefined : v)}
-            >
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="Todas agências" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas agências</SelectItem>
-                {agencies.map((agency) => (
-                  <SelectItem key={agency.id} value={agency.id}>
-                    {agency.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
-          
-          <Select
-            value={filters.clientId || 'all'}
-            onValueChange={(v) => updateFilter('clientId', v === 'all' ? undefined : v)}
-          >
-            <SelectTrigger className="w-[180px]">
-              <SelectValue placeholder="Todos clientes" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos clientes</SelectItem>
-              {clients.map((client) => (
-                <SelectItem key={client.id} value={client.id}>
-                  {client.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Select
-            value={filters.year?.toString() || 'all'}
-            onValueChange={(v) => updateFilter('year', v === 'all' ? undefined : parseInt(v))}
-          >
-            <SelectTrigger className="w-[120px]">
-              <SelectValue placeholder="Ano" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos anos</SelectItem>
-              {years.map((year) => (
-                <SelectItem key={year} value={year.toString()}>
-                  {year}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-          
-          <Select
-            value={filters.month?.toString() || 'all'}
-            onValueChange={(v) => updateFilter('month', v === 'all' ? undefined : parseInt(v))}
-          >
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Mês" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos meses</SelectItem>
-              {months.map((month) => (
-                <SelectItem key={month.value} value={month.value.toString()}>
-                  {month.label}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+    <div
+      className={`min-h-screen transition-colors duration-500 ${
+        isDark
+          ? 'bg-gradient-to-b from-[#0b1410] via-[#0c1613] to-[#0b1410] text-slate-50'
+          : 'bg-gradient-to-b from-emerald-50 via-white to-emerald-50 text-slate-900'
+      }`}
+    >
+      <div className="max-w-7xl mx-auto p-6 space-y-6 transition-all duration-500 relative">
+        <RefreshOverlay show={showRefreshing} isDark={isDark} />
 
-      {/* KPI Cards */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Faturamento Total</p>
-                <p className="text-2xl font-bold">{formatCurrency(metrics.totalRevenue)}</p>
-              </div>
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <DollarSign className="w-6 h-6 text-primary" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+        {showFullSkeleton ? (
+          <FullPageSkeleton />
+        ) : (
+          <>
+            {/* Hero */}
+            <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+              <div
+                className={`relative overflow-hidden rounded-2xl border p-6 shadow-xl transition-colors duration-500 ${
+                  isDark
+                    ? 'border-emerald-500/20 bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700'
+                    : 'border-emerald-100 bg-gradient-to-r from-emerald-100 via-emerald-200 to-emerald-300 text-slate-900'
+                }`}
+              >
+                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.12),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.1),transparent_30%)]" />
+                <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                  <div className="space-y-2">
+                    <p className={`text-sm font-medium ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Painel Inteligente</p>
+                    <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-emerald-950'}`}>Performance em tempo real</h1>
+                    <p className={`${isDark ? 'text-white/80' : 'text-emerald-900/80'} max-w-xl`}>
+                      Acompanhe faturamento, margens e conversões de todas as agências em um só lugar.
+                    </p>
+                    <div className="flex flex-wrap gap-3">
+                      <div className={`rounded-full px-3 py-1 text-sm font-medium flex items-center gap-2 ${isDark ? 'bg-white/20 text-white' : 'bg-white/70 text-emerald-900'}`}>
+                        <ShieldCheck size={16} />
+                        Operações ativas
+                      </div>
+                      <div className={`rounded-full px-3 py-1 text-sm font-medium flex items-center gap-2 ${isDark ? 'bg-black/30 text-white' : 'bg-emerald-200 text-emerald-900'}`}>
+                        <Compass size={16} />
+                        Visão multiagência
+                      </div>
+                    </div>
+                  </div>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Lucro</p>
-                <p className="text-2xl font-bold">{formatCurrency(metrics.totalProfit)}</p>
-              </div>
-              <div className="w-12 h-12 rounded-lg bg-chart-2/10 flex items-center justify-center">
-                <TrendingUp className="w-6 h-6 text-chart-2" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
+                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
+                    <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-white/15' : 'bg-white/70'}`}>
+                      <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Faturamento</p>
+                      <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
+                        {showRefreshing ? <Skeleton className="h-6 w-32 rounded-md bg-white/30" /> : formatCurrency(metrics?.totalRevenue || 0)}
+                      </div>
+                      <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>YTD</span>
+                    </div>
 
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Propostas</p>
-                <p className="text-2xl font-bold">{metrics.totalProposals}</p>
-              </div>
-              <div className="w-12 h-12 rounded-lg bg-chart-3/10 flex items-center justify-center">
-                <FileText className="w-6 h-6 text-chart-3" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="text-sm text-muted-foreground">Taxa de Conversão</p>
-                <p className="text-2xl font-bold">{metrics.conversionRate}%</p>
-              </div>
-              <div className="w-12 h-12 rounded-lg bg-chart-4/10 flex items-center justify-center">
-                <Target className="w-6 h-6 text-chart-4" />
-              </div>
-            </div>
-          </CardContent>
-        </Card>
-      </div>
-
-      {/* Charts */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Revenue Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Faturamento x Lucro</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              {metrics.revenueByMonth.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <BarChart data={metrics.revenueByMonth}>
-                    <CartesianGrid strokeDasharray="3 3" className="stroke-border" />
-                    <XAxis dataKey="month" className="text-xs" />
-                    <YAxis className="text-xs" tickFormatter={(value) => `${value / 1000}k`} />
-                    <Tooltip
-                      formatter={(value: number) => formatCurrency(value)}
-                      contentStyle={{ backgroundColor: 'hsl(var(--card))', border: '1px solid hsl(var(--border))' }}
-                    />
-                    <Bar dataKey="revenue" name="Faturamento" fill="hsl(var(--primary))" radius={[4, 4, 0, 0]} />
-                    <Bar dataKey="profit" name="Lucro" fill="hsl(var(--chart-2))" radius={[4, 4, 0, 0]} />
-                  </BarChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  Sem dados para exibir
+                    <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-black/20' : 'bg-emerald-200/70'}`}>
+                      <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Taxa de Conversão</p>
+                      <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
+                        {showRefreshing ? <Skeleton className="h-6 w-24 rounded-md bg-white/30" /> : `${metrics?.conversionRate ?? 0}%`}
+                      </div>
+                      <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Pipeline</span>
+                    </div>
+                  </div>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
+              </div>
 
-        {/* Pipeline Chart */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg">Propostas por Estágio</CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="h-[300px]">
-              {metrics.proposalsByStage.length > 0 ? (
-                <ResponsiveContainer width="100%" height="100%">
-                  <PieChart>
-                    <Pie
-                      data={metrics.proposalsByStage}
-                      dataKey="value"
-                      nameKey="stage"
-                      cx="50%"
-                      cy="50%"
-                      outerRadius={100}
-                      label={({ stage, value }) => `${stage}: ${formatCurrency(value)}`}
+              <div className={`rounded-2xl p-5 backdrop-blur-md border ${surfaceCard}`}>
+                <div className="flex items-center justify-between mb-4">
+                  <div>
+                    <p className={`text-xs ${textMuted}`}>Status geral</p>
+                    <p className={`text-lg font-semibold ${textStrong}`}>Operação saudável</p>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
+                        isDark ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-800'
+                      }`}
+                      onClick={() => setTheme(isDark ? 'light' : 'dark')}
                     >
-                      {metrics.proposalsByStage.map((entry, index) => (
-                        <Cell key={`cell-${index}`} fill={STAGE_COLORS[entry.stage] || `hsl(var(--chart-${(index % 5) + 1}))`} />
-                      ))}
-                    </Pie>
-                    <Tooltip formatter={(value: number) => formatCurrency(value)} />
-                  </PieChart>
-                </ResponsiveContainer>
-              ) : (
-                <div className="h-full flex items-center justify-center text-muted-foreground">
-                  Sem dados para exibir
+                      {isDark ? <Sun size={16} /> : <Moon size={16} />}
+                      {isDark ? 'Modo Claro' : 'Modo Escuro'}
+                    </button>
+                    <Activity className="text-emerald-400" />
+                  </div>
                 </div>
-              )}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
-      {/* Top Lists */}
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        {/* Top Clients */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Users className="w-5 h-5" />
-              Top Clientes
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {metrics.topClients.length > 0 ? (
-                metrics.topClients.map((client, index) => (
-                  <div key={client.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
-                        {index + 1}
-                      </span>
-                      <span className="font-medium">{client.name}</span>
-                    </div>
-                    <span className="text-muted-foreground">{formatCurrency(client.revenue)}</span>
+                <div className="grid grid-cols-3 gap-3 text-sm">
+                  <div className={`rounded-xl p-3 ${subtleCard}`}>
+                    <p className={textMuted}>Propostas</p>
+                    <div className={`text-xl font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-12 rounded bg-white/20" /> : metrics?.totalProposals ?? 0}</div>
                   </div>
-                ))
-              ) : (
-                <p className="text-muted-foreground text-center py-4">Sem dados para exibir</p>
-              )}
-            </div>
-          </CardContent>
-        </Card>
 
-        {/* Top Partners */}
-        <Card>
-          <CardHeader>
-            <CardTitle className="text-lg flex items-center gap-2">
-              <Target className="w-5 h-5" />
-              Top Fornecedores
-            </CardTitle>
-          </CardHeader>
-          <CardContent>
-            <div className="space-y-4">
-              {metrics.topPartners.length > 0 ? (
-                metrics.topPartners.map((partner, index) => (
-                  <div key={partner.name} className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <span className="w-6 h-6 rounded-full bg-primary/10 text-primary text-xs font-bold flex items-center justify-center">
-                        {index + 1}
-                      </span>
-                      <span className="font-medium">{partner.name}</span>
-                    </div>
-                    <span className="text-muted-foreground">{formatCurrency(partner.revenue)}</span>
+                  <div className={`rounded-xl p-3 ${subtleCard}`}>
+                    <p className={textMuted}>Lucro</p>
+                    <div className={`text-xl font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-16 rounded bg-white/20" /> : formatCurrency(metrics?.totalProfit || 0)}</div>
                   </div>
-                ))
-              ) : (
-                <p className="text-muted-foreground text-center py-4">Sem dados para exibir</p>
-              )}
+
+                  <div className={`rounded-xl p-3 ${subtleCard}`}>
+                    <p className={textMuted}>Clientes</p>
+                    <div className={`text-xl font-semibold ${textStrong}`}>{clients.length}</div>
+                  </div>
+                </div>
+              </div>
             </div>
-          </CardContent>
-        </Card>
+
+            {/* Filters */}
+            <div className={`rounded-2xl p-4 backdrop-blur-md shadow-lg border ${surfaceCard}`}>
+              <div className="flex flex-wrap items-center gap-3">
+                <div className={`flex items-center gap-2 rounded-full px-3 py-2 ${isDark ? 'bg-black/30 text-emerald-100' : 'bg-emerald-50 text-emerald-800'}`}>
+                  <Filter className="w-4 h-4" />
+                  <span className="text-sm font-medium">Filtros</span>
+                </div>
+
+                {isSuperAdmin && (
+                  <Select value={filters.agencyId || 'all'} onValueChange={(v) => updateFilter('agencyId', v === 'all' ? undefined : v)}>
+                    <SelectTrigger className={`w-[200px] border-emerald-500/20 ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
+                      <SelectValue placeholder="Todas agências" />
+                    </SelectTrigger>
+                    <SelectContent className={`border-emerald-500/20 ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
+                      <SelectItem value="all">Todas agências</SelectItem>
+                      {agencies.map((agency) => (
+                        <SelectItem key={agency.id} value={agency.id}>
+                          {agency.name}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                )}
+
+                <Select value={filters.clientId || 'all'} onValueChange={(v) => updateFilter('clientId', v === 'all' ? undefined : v)}>
+                  <SelectTrigger className={`w-[200px] border-emerald-500/20 ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
+                    <SelectValue placeholder="Todos clientes" />
+                  </SelectTrigger>
+                  <SelectContent className={`border-emerald-500/20 ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
+                    <SelectItem value="all">Todos clientes</SelectItem>
+                    {clients.map((client) => (
+                      <SelectItem key={client.id} value={client.id}>
+                        {client.name}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={filters.year?.toString() || 'all'} onValueChange={(v) => updateFilter('year', v === 'all' ? undefined : parseInt(v, 10))}>
+                  <SelectTrigger className={`w-[140px] border-emerald-500/20 ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
+                    <SelectValue placeholder="Ano" />
+                  </SelectTrigger>
+                  <SelectContent className={`border-emerald-500/20 ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
+                    <SelectItem value="all">Todos anos</SelectItem>
+                    {years.map((y) => (
+                      <SelectItem key={y} value={y.toString()}>
+                        {y}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+
+                <Select value={filters.month?.toString() || 'all'} onValueChange={(v) => updateFilter('month', v === 'all' ? undefined : parseInt(v, 10))}>
+                  <SelectTrigger className={`w-[160px] border-emerald-500/20 ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
+                    <SelectValue placeholder="Mês" />
+                  </SelectTrigger>
+                  <SelectContent className={`border-emerald-500/20 ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
+                    <SelectItem value="all">Todos meses</SelectItem>
+                    {months.map((m) => (
+                      <SelectItem key={m.value} value={m.value.toString()}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            {/* KPI cards */}
+            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-sm ${textMuted}`}>Faturamento</p>
+                      <div className={`text-2xl font-semibold ${textStrong}`}>
+                        {showRefreshing ? <Skeleton className="h-7 w-32 rounded bg-white/20" /> : formatCurrency(metrics?.totalRevenue || 0)}
+                      </div>
+                    </div>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>
+                      <DollarSign className="w-6 h-6" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-sm ${textMuted}`}>Lucro</p>
+                      <div className={`text-2xl font-semibold ${textStrong}`}>
+                        {showRefreshing ? <Skeleton className="h-7 w-28 rounded bg-white/20" /> : formatCurrency(metrics?.totalProfit || 0)}
+                      </div>
+                    </div>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>
+                      <TrendingUp className="w-6 h-6" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-sm ${textMuted}`}>Propostas</p>
+                      <div className={`text-2xl font-semibold ${textStrong}`}>
+                        {showRefreshing ? <Skeleton className="h-7 w-14 rounded bg-white/20" /> : metrics?.totalProposals ?? 0}
+                      </div>
+                    </div>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>
+                      <FileText className="w-6 h-6" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
+                <CardContent className="p-5">
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <p className={`text-sm ${textMuted}`}>Conversão</p>
+                      <div className={`text-2xl font-semibold ${textStrong}`}>
+                        {showRefreshing ? <Skeleton className="h-7 w-16 rounded bg-white/20" /> : `${metrics?.conversionRate ?? 0}%`}
+                      </div>
+                    </div>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>
+                      <Target className="w-6 h-6" />
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Charts */}
+            <div className="grid grid-cols-1 xl:grid-cols-[2fr,1fr] gap-6">
+              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
+                <CardHeader>
+                  <CardTitle className={`text-lg ${textStrong}`}>Faturamento x Lucro</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {revenueData.length ? (
+                    <ChartContainer
+                      config={
+                        {
+                          revenue: { label: 'Faturamento', color: isDark ? '#10b981' : '#16a34a' },
+                          profit: { label: 'Lucro', color: isDark ? '#34d399' : '#86efac' },
+                        } satisfies ChartConfig
+                      }
+                      className="h-[320px]"
+                    >
+                      <BarChart accessibilityLayer data={revenueData}>
+                        <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'} />
+                        <XAxis
+                          dataKey="month"
+                          tickLine={false}
+                          tickMargin={10}
+                          axisLine={false}
+                          tick={{ fill: isDark ? '#e5e7eb' : '#0f172a' }}
+                        />
+                        <ChartTooltip content={<ChartTooltipContent formatter={(v) => formatCurrency(Number(v))} />} />
+                        <ChartLegend content={<ChartLegendContent />} />
+                        <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} isAnimationActive={!showRefreshing} />
+                        <Bar dataKey="profit" fill="var(--color-profit)" radius={[0, 0, 4, 4]} isAnimationActive={!showRefreshing} />
+                      </BarChart>
+                    </ChartContainer>
+                  ) : (
+                    <div className={`h-[320px] flex items-center justify-center ${textMuted}`}>Sem dados para exibir</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
+                <CardHeader>
+                  <CardTitle className={`text-lg ${textStrong}`}>Pipeline por estágio</CardTitle>
+                </CardHeader>
+                <CardContent>
+                  {pipelineData.length ? (
+                    <ChartContainer
+                      config={
+                        {
+                          count: { label: 'Propostas', color: isDark ? '#34d399' : '#16a34a' },
+                          label: { color: 'var(--background)' },
+                        } satisfies ChartConfig
+                      }
+                      className="h-[320px]"
+                    >
+                      <BarChart
+                        accessibilityLayer
+                        data={pipelineData}
+                        layout="vertical"
+                        margin={{ right: 16, left: 16 }}
+                      >
+                        <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke={isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'} />
+                        <YAxis dataKey="stage" type="category" hide />
+                        <XAxis dataKey="count" type="number" hide />
+                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                        <Bar
+                          dataKey="count"
+                          layout="vertical"
+                          radius={4}
+                          barSize={26}
+                          minPointSize={2}
+                          isAnimationActive={!showRefreshing}
+                        >
+                          <LabelList dataKey="stage" content={pipelineStageLabel} />
+                          <LabelList dataKey="count" content={pipelineCountLabel} />
+                          {pipelineData.map((entry, idx) => (
+                            <Cell key={entry.stage} fill={entry.color || colorForStage(entry.stage, idx)} fillOpacity={entry.count === 0 ? 0.15 : 1} />
+                          ))}
+                        </Bar>
+                      </BarChart>
+                    </ChartContainer>
+                  ) : (
+                    <div className={`h-[320px] flex items-center justify-center ${textMuted}`}>Sem dados para exibir</div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+
+            {/* Seller summary */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
+              {sellerSummary.map((seller) => (
+                <Card key={seller.name} className={`backdrop-blur-lg border ${surfaceCard}`}>
+                  <CardContent className="p-5 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-3">
+                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-200' : 'bg-emerald-100 text-emerald-800'}`}>
+                          <User size={18} />
+                        </div>
+                        <div>
+                          <p className={`text-sm ${textMuted}`}>Resumo por vendedor</p>
+                          <p className={`font-semibold ${textStrong}`}>{seller.name}</p>
+                        </div>
+                      </div>
+                      {seller.isMe && (
+                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${isDark ? 'bg-emerald-500/20 text-emerald-100' : 'bg-emerald-100 text-emerald-800'}`}>
+                          Você
+                        </span>
+                      )}
+                    </div>
+
+                    <div className="grid grid-cols-2 gap-3 text-sm">
+                      <div className={`rounded-lg p-3 ${subtleCard}`}>
+                        <p className={textMuted}>Propostas</p>
+                        <div className={`text-lg font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-10 rounded bg-white/20" /> : seller.proposals}</div>
+                      </div>
+                      <div className={`rounded-lg p-3 ${subtleCard}`}>
+                        <p className={textMuted}>Conversão</p>
+                        <div className={`text-lg font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-12 rounded bg-white/20" /> : `${seller.conversion}%`}</div>
+                      </div>
+                      <div className={`rounded-lg p-3 ${subtleCard}`}>
+                        <p className={textMuted}>Faturamento</p>
+                        <div className={`text-lg font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(seller.revenue)}</div>
+                      </div>
+                      <div className={`rounded-lg p-3 ${subtleCard}`}>
+                        <p className={textMuted}>Lucro</p>
+                        <div className={`text-lg font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(seller.profit)}</div>
+                      </div>
+                    </div>
+                  </CardContent>
+                </Card>
+              ))}
+            </div>
+
+            {/* Lists */}
+            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
+              <Card className={`backdrop-blur-lg border ${surfaceCard} xl:col-span-2`}>
+                <CardHeader>
+                  <CardTitle className={`text-lg flex items-center gap-2 ${textStrong}`}>
+                    <Users className={`${isDark ? 'text-emerald-300' : 'text-emerald-700'} w-5 h-5`} />
+                    Top Clientes
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {metrics?.topClients?.length ? (
+                      metrics.topClients.map((client, index) => (
+                        <div
+                          key={client.name}
+                          className={`flex items-center justify-between rounded-xl px-4 py-3 border ${isDark ? 'border-emerald-500/10 bg-black/20' : 'border-emerald-100 bg-white'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-200' : 'bg-emerald-100 text-emerald-800'}`}>
+                              {index + 1}
+                            </span>
+                            <div>
+                              <p className={`font-medium ${textStrong}`}>{client.name}</p>
+                              <p className={`text-xs ${textMuted}`}>Faturamento direto</p>
+                            </div>
+                          </div>
+                          <div className={`font-medium ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(client.revenue)}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className={`${textMuted} text-center py-6`}>Sem dados para exibir</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
+                <CardHeader>
+                  <CardTitle className={`text-lg flex items-center gap-2 ${textStrong}`}>
+                    <Target className={`${isDark ? 'text-emerald-300' : 'text-emerald-700'} w-5 h-5`} />
+                    Top Fornecedores
+                  </CardTitle>
+                </CardHeader>
+                <CardContent>
+                  <div className="space-y-4">
+                    {metrics?.topPartners?.length ? (
+                      metrics.topPartners.map((partner, index) => (
+                        <div
+                          key={partner.name}
+                          className={`flex items-center justify-between rounded-xl px-4 py-3 border ${isDark ? 'border-emerald-500/10 bg-black/20' : 'border-emerald-100 bg-white'}`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-200' : 'bg-emerald-100 text-emerald-800'}`}>
+                              {index + 1}
+                            </span>
+                            <div>
+                              <p className={`font-medium ${textStrong}`}>{partner.name}</p>
+                              <p className={`text-xs ${textMuted}`}>Volume em serviços</p>
+                            </div>
+                          </div>
+                          <div className={`font-medium ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(partner.revenue)}</div>
+                        </div>
+                      ))
+                    ) : (
+                      <p className={`${textMuted} text-center py-6`}>Sem dados para exibir</p>
+                    )}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          </>
+        )}
       </div>
     </div>
   );
