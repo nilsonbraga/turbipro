@@ -10,6 +10,7 @@ interface Profile {
   email: string | null;
   avatar_url: string | null;
   phone: string | null;
+  theme_preference?: 'light' | 'dark';
 }
 
 interface Agency {
@@ -69,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       email: profilePayload.email,
       avatar_url: profilePayload.avatarUrl,
       phone: profilePayload.phone,
+      theme_preference: (profilePayload as any).themePreference ?? (profilePayload as any).theme_preference,
     };
   };
 
@@ -156,6 +158,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       isMounted = false;
     };
   }, []);
+
+  // aplica classe global de tema conforme preferência do perfil
+  useEffect(() => {
+    const theme = (profile?.theme_preference as 'light' | 'dark' | undefined) || 'light';
+    const root = document.documentElement;
+    if (theme === 'dark') {
+      root.classList.add('dark');
+    } else {
+      root.classList.remove('dark');
+    }
+  }, [profile?.theme_preference]);
 
   return (
     <AuthContext.Provider value={{ 

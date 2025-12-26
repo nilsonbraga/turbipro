@@ -26,6 +26,7 @@ const mapProfile = (profile: any | null) =>
         email: profile.email,
         phone: profile.phone,
         avatarUrl: profile.avatarUrl,
+        themePreference: profile.themePreference ?? 'dark',
       }
     : null;
 

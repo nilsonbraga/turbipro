@@ -21,6 +21,7 @@ export type AuthPayload = {
     email: string | null;
     phone: string | null;
     avatarUrl: string | null;
+    themePreference?: 'light' | 'dark';
   } | null;
   agency: {
     id: string;

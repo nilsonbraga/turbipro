@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -21,6 +21,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
+import { apiFetch } from '@/lib/api';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -147,6 +148,28 @@ export default function Dashboard() {
 
   const updateFilter = (key: keyof DashboardFilters, value: string | number | undefined) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
+  };
+
+  // Aplica tema vindo do perfil quando houver
+  useEffect(() => {
+    const preferred = (profile?.theme_preference as 'dark' | 'light' | undefined) ?? 'dark';
+    setTheme(preferred);
+  }, [profile?.theme_preference]);
+
+  const persistTheme = async (nextTheme: 'dark' | 'light') => {
+    setTheme(nextTheme);
+    if (!profile?.id) return;
+    try {
+      await apiFetch(`/api/profile/${profile.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          themePreference: nextTheme,
+          updatedAt: new Date().toISOString(),
+        }),
+      });
+    } catch (err) {
+      console.error('Erro ao atualizar tema do perfil', err);
+    }
   };
 
   // Full skeleton só quando realmente não tem dado útil ainda
@@ -311,7 +334,7 @@ export default function Dashboard() {
                       className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
                         isDark ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-800'
                       }`}
-                      onClick={() => setTheme(isDark ? 'light' : 'dark')}
+                      onClick={() => persistTheme(isDark ? 'light' : 'dark')}
                     >
                       {isDark ? <Sun size={16} /> : <Moon size={16} />}
                       {isDark ? 'Modo Claro' : 'Modo Escuro'}

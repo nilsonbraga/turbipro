@@ -111,6 +111,7 @@ model Profile {
   email     String?
   phone     String?
   avatarUrl String?
+  themePreference String @default("dark")
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
