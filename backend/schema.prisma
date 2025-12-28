@@ -58,6 +58,7 @@ model User {
   taskAssignees            TaskAssignee[]
   taskChecklistsCreated    TaskChecklist[]         @relation("TaskChecklistsCreatedBy")
   taskComments             TaskComment[]
+  taskHistories            TaskHistory[]           @relation("UserTaskHistories")
 }
 
 model Agency {
@@ -487,6 +488,7 @@ model Task {
   assignees TaskAssignee[]
   checklists TaskChecklist[]
   comments   TaskComment[]
+  histories  TaskHistory[]
 
   @@index([agencyId])
   @@index([columnId])
@@ -494,6 +496,25 @@ model Task {
   @@index([proposalId])
   @@index([clientId])
   @@index([createdById])
+}
+
+model TaskHistory {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @db.Uuid
+  userId    String?  @db.Uuid
+  action    String
+  field     String?
+  oldValue  String?
+  newValue  String?
+  details   String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User? @relation("UserTaskHistories", fields: [userId], references: [id], onDelete: SetNull)
+
+  @@index([taskId])
+  @@index([userId])
+  @@index([createdAt])
 }
 
 model TaskAssignee {

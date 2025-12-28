@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -21,9 +21,25 @@ import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
-import { Checkbox as ShadCheckbox } from '@/components/ui/checkbox';
-import { MessageSquare, Plus, CheckSquare, Trash2 } from 'lucide-react';
+import { MessageSquare, MessageSquareOff, Plus, CheckSquare, Trash2, ChevronDown, ChevronUp, X, ArrowLeftRight, History, Slash, PlusCircle, ArrowRight, Clock } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from '@/components/ui/tooltip';
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 interface TaskDialogProps {
   open: boolean;
@@ -55,6 +71,7 @@ export function TaskDialog({
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
+  const [startDate, setStartDate] = useState<Date | undefined>();
   const [dueDate, setDueDate] = useState<Date | undefined>();
   const [columnId, setColumnId] = useState('');
   const [clientId, setClientId] = useState<string>('');
@@ -67,11 +84,26 @@ export function TaskDialog({
   const [newItems, setNewItems] = useState<Record<string, string>>({});
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const checklistRef = useRef<HTMLDivElement | null>(null);
+  const commentsRef = useRef<HTMLDivElement | null>(null);
+  const [showChecklistPanel, setShowChecklistPanel] = useState(false);
+  const [showCommentsPanel, setShowCommentsPanel] = useState(false);
+  const [commentsExpanded, setCommentsExpanded] = useState(false);
+  const [confirmDeleteChecklistId, setConfirmDeleteChecklistId] = useState<string | null>(null);
+  const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState<string | null>(null);
+  const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+
+  useEffect(() => {
+    if (open) {
+      setShowHistoryPanel(false);
+    }
+  }, [open]);
 
   useEffect(() => {
     if (task) {
       setTitle(task.title);
       setDescription(task.description || '');
+      setStartDate(task.start_date ? new Date(task.start_date) : new Date(task.created_at));
       setDueDate(task.due_date ? new Date(task.due_date) : undefined);
       setColumnId(task.column_id);
       setClientId(task.client_id || '');
@@ -79,21 +111,32 @@ export function TaskDialog({
       setPriority(task.priority || 'medium');
       setTags((task.tags || []).join(', '));
       setSelectedAssignees(task.assignees?.map(a => a.user_id) || []);
-      setChecklists(task.checklists || []);
-      setComments(task.comments || []);
+      const existingChecklists = task.checklists || [];
+      const existingComments = task.comments || [];
+      setChecklists(existingChecklists);
+      setComments(existingComments);
+      setShowChecklistPanel(existingChecklists.length > 0);
+      setShowCommentsPanel(existingComments.length > 0);
+      setShowHistoryPanel(false);
+      setCommentsExpanded(false);
     } else {
       setTitle(prefillData?.title || '');
       setDescription(prefillData?.description || '');
+     setStartDate(new Date());
       setDueDate(undefined);
       setColumnId(defaultColumnId || columns[0]?.id || '');
       setClientId('');
       setProposalId('');
-      setPriority('medium');
-      setTags('');
-      setSelectedAssignees([]);
-      setChecklists([]);
-      setComments([]);
-    }
+     setPriority('medium');
+     setTags('');
+     setSelectedAssignees([]);
+     setChecklists([]);
+     setComments([]);
+     setShowChecklistPanel(false);
+     setShowCommentsPanel(false);
+     setShowHistoryPanel(false);
+     setCommentsExpanded(false);
+   }
   }, [task, defaultColumnId, columns, prefillData]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -106,6 +149,7 @@ export function TaskDialog({
       title: title.trim(),
       description: description.trim() || undefined,
       due_date: dueDate?.toISOString() || null,
+      start_date: startDate?.toISOString() || new Date().toISOString(),
       column_id: columnId,
       client_id: clientId || null,
       proposal_id: proposalId || null,
@@ -118,6 +162,20 @@ export function TaskDialog({
     });
   };
 
+  const handleDeleteComment = async (commentId: string) => {
+    setConfirmDeleteCommentId(commentId);
+  };
+
+  const performDeleteComment = async (commentId: string) => {
+    try {
+      await apiFetch(`/api/taskComment/${commentId}`, { method: 'DELETE', headers: user?.id ? { 'x-user-id': user.id } : undefined });
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    } catch (error: any) {
+      toast({ title: 'Erro ao excluir comentário', description: error.message, variant: 'destructive' });
+    }
+  };
+
   const toggleAssignee = (userId: string) => {
     setSelectedAssignees(prev =>
       prev.includes(userId)
@@ -126,12 +184,19 @@ export function TaskDialog({
     );
   };
 
+  const scrollToSection = (ref: React.RefObject<HTMLElement>) => {
+    if (ref.current) {
+      ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
   const handleAddChecklist = async () => {
     if (!task || !newChecklistTitle.trim() || !user?.id) return;
     try {
       const order = checklists.length;
       const created = await apiFetch<any>('/api/taskChecklist', {
         method: 'POST',
+        headers: user?.id ? { 'x-user-id': user.id } : undefined,
         body: JSON.stringify({
           taskId: task.id,
           title: newChecklistTitle.trim(),
@@ -148,6 +213,7 @@ export function TaskDialog({
         items: [],
       }]);
       setNewChecklistTitle('');
+      setShowChecklistPanel(true);
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     } catch (error: any) {
       toast({ title: 'Erro ao adicionar checklist', description: error.message, variant: 'destructive' });
@@ -162,6 +228,7 @@ export function TaskDialog({
       const order = checklist ? checklist.items.length : 0;
       const created = await apiFetch<any>('/api/taskChecklistItem', {
         method: 'POST',
+        headers: user?.id ? { 'x-user-id': user.id } : undefined,
         body: JSON.stringify({ checklistId, content, order }),
       });
       setChecklists((prev) =>
@@ -184,6 +251,7 @@ export function TaskDialog({
         ),
       );
       setNewItems((prev) => ({ ...prev, [checklistId]: '' }));
+      setShowChecklistPanel(true);
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     } catch (error: any) {
       toast({ title: 'Erro ao adicionar item', description: error.message, variant: 'destructive' });
@@ -194,6 +262,7 @@ export function TaskDialog({
     try {
       await apiFetch(`/api/taskChecklistItem/${itemId}`, {
         method: 'PUT',
+        headers: user?.id ? { 'x-user-id': user.id } : undefined,
         body: JSON.stringify({ isDone }),
       });
       setChecklists((prev) =>
@@ -210,7 +279,7 @@ export function TaskDialog({
 
   const handleDeleteItem = async (itemId: string) => {
     try {
-      await apiFetch(`/api/taskChecklistItem/${itemId}`, { method: 'DELETE' });
+      await apiFetch(`/api/taskChecklistItem/${itemId}`, { method: 'DELETE', headers: user?.id ? { 'x-user-id': user.id } : undefined });
       setChecklists((prev) =>
         prev.map((c) => ({ ...c, items: c.items.filter((it) => it.id !== itemId) })),
       );
@@ -221,8 +290,12 @@ export function TaskDialog({
   };
 
   const handleDeleteChecklist = async (checklistId: string) => {
+    setConfirmDeleteChecklistId(checklistId);
+  };
+
+  const performDeleteChecklist = async (checklistId: string) => {
     try {
-      await apiFetch(`/api/taskChecklist/${checklistId}`, { method: 'DELETE' });
+      await apiFetch(`/api/taskChecklist/${checklistId}`, { method: 'DELETE', headers: user?.id ? { 'x-user-id': user.id } : undefined });
       setChecklists((prev) => prev.filter((c) => c.id !== checklistId));
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     } catch (error: any) {
@@ -235,6 +308,7 @@ export function TaskDialog({
     try {
       const created = await apiFetch<any>('/api/taskComment', {
         method: 'POST',
+        headers: user?.id ? { 'x-user-id': user.id } : undefined,
         body: JSON.stringify({
           taskId: task.id,
           userId: user.id,
@@ -253,6 +327,7 @@ export function TaskDialog({
         },
       ]);
       setNewComment('');
+      setShowCommentsPanel(true);
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
     } catch (error: any) {
       toast({ title: 'Erro ao adicionar comentário', description: error.message, variant: 'destructive' });
@@ -261,266 +336,454 @@ export function TaskDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{task ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle>
-        </DialogHeader>
-
-        <form onSubmit={handleSubmit} className="space-y-4">
-          <div className="space-y-2">
-            <Label htmlFor="title">Título *</Label>
-            <Input
-              id="title"
-              value={title}
-              onChange={(e) => setTitle(e.target.value)}
-              placeholder="Título da tarefa"
-              required
-            />
+      <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
+        <DialogHeader className="flex flex-row items-start justify-between space-y-0">
+          <div className="flex items-center gap-3">
+            <DialogTitle>{task ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle>
           </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="description">Descrição</Label>
-            <Textarea
-              id="description"
-              value={description}
-              onChange={(e) => setDescription(e.target.value)}
-              placeholder="Descrição da tarefa"
-              rows={3}
-            />
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Coluna *</Label>
-              <Select value={columnId} onValueChange={setColumnId}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {columns.map((col) => (
-                    <SelectItem key={col.id} value={col.id}>
-                      <div className="flex items-center gap-2">
-                        <div
-                          className="w-3 h-3 rounded-full"
-                          style={{ backgroundColor: col.color }}
-                        />
-                        {col.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Prazo</Label>
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button
-                    variant="outline"
-                    className={cn(
-                      "w-full justify-start text-left font-normal",
-                      !dueDate && "text-muted-foreground"
-                    )}
-                  >
-                    <CalendarIcon className="mr-2 h-4 w-4" />
-                    {dueDate ? format(dueDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecionar"}
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-auto p-0" align="start">
-                  <Calendar
-                    mode="single"
-                    selected={dueDate}
-                    onSelect={setDueDate}
-                    locale={ptBR}
-                    className="pointer-events-auto"
-                  />
-                </PopoverContent>
-              </Popover>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Prioridade</Label>
-              <Select value={priority} onValueChange={(val) => setPriority(val as 'low' | 'medium' | 'high')}>
-                <SelectTrigger>
-                  <SelectValue />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="high">Alta</SelectItem>
-                  <SelectItem value="medium">Média</SelectItem>
-                  <SelectItem value="low">Baixa</SelectItem>
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Tags (separe por vírgula)</Label>
-              <Input
-                value={tags}
-                onChange={(e) => setTags(e.target.value)}
-                placeholder="ex: UI, Financeiro, Urgente"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-2 gap-4">
-            <div className="space-y-2">
-              <Label>Cliente</Label>
-              <Select value={clientId || "none"} onValueChange={(val) => setClientId(val === "none" ? "" : val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Nenhum" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {clients?.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-
-            <div className="space-y-2">
-              <Label>Cotação</Label>
-              <Select value={proposalId || "none"} onValueChange={(val) => setProposalId(val === "none" ? "" : val)}>
-                <SelectTrigger>
-                  <SelectValue placeholder="Nenhuma" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhuma</SelectItem>
-                  {proposals?.map((proposal) => (
-                    <SelectItem key={proposal.id} value={proposal.id}>
-                      #{proposal.number} - {proposal.title}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
-          </div>
-
-          {users && users.length > 0 && (
-            <div className="space-y-2">
-              <Label>Responsáveis</Label>
-              <div className="border rounded-md p-3 max-h-32 overflow-y-auto space-y-2">
-                {users.map((user) => (
-                  <div key={user.id} className="flex items-center space-x-2">
-                    <Checkbox
-                      id={`user-${user.id}`}
-                      checked={selectedAssignees.includes(user.id)}
-                      onCheckedChange={() => toggleAssignee(user.id)}
-                    />
-                    <label
-                      htmlFor={`user-${user.id}`}
-                      className="text-sm cursor-pointer"
-                    >
-                      {user.name} ({user.email})
-                    </label>
-                  </div>
-                ))}
-              </div>
+          {task && (
+            <div className="flex gap-2 items-center">
+              {comments.length > 0 && (
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant={showCommentsPanel ? 'secondary' : 'outline'}
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => {
+                          setShowCommentsPanel((prev) => !prev);
+                        }}
+                      >
+                        {showCommentsPanel ? (
+                          <MessageSquare className="h-4 w-4" />
+                        ) : (
+                          <MessageSquareOff className="h-4 w-4" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {showCommentsPanel ? 'Ocultar comentários' : 'Exibir comentários'}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              {task && (
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant={showHistoryPanel ? 'secondary' : 'outline'}
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => {
+                          setShowHistoryPanel((prev) => !prev);
+                        }}
+                      >
+                        {showHistoryPanel ? (
+                          <span className="relative inline-flex items-center justify-center">
+                            <History className="h-4 w-4 text-foreground" />
+                            <Slash className="h-4 w-4 text-muted-foreground absolute inset-0 rotate-45" />
+                          </span>
+                        ) : (
+                          <History className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {showHistoryPanel ? 'Ocultar histórico' : 'Exibir histórico'}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
+              <Button
+                variant="outline"
+                size="sm"
+                className="shadow-sm gap-2"
+                onClick={() => {
+                  setShowChecklistPanel(true);
+                  scrollToSection(checklistRef);
+                }}
+              >
+                <Plus className="h-4 w-4" />
+                Checklist
+              </Button>
+              {comments.length === 0 && (
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className="shadow-sm gap-2"
+                  onClick={() => {
+                    setShowCommentsPanel(true);
+                    scrollToSection(commentsRef);
+                  }}
+                >
+                  <Plus className="h-4 w-4" />
+                  Comentários
+                </Button>
+              )}
             </div>
           )}
+        </DialogHeader>
 
-          {task && (
-            <>
-              <Separator />
-              <div className="space-y-3">
-                <div className="flex items-center justify-between">
-                  <div className="flex items-center gap-2">
-                    <CheckSquare className="h-4 w-4 text-primary" />
-                    <h4 className="font-medium">Checklists</h4>
+        {task && showHistoryPanel ? (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center gap-2">
+              <History className="h-4 w-4 text-primary" />
+              <h4 className="font-medium text-base">Histórico</h4>
+            </div>
+            <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
+              {(task.histories || []).length === 0 && (
+                <p className="text-sm text-muted-foreground">Sem registros ainda.</p>
+              )}
+              {(task.histories || []).map((h, idx) => {
+                const IconComp =
+                  h.action === 'Criação'
+                    ? PlusCircle
+                    : h.field === 'Coluna'
+                      ? ArrowRight
+                      : History;
+                const isLast = idx === (task.histories?.length || 0) - 1;
+                return (
+                  <div key={h.id} className="flex gap-4">
+                    <div className="flex flex-col items-center">
+                      <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                        <IconComp className="w-4 h-4 text-primary" />
+                      </div>
+                      {!isLast && <div className="flex-1 w-px bg-border mt-2" />}
+                    </div>
+                    <div className="flex-1 pb-6">
+                      <div className="flex items-center gap-2 mb-1">
+                        <span className="font-medium text-sm">{h.action}</span>
+                      </div>
+                      {h.field && (
+                        <div className="text-sm text-muted-foreground mb-1">
+                          <div className="font-medium text-foreground">{h.field}</div>
+                          {h.oldValue && <div className="line-through">{h.oldValue}</div>}
+                          {h.newValue && <div className="font-semibold text-foreground">{h.newValue}</div>}
+                        </div>
+                      )}
+                      {!h.field && h.details && (
+                        <p className="text-sm text-muted-foreground mb-1">{h.details}</p>
+                      )}
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <Clock className="w-3 h-3" />
+                        <span>{format(new Date(h.created_at), 'dd MMM yyyy, HH:mm', { locale: ptBR })}</span>
+                        <span>por</span>
+                        <span className="font-medium text-foreground">{h.user?.name || 'Sistema'}</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="flex gap-2">
-                    <Input
-                      placeholder="Nova checklist"
-                      value={newChecklistTitle}
-                      onChange={(e) => setNewChecklistTitle(e.target.value)}
-                      className="h-9"
-                    />
-                    <Button type="button" size="sm" onClick={handleAddChecklist} disabled={!newChecklistTitle.trim()}>
-                      <Plus className="h-4 w-4 mr-1" />
-                      Adicionar
-                    </Button>
+                );
+              })}
+            </div>
+          </div>
+        ) : (
+        <form onSubmit={handleSubmit} className="space-y-4">
+          <div
+            className={cn(
+              'grid gap-6',
+              task && showCommentsPanel
+                ? commentsExpanded
+                  ? 'md:grid-cols-2'
+                  : 'md:grid-cols-[3fr,1.35fr]'
+                : '',
+            )}
+          >
+            <div className="space-y-4">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 items-start">
+                <div className="space-y-2 md:col-span-1">
+                  <Label htmlFor="title">Título *</Label>
+                  <Input
+                    id="title"
+                    value={title}
+                    onChange={(e) => setTitle(e.target.value)}
+                    placeholder="Título da tarefa"
+                    required
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3 md:col-span-1">
+                  <div className="space-y-2">
+                    <Label>Cliente</Label>
+                    <Select value={clientId || "none"} onValueChange={(val) => setClientId(val === "none" ? "" : val)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Nenhum" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhum</SelectItem>
+                        {clients?.map((client) => (
+                          <SelectItem key={client.id} value={client.id}>
+                            {client.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Cotação</Label>
+                    <Select value={proposalId || "none"} onValueChange={(val) => setProposalId(val === "none" ? "" : val)}>
+                      <SelectTrigger>
+                        <SelectValue placeholder="Nenhuma" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="none">Nenhuma</SelectItem>
+                        {proposals?.map((proposal) => (
+                          <SelectItem key={proposal.id} value={proposal.id}>
+                            #{proposal.number} - {proposal.title}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
                   </div>
                 </div>
+              </div>
 
-                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
-                  {checklists.map((checklist) => (
-                    <div key={checklist.id} className="rounded-md border border-border/70 p-3 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <p className="font-medium text-sm">{checklist.title}</p>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          className="h-8 w-8 text-muted-foreground"
-                          onClick={() => handleDeleteChecklist(checklist.id)}
+              <div className="space-y-2">
+                <Label htmlFor="description">Descrição</Label>
+                <Textarea
+                  id="description"
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                  placeholder="Descrição da tarefa"
+                  rows={3}
+                />
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                <div className="space-y-2">
+                  <Label>Início</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !startDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {startDate ? format(startDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecionar"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={startDate}
+                        onSelect={setStartDate}
+                        locale={ptBR}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-2">
+                  <Label>Prazo</Label>
+                  <Popover>
+                    <PopoverTrigger asChild>
+                      <Button
+                        variant="outline"
+                        className={cn(
+                          "w-full justify-start text-left font-normal",
+                          !dueDate && "text-muted-foreground"
+                        )}
+                      >
+                        <CalendarIcon className="mr-2 h-4 w-4" />
+                        {dueDate ? format(dueDate, "dd/MM/yyyy", { locale: ptBR }) : "Selecionar"}
+                      </Button>
+                    </PopoverTrigger>
+                    <PopoverContent className="w-auto p-0" align="start">
+                      <Calendar
+                        mode="single"
+                        selected={dueDate}
+                        onSelect={setDueDate}
+                        locale={ptBR}
+                        className="pointer-events-auto"
+                      />
+                    </PopoverContent>
+                  </Popover>
+                </div>
+                <div className="space-y-2">
+                  <Label>Prioridade</Label>
+                  <Select value={priority} onValueChange={(val) => setPriority(val as 'low' | 'medium' | 'high')}>
+                    <SelectTrigger>
+                      <SelectValue />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="high">Alta</SelectItem>
+                      <SelectItem value="medium">Média</SelectItem>
+                      <SelectItem value="low">Baixa</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="space-y-2">
+                  <Label>Tags (separe por vírgula)</Label>
+                  <Input
+                    value={tags}
+                    onChange={(e) => setTags(e.target.value)}
+                    placeholder="ex: UI, Financeiro, Urgente"
+                  />
+                </div>
+              </div>
+
+              {users && users.length > 0 && (
+                <div className="space-y-2">
+                  <Label>Responsáveis</Label>
+                  <div className="border rounded-md p-3 max-h-32 overflow-y-auto space-y-2">
+                    {users.map((user) => (
+                      <div key={user.id} className="flex items-center space-x-2">
+                        <Checkbox
+                          id={`user-${user.id}`}
+                          checked={selectedAssignees.includes(user.id)}
+                          onCheckedChange={() => toggleAssignee(user.id)}
+                        />
+                        <label
+                          htmlFor={`user-${user.id}`}
+                          className="text-sm cursor-pointer"
                         >
-                          <Trash2 className="h-4 w-4" />
-                        </Button>
+                          {user.name} ({user.email})
+                        </label>
                       </div>
-                      <div className="space-y-2">
-                        {checklist.items.map((item) => (
-                          <div key={item.id} className="flex items-center gap-2">
-                            <ShadCheckbox
-                              checked={item.is_done}
-                              onCheckedChange={(checked) => handleToggleItem(item.id, !!checked)}
-                            />
-                            <span className={cn('text-sm flex-1', item.is_done && 'line-through text-muted-foreground')}>
-                              {item.content}
-                            </span>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {task && showChecklistPanel && (
+                <div ref={checklistRef} className="space-y-3">
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <CheckSquare className="h-4 w-4 text-primary" />
+                      <h4 className="font-medium">Checklists</h4>
+                    </div>
+                    <div className="flex gap-2">
+                      <Input
+                        placeholder="Nova checklist"
+                        value={newChecklistTitle}
+                        onChange={(e) => setNewChecklistTitle(e.target.value)}
+                        className="h-9"
+                      />
+                      <Button type="button" size="sm" onClick={handleAddChecklist} disabled={!newChecklistTitle.trim()}>
+                        <Plus className="h-4 w-4 mr-1" />
+                        Adicionar
+                      </Button>
+                    </div>
+                  </div>
+
+                  <div className="space-y-3 max-h-80 overflow-y-auto pr-1">
+                    {checklists.map((checklist) => {
+                      const totalItems = checklist.items.length;
+                      const doneItems = checklist.items.filter((it) => it.is_done).length;
+                      const percent = totalItems > 0 ? Math.round((doneItems / totalItems) * 100) : 0;
+
+                      return (
+                        <div key={checklist.id} className="rounded-md border border-border/70 p-3 space-y-3">
+                          <div className="flex items-center justify-between">
+                            <p className="font-medium text-sm">{checklist.title}</p>
                             <Button
                               type="button"
                               variant="ghost"
                               size="icon"
-                              className="h-7 w-7 text-muted-foreground"
-                              onClick={() => handleDeleteItem(item.id)}
+                              className="h-8 w-8 text-muted-foreground"
+                              onClick={() => handleDeleteChecklist(checklist.id)}
                             >
                               <Trash2 className="h-4 w-4" />
                             </Button>
                           </div>
-                        ))}
-                        <div className="flex items-center gap-2">
-                          <Input
-                            placeholder="Nova subtarefa"
-                            value={newItems[checklist.id] || ''}
-                            onChange={(e) =>
-                              setNewItems((prev) => ({
-                                ...prev,
-                                [checklist.id]: e.target.value,
-                              }))
-                            }
-                            className="h-9"
-                          />
-                          <Button
-                            type="button"
-                            size="sm"
-                            variant="secondary"
-                            onClick={() => handleAddItem(checklist.id)}
-                            disabled={!newItems[checklist.id]?.trim()}
-                          >
-                            Adicionar
-                          </Button>
-                        </div>
-                      </div>
-                    </div>
-                  ))}
-                  {checklists.length === 0 && (
-                    <p className="text-sm text-muted-foreground">Nenhuma checklist adicionada.</p>
-                  )}
-                </div>
-              </div>
 
-              <Separator />
-              <div className="space-y-3">
-                <div className="flex items-center gap-2">
-                  <MessageSquare className="h-4 w-4 text-primary" />
-                  <h4 className="font-medium">Comentários</h4>
+                          <div className="space-y-1.5">
+                            <div className="flex items-center justify-between text-xs text-muted-foreground">
+                              <span>{doneItems}/{totalItems || 0} feitos</span>
+                              <span>{percent}%</span>
+                            </div>
+                            <div className="h-2 w-full rounded-full bg-muted">
+                              <div
+                                className="h-2 rounded-full bg-primary transition-all"
+                                style={{ width: `${percent}%` }}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="space-y-2">
+                            {checklist.items.map((item) => (
+                              <div key={item.id} className="flex items-center gap-2">
+                                <Checkbox
+                                  checked={item.is_done}
+                                  onCheckedChange={(checked) => handleToggleItem(item.id, !!checked)}
+                                  className="rounded-full"
+                                />
+                                <span className={cn('text-sm flex-1', item.is_done && 'line-through text-muted-foreground')}>
+                                  {item.content}
+                                </span>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-7 w-7 text-muted-foreground"
+                                  onClick={() => handleDeleteItem(item.id)}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            ))}
+                            <div className="flex items-center gap-2">
+                              <Input
+                                placeholder="Nova subtarefa"
+                                value={newItems[checklist.id] || ''}
+                                onChange={(e) =>
+                                  setNewItems((prev) => ({
+                                    ...prev,
+                                    [checklist.id]: e.target.value,
+                                  }))
+                                }
+                                className="h-9"
+                              />
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="secondary"
+                                onClick={() => handleAddItem(checklist.id)}
+                                disabled={!newItems[checklist.id]?.trim()}
+                              >
+                                Adicionar
+                              </Button>
+                            </div>
+                          </div>
+                        </div>
+                      );
+                    })}
+                    {checklists.length === 0 && (
+                      <p className="text-sm text-muted-foreground">Nenhuma checklist adicionada.</p>
+                    )}
+                  </div>
                 </div>
-                <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+              )}
+            </div>
+
+            {task && showCommentsPanel && (
+              <div ref={commentsRef} className="space-y-3 md:border-l md:pl-4 lg:pl-6">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <MessageSquare className="h-4 w-4 text-primary" />
+                    <h4 className="font-medium">Comentários</h4>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="text-muted-foreground gap-2 px-4"
+                      onClick={() => setCommentsExpanded((prev) => !prev)}
+                    >
+                      <ArrowLeftRight className="h-4 w-4" />
+                      {commentsExpanded ? 'Retr. largura' : 'Expandir'}
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
                   {comments.map((comment) => (
                     <div key={comment.id} className="flex gap-2">
                       <Avatar className="h-9 w-9">
@@ -545,6 +808,17 @@ export function TaskDialog({
                           </span>
                         </div>
                         <p className="text-sm text-foreground mt-1 whitespace-pre-line">{comment.content}</p>
+                        <div className="flex justify-end">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="h-7 w-7 text-muted-foreground"
+                            onClick={() => handleDeleteComment(comment.id)}
+                          >
+                            <X className="h-4 w-4" />
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   ))}
@@ -557,7 +831,7 @@ export function TaskDialog({
                   <Textarea
                     value={newComment}
                     onChange={(e) => setNewComment(e.target.value)}
-                    rows={2}
+                    rows={3}
                     placeholder="Escreva um comentário"
                   />
                   <div className="flex justify-end">
@@ -567,8 +841,9 @@ export function TaskDialog({
                   </div>
                 </div>
               </div>
-            </>
-          )}
+            )}
+
+          </div>
 
           <div className="flex justify-end gap-2 pt-4">
             <Button
@@ -583,7 +858,56 @@ export function TaskDialog({
             </Button>
           </div>
         </form>
+        )}
       </DialogContent>
+
+      {/* Confirm delete checklist */}
+      <AlertDialog open={!!confirmDeleteChecklistId} onOpenChange={(open) => !open && setConfirmDeleteChecklistId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir checklist?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmDeleteChecklistId) {
+                  performDeleteChecklist(confirmDeleteChecklistId);
+                  setConfirmDeleteChecklistId(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Confirm delete comment */}
+      <AlertDialog open={!!confirmDeleteCommentId} onOpenChange={(open) => !open && setConfirmDeleteCommentId(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir comentário?</AlertDialogTitle>
+            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={() => {
+                if (confirmDeleteCommentId) {
+                  performDeleteComment(confirmDeleteCommentId);
+                  setConfirmDeleteCommentId(null);
+                }
+              }}
+              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+            >
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </Dialog>
   );
 }

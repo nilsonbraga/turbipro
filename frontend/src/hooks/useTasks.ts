@@ -34,12 +34,14 @@ export interface Task {
   tags: string[];
   title: string;
   description: string | null;
+  start_date: string | null;
   due_date: string | null;
   client_id: string | null;
   proposal_id: string | null;
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  histories?: TaskHistory[];
   checklists?: TaskChecklist[];
   comments?: TaskComment[];
   client?: {
@@ -85,11 +87,30 @@ export interface TaskComment {
   };
 }
 
+export interface TaskHistory {
+  id: string;
+  task_id: string;
+  user_id: string | null;
+  action: string;
+  field?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  details?: string | null;
+  created_at: string;
+  user?: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    avatarUrl?: string | null;
+  };
+}
+
 export interface TaskInput {
   title: string;
   priority?: 'low' | 'medium' | 'high';
   tags?: string[];
   description?: string;
+  start_date?: string | null;
   due_date?: string | null;
   client_id?: string | null;
   proposal_id?: string | null;
@@ -274,6 +295,7 @@ export function useTasks(filters?: {
     created_by: t.createdById ?? null,
     title: t.title,
     description: t.description ?? null,
+    start_date: t.startDate ?? null,
     due_date: t.dueDate ?? null,
     created_at: t.createdAt,
     updated_at: t.updatedAt,
@@ -312,6 +334,20 @@ export function useTasks(filters?: {
         ? { id: c.user.id, name: c.user.name, email: c.user.email, avatarUrl: c.user.avatarUrl }
         : undefined,
     })),
+    histories: (t.histories || []).map((h: any) => ({
+      id: h.id,
+      task_id: h.taskId,
+      user_id: h.userId,
+      action: h.action,
+      field: h.field ?? null,
+      oldValue: h.oldValue ?? null,
+      newValue: h.newValue ?? null,
+      details: h.details ?? null,
+      created_at: h.createdAt,
+      user: h.user
+        ? { id: h.user.id, name: h.user.name, email: h.user.email, avatarUrl: h.user.avatarUrl }
+        : undefined,
+    })),
   });
 
   const { data: tasks = [], isLoading, error } = useQuery({
@@ -331,6 +367,7 @@ export function useTasks(filters?: {
           assignees: { include: { user: { select: { id: true, name: true, email: true } } } },
           checklists: { include: { items: true } },
           comments: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } } },
+          histories: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } }, orderBy: { createdAt: 'desc' } },
         }),
         orderBy: JSON.stringify({ createdAt: 'desc' }),
       });
@@ -402,6 +439,7 @@ export function useTasks(filters?: {
         createdById: user?.id,
         title: input.title,
         description: input.description ?? null,
+        startDate: input.start_date ?? new Date().toISOString(),
         dueDate: input.due_date ?? null,
         assignees: input.assignee_ids && input.assignee_ids.length > 0 ? {
           create: input.assignee_ids.map((userId) => ({ userId })),
@@ -410,6 +448,7 @@ export function useTasks(filters?: {
 
       const created = await apiFetch<any>('/api/task', {
         method: 'POST',
+        headers: user?.id ? { 'x-user-id': user.id } : undefined,
         body: JSON.stringify(payload),
       });
 
@@ -431,6 +470,7 @@ export function useTasks(filters?: {
         priority: input.priority ?? 'medium',
         tags: input.tags ?? [],
         description: input.description,
+        startDate: input.start_date,
         dueDate: input.due_date,
         clientId: input.client_id ?? null,
         proposalId: input.proposal_id ?? null,
@@ -446,6 +486,7 @@ export function useTasks(filters?: {
 
       await apiFetch(`/api/task/${id}`, {
         method: 'PUT',
+        headers: user?.id ? { 'x-user-id': user.id } : undefined,
         body: JSON.stringify(payload),
       });
     },
@@ -462,6 +503,7 @@ export function useTasks(filters?: {
     mutationFn: async ({ taskId, columnId }: { taskId: string; columnId: string }) => {
       await apiFetch(`/api/task/${taskId}`, {
         method: 'PUT',
+        headers: user?.id ? { 'x-user-id': user.id } : undefined,
         body: JSON.stringify({ columnId }),
       });
     },
@@ -475,7 +517,7 @@ export function useTasks(filters?: {
 
   const deleteTask = useMutation({
     mutationFn: async (id: string) => {
-      await apiFetch(`/api/task/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/task/${id}`, { method: 'DELETE', headers: user?.id ? { 'x-user-id': user.id } : undefined });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -491,6 +533,7 @@ export function useTasks(filters?: {
       if (!user?.id) throw new Error('Usuário não encontrado');
       return apiFetch('/api/taskChecklist', {
         method: 'POST',
+        headers: { 'x-user-id': user.id },
         body: JSON.stringify({
           taskId,
           title,
@@ -509,7 +552,7 @@ export function useTasks(filters?: {
 
   const deleteChecklist = useMutation({
     mutationFn: async (id: string) => {
-      await apiFetch(`/api/taskChecklist/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/taskChecklist/${id}`, { method: 'DELETE', headers: user?.id ? { 'x-user-id': user.id } : undefined });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -523,6 +566,7 @@ export function useTasks(filters?: {
     mutationFn: async ({ checklistId, content, order }: { checklistId: string; content: string; order: number }) => {
       return apiFetch('/api/taskChecklistItem', {
         method: 'POST',
+        headers: user?.id ? { 'x-user-id': user.id } : undefined,
         body: JSON.stringify({
           checklistId,
           content,
@@ -542,6 +586,7 @@ export function useTasks(filters?: {
     mutationFn: async ({ id, data }: { id: string; data: Partial<{ content: string; isDone: boolean; order: number }> }) => {
       return apiFetch(`/api/taskChecklistItem/${id}`, {
         method: 'PUT',
+        headers: user?.id ? { 'x-user-id': user.id } : undefined,
         body: JSON.stringify(data),
       });
     },
@@ -555,7 +600,7 @@ export function useTasks(filters?: {
 
   const deleteChecklistItem = useMutation({
     mutationFn: async (id: string) => {
-      await apiFetch(`/api/taskChecklistItem/${id}`, { method: 'DELETE' });
+      await apiFetch(`/api/taskChecklistItem/${id}`, { method: 'DELETE', headers: user?.id ? { 'x-user-id': user.id } : undefined });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['tasks'] });
@@ -570,6 +615,7 @@ export function useTasks(filters?: {
       if (!user?.id) throw new Error('Usuário não encontrado');
       return apiFetch('/api/taskComment', {
         method: 'POST',
+        headers: { 'x-user-id': user.id },
         body: JSON.stringify({
           taskId,
           userId: user.id,

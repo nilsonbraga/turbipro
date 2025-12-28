@@ -409,6 +409,39 @@ const normalizeProposalServiceRelations = (data: Record<string, unknown>, option
   return data;
 };
 
+type HistoryPayload = {
+  field?: string | null;
+  oldValue?: string | null;
+  newValue?: string | null;
+  details?: string | null;
+};
+
+const addTaskHistory = async (
+  prisma: PrismaClient,
+  taskId: string,
+  userId: string | null,
+  action: string,
+  extra?: HistoryPayload,
+) => {
+  try {
+    await prisma.taskHistory.create({
+      data: {
+        taskId,
+        userId,
+        action,
+        field: extra?.field ?? null,
+        oldValue: extra?.oldValue ?? null,
+        newValue: extra?.newValue ?? null,
+        details: extra?.details ?? null,
+      },
+    });
+  } catch (err) {
+    // avoid blocking main flow
+    // eslint-disable-next-line no-console
+    console.error('TaskHistory log error', err);
+  }
+};
+
 router.get(
   '/:model',
   asyncHandler(async (req, res) => {
@@ -543,6 +576,37 @@ router.post(
         include: include ?? undefined,
         select: select ?? undefined,
       });
+
+      if (name === 'task') {
+        const userId = (req.headers['x-user-id'] as string | undefined) ?? created.createdById ?? null;
+        void addTaskHistory(prisma, created.id, userId, 'Criação', { details: 'Tarefa criada' });
+      }
+      if (name === 'taskComment') {
+        const userId = (req.headers['x-user-id'] as string | undefined) ?? (created as any)?.userId ?? null;
+        void addTaskHistory(prisma, (created as any).taskId, userId, 'Comentário', { details: `Comentário adicionado: ${(created as any).content ?? ''}` });
+      }
+      if (name === 'taskChecklist') {
+        const userId = (req.headers['x-user-id'] as string | undefined) ?? (created as any)?.createdBy ?? null;
+        void addTaskHistory(prisma, (created as any).taskId, userId, 'Checklist', { details: `Checklist: ${(created as any).title}` });
+      }
+      if (name === 'taskChecklistItem') {
+        const userId = (req.headers['x-user-id'] as string | undefined) ?? null;
+        let taskId =
+          (created as any).taskId ??
+          (created as any).checklist?.taskId ??
+          (data as any)?.taskId ??
+          null;
+        if (!taskId && (data as any)?.checklistId) {
+          const parent = await prisma.taskChecklist.findUnique({
+            where: { id: (data as any).checklistId },
+            select: { taskId: true },
+          });
+          taskId = parent?.taskId ?? null;
+        }
+        void addTaskHistory(prisma, taskId ?? '', userId, 'Checklist', {
+          details: `Item adicionado: ${(created as any).content}`,
+        });
+      }
       return res.status(201).json(created);
     } catch (error) {
       if (name === 'proposalHistory') {
@@ -618,12 +682,127 @@ router.put(
       delete (data as any).updatedAt;
     }
 
+    const beforeTask =
+      name === 'task'
+        ? await prisma.task.findUnique({
+            where,
+            select: {
+              title: true,
+              description: true,
+              startDate: true,
+              dueDate: true,
+              columnId: true,
+              priority: true,
+              tags: true,
+              clientId: true,
+              proposalId: true,
+              assignees: { select: { userId: true } },
+            },
+          })
+        : null;
+
     const updated = await delegate.update({
       where,
       data,
       include: include ?? undefined,
       select: select ?? undefined,
     });
+
+    if (name === 'task') {
+      const userId = (req.headers['x-user-id'] as string | undefined) ?? null;
+      // Registrar diffs
+      if (beforeTask) {
+        const changes: Array<{ field: string; oldValue: string; newValue: string }> = [];
+        const after = updated as any;
+        const asString = (val: any) => {
+          if (val === null || val === undefined) return '';
+          if (Array.isArray(val)) return val.join(', ');
+          return String(val);
+        };
+
+        const compare = (field: string, oldVal: any, newVal: any) => {
+          if (asString(oldVal) !== asString(newVal)) {
+            changes.push({ field, oldValue: asString(oldVal), newValue: asString(newVal) });
+          }
+        };
+
+        compare('Título', beforeTask.title, after.title);
+        compare('Descrição', beforeTask.description, after.description);
+        compare('Início', beforeTask.startDate, after.startDate);
+        compare('Prazo', beforeTask.dueDate, after.dueDate);
+        compare('Prioridade', beforeTask.priority, after.priority);
+        compare('Tags', beforeTask.tags ?? [], after.tags ?? []);
+        compare('Cliente', beforeTask.clientId, after.clientId);
+        compare('Cotação', beforeTask.proposalId, after.proposalId);
+        // Responsáveis com nomes legíveis
+        const incomingAssignees =
+          (data as any).assigneeIds ??
+          (data as any).assignee_ids ??
+          ((data as any).assignees?.create?.map((c: any) => c.userId).filter(Boolean) as string[] | undefined) ??
+          null;
+        const beforeAssignees = (beforeTask.assignees || []).map((a) => a.userId).filter(Boolean).sort();
+        const afterAssignees = incomingAssignees
+          ? (incomingAssignees as string[]).filter(Boolean).sort()
+          : (after.assignees || []).map((a: any) => a.userId || a.user?.id).filter(Boolean).sort();
+        if (asString(beforeAssignees) !== asString(afterAssignees)) {
+          const allIds = Array.from(new Set([...beforeAssignees, ...afterAssignees]));
+          const users = await prisma.user.findMany({
+            where: { id: { in: allIds } },
+            select: { id: true, name: true, email: true },
+          });
+          const displayNames = (ids: string[]) =>
+            ids.length === 0
+              ? '—'
+              : ids
+                  .map((id) => users.find((u) => u.id === id)?.name || users.find((u) => u.id === id)?.email || id)
+                  .join(', ');
+          changes.push({
+            field: 'Responsáveis',
+            oldValue: displayNames(beforeAssignees),
+            newValue: displayNames(afterAssignees),
+          });
+        }
+        // Coluna com nomes
+        if (beforeTask.columnId !== after.columnId) {
+          const colIds = [beforeTask.columnId, after.columnId].filter(Boolean);
+          const cols = await prisma.taskColumn.findMany({
+            where: { id: { in: colIds as string[] } },
+            select: { id: true, name: true },
+          });
+          const nameFor = (id: string | null | undefined) => cols.find((c) => c.id === id)?.name ?? id ?? '';
+          changes.push({
+            field: 'Coluna',
+            oldValue: nameFor(beforeTask.columnId),
+            newValue: nameFor(after.columnId),
+          });
+        }
+
+        for (const change of changes) {
+          void addTaskHistory(prisma, updated.id, userId, 'Alteração', {
+            field: change.field,
+            oldValue: change.oldValue,
+            newValue: change.newValue,
+          });
+        }
+      }
+    }
+    if (name === 'taskChecklistItem' && 'isDone' in data) {
+      const userId = (req.headers['x-user-id'] as string | undefined) ?? null;
+      let taskId =
+        (updated as any).taskId ??
+        (updated as any).checklist?.taskId ??
+        null;
+      if (!taskId && (updated as any).checklistId) {
+        const parent = await prisma.taskChecklist.findUnique({
+          where: { id: (updated as any).checklistId },
+          select: { taskId: true },
+        });
+        taskId = parent?.taskId ?? null;
+      }
+      void addTaskHistory(prisma, taskId ?? '', userId, 'Checklist', {
+        details: `Item ${(data as any).isDone ? 'concluído' : 'reaberto'}: ${(updated as any).content}`,
+      });
+    }
 
     return res.json(updated);
   }),
@@ -635,6 +814,33 @@ router.delete(
     const { name, delegate } = resolveModel(req);
     const where = buildPrimaryWhere(req, name);
 
+    if (name === 'taskComment') {
+      const existing = await prisma.taskComment.findUnique({ where });
+      if (existing) {
+        const userId = (req.headers['x-user-id'] as string | undefined) ?? existing.userId ?? null;
+        void addTaskHistory(prisma, existing.taskId, userId, 'Comentário', { details: `Comentário removido: ${existing.content ?? ''}` });
+      }
+    }
+    if (name === 'taskChecklist') {
+      const existing = await prisma.taskChecklist.findUnique({ where });
+      if (existing) {
+        const userId = (req.headers['x-user-id'] as string | undefined) ?? existing.createdBy ?? null;
+        void addTaskHistory(prisma, existing.taskId, userId, 'Checklist', { details: `Checklist removida: ${existing.title}` });
+      }
+    }
+    if (name === 'taskChecklistItem') {
+      const existing = await prisma.taskChecklistItem.findUnique({ where, include: { checklist: { select: { taskId: true, title: true } } } });
+      if (existing) {
+        const userId = (req.headers['x-user-id'] as string | undefined) ?? null;
+        void addTaskHistory(
+          prisma,
+          existing.checklist?.taskId ?? (existing as any).taskId ?? '',
+          userId,
+          'Checklist',
+          { details: `Item removido: ${existing.content}` },
+        );
+      }
+    }
     await delegate.delete({ where });
     return res.status(204).send();
   }),
