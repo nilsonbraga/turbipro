@@ -117,8 +117,8 @@ export function TaskCard({ task, onEdit, onDelete, onOpenProposal }: TaskCardPro
       ref={setNodeRef}
       style={style}
       className={cn(
-        "p-3 hover:shadow-md transition-all group relative",
-        isDragging && "shadow-lg",
+        "p-4 hover:shadow-lg hover:-translate-y-[1px] transition-all duration-200 group relative border-border/70 bg-card/90 backdrop-blur-sm",
+        isDragging && "shadow-xl ring-1 ring-primary/30",
         dueDateStatus?.priority === 'high' && "border-l-4 border-l-destructive",
         dueDateStatus?.priority === 'medium' && "border-l-4 border-l-warning",
       )}
@@ -131,23 +131,23 @@ export function TaskCard({ task, onEdit, onDelete, onOpenProposal }: TaskCardPro
         onMouseDown={() => setIsDragMode(true)}
         onMouseUp={() => setTimeout(() => setIsDragMode(false), 100)}
       >
-        <GripVertical className="h-4 w-4 text-muted-foreground" />
+        <GripVertical className="h-4 w-4 text-muted-foreground/80" />
       </div>
 
       {/* Content - Clickable area for edit */}
       <div 
-        className="cursor-pointer pl-5"
+        className="cursor-pointer pl-6"
         onClick={handleCardClick}
       >
         {/* Header with title and menu */}
-        <div className="flex items-start justify-between gap-2 mb-2">
-          <h4 className="font-medium text-sm flex-1 line-clamp-2">{task.title}</h4>
+        <div className="flex items-start justify-between gap-2 mb-3">
+          <h4 className="font-semibold text-sm flex-1 line-clamp-2 text-foreground">{task.title}</h4>
           <DropdownMenu>
             <DropdownMenuTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                className="h-7 w-7 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity text-muted-foreground"
                 onClick={(e) => e.stopPropagation()}
               >
                 <MoreHorizontal className="h-4 w-4" />
@@ -169,34 +169,34 @@ export function TaskCard({ task, onEdit, onDelete, onOpenProposal }: TaskCardPro
           </DropdownMenu>
         </div>
 
-        {/* Description */}
-        {task.description && (
-          <p className="text-xs text-muted-foreground mb-2 line-clamp-2">
-            {task.description}
-          </p>
-        )}
+      {/* Description */}
+      {task.description && (
+        <p className="text-xs text-muted-foreground mb-3 line-clamp-2">
+          {task.description}
+        </p>
+      )}
 
-        {/* Status Badge - Prominent display */}
-        {dueDateStatus && (
-          <div className={cn(
-            "flex items-center gap-1.5 px-2 py-1 rounded-md text-xs font-medium mb-2",
+      {/* Status Badge - Prominent display */}
+      {dueDateStatus && (
+        <div className={cn(
+            "flex items-center gap-1.5 px-2.5 py-1 rounded-md text-xs font-medium mb-3 border",
             dueDateStatus.bgColor,
             dueDateStatus.color
           )}>
-            <dueDateStatus.icon className="h-3.5 w-3.5" />
-            <span>{dueDateStatus.label}</span>
-            {task.due_date && (
-              <span className="text-muted-foreground ml-auto">
-                {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
-              </span>
-            )}
-          </div>
-        )}
+          <dueDateStatus.icon className="h-3.5 w-3.5" />
+          <span>{dueDateStatus.label}</span>
+          {task.due_date && (
+            <span className="text-muted-foreground ml-auto">
+              {format(new Date(task.due_date), "dd/MM", { locale: ptBR })}
+            </span>
+          )}
+        </div>
+      )}
 
-        {/* Client and Proposal badges */}
+      {/* Client and Proposal badges */}
         <div className="flex flex-wrap gap-1.5">
           {task.client && (
-            <Badge variant="secondary" className="text-xs gap-1">
+            <Badge variant="secondary" className="text-xs gap-1 bg-primary/10 text-primary">
               <User className="h-3 w-3" />
               {task.client.name}
             </Badge>
@@ -205,7 +205,7 @@ export function TaskCard({ task, onEdit, onDelete, onOpenProposal }: TaskCardPro
           {task.proposal && (
             <Badge 
               variant="outline" 
-              className="text-xs gap-1 cursor-pointer hover:bg-primary hover:text-primary-foreground transition-colors"
+              className="text-xs gap-1 cursor-pointer border-primary/40 text-primary hover:bg-primary hover:text-primary-foreground transition-colors"
               onClick={handleProposalClick}
             >
               <FileText className="h-3 w-3" />
@@ -214,7 +214,7 @@ export function TaskCard({ task, onEdit, onDelete, onOpenProposal }: TaskCardPro
           )}
 
           {!task.due_date && (
-            <Badge variant="outline" className="text-xs text-muted-foreground">
+            <Badge variant="outline" className="text-xs text-muted-foreground border-border/60">
               Sem prazo
             </Badge>
           )}

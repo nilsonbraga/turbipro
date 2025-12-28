@@ -219,7 +219,7 @@ export default function Tasks() {
   }
 
   return (
-    <div className="flex flex-col h-full bg-background">
+    <div className="flex flex-col h-full">
       {/* Header */}
       <div className="border-b bg-card/50">
         <div className="flex items-center justify-between p-4">
