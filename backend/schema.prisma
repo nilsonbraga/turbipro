@@ -474,6 +474,7 @@ model Task {
   tags        String[]  @default([])
   title       String
   description String?
+  startDate   DateTime  @default(now()) @db.Timestamptz(6)
   dueDate     DateTime? @db.Timestamptz(6)
   createdAt   DateTime  @default(now()) @db.Timestamptz(6)
   updatedAt   DateTime  @updatedAt @db.Timestamptz(6)
@@ -489,6 +490,7 @@ model Task {
 
   @@index([agencyId])
   @@index([columnId])
+  @@index([startDate])
   @@index([proposalId])
   @@index([clientId])
   @@index([createdById])

@@ -505,6 +505,12 @@ router.post(
     if (name === 'customItinerary') {
       normalizeDateOnlyFields(data, ['startDate', 'endDate']);
     }
+    if (name === 'task') {
+      normalizeDateOnlyFields(data, ['startDate', 'dueDate']);
+      if (!('startDate' in data)) {
+        data.startDate = new Date();
+      }
+    }
     if (name === 'itineraryDay') {
       normalizeDateOnlyFields(data, ['date']);
     }
@@ -580,6 +586,9 @@ router.put(
     }
     if (name === 'customItinerary') {
       normalizeDateOnlyFields(data, ['startDate', 'endDate']);
+    }
+    if (name === 'task') {
+      normalizeDateOnlyFields(data, ['startDate', 'dueDate']);
     }
     if (name === 'itineraryDay') {
       normalizeDateOnlyFields(data, ['date']);
