@@ -84,6 +84,7 @@ export function TaskDialog({
   const [newItems, setNewItems] = useState<Record<string, string>>({});
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const [histories, setHistories] = useState(task?.histories || []);
   const checklistRef = useRef<HTMLDivElement | null>(null);
   const commentsRef = useRef<HTMLDivElement | null>(null);
   const [showChecklistPanel, setShowChecklistPanel] = useState(false);
@@ -113,6 +114,7 @@ export function TaskDialog({
       setSelectedAssignees(task.assignees?.map(a => a.user_id) || []);
       const existingChecklists = task.checklists || [];
       const existingComments = task.comments || [];
+      setHistories(task.histories || []);
       setChecklists(existingChecklists);
       setComments(existingComments);
       setShowChecklistPanel(existingChecklists.length > 0);
@@ -132,12 +134,38 @@ export function TaskDialog({
      setSelectedAssignees([]);
      setChecklists([]);
      setComments([]);
+     setHistories([]);
      setShowChecklistPanel(false);
      setShowCommentsPanel(false);
      setShowHistoryPanel(false);
      setCommentsExpanded(false);
    }
   }, [task, defaultColumnId, columns, prefillData]);
+
+  const refreshHistories = async () => {
+    if (!task?.id) return;
+    try {
+      const include = {
+        histories: {
+          include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } },
+          orderBy: { createdAt: 'desc' },
+        },
+      };
+      const params = new URLSearchParams({
+        include: JSON.stringify(include),
+      });
+      const latest = await apiFetch<any>(`/api/task/${task.id}?${params.toString()}`);
+      setHistories(latest?.histories || []);
+    } catch (error) {
+      console.error('Erro ao atualizar histórico da tarefa', error);
+    }
+  };
+
+  useEffect(() => {
+    if (showHistoryPanel) {
+      refreshHistories();
+    }
+  }, [showHistoryPanel]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -435,17 +463,26 @@ export function TaskDialog({
               <h4 className="font-medium text-base">Histórico</h4>
             </div>
             <div className="space-y-6 max-h-[70vh] overflow-y-auto pr-2">
-              {(task.histories || []).length === 0 && (
+              {histories.length === 0 && (
                 <p className="text-sm text-muted-foreground">Sem registros ainda.</p>
               )}
-              {(task.histories || []).map((h, idx) => {
+              {histories.map((h, idx) => {
                 const IconComp =
                   h.action === 'Criação'
                     ? PlusCircle
-                    : h.field === 'Coluna'
-                      ? ArrowRight
-                      : History;
-                const isLast = idx === (task.histories?.length || 0) - 1;
+                    : h.action === 'Comentário'
+                      ? MessageSquare
+                      : h.action === 'Checklist'
+                        ? CheckSquare
+                        : h.field === 'Coluna'
+                          ? ArrowRight
+                          : History;
+                const isLast = idx === histories.length - 1;
+                const parsedDate = h.created_at ? new Date(h.created_at) : null;
+                const dateText =
+                  parsedDate && !Number.isNaN(parsedDate.getTime())
+                    ? format(parsedDate, 'dd MMM yyyy, HH:mm', { locale: ptBR })
+                    : '—';
                 return (
                   <div key={h.id} className="flex gap-4">
                     <div className="flex flex-col items-center">
@@ -470,7 +507,7 @@ export function TaskDialog({
                       )}
                       <div className="flex items-center gap-2 text-xs text-muted-foreground">
                         <Clock className="w-3 h-3" />
-                        <span>{format(new Date(h.created_at), 'dd MMM yyyy, HH:mm', { locale: ptBR })}</span>
+                        <span>{dateText}</span>
                         <span>por</span>
                         <span className="font-medium text-foreground">{h.user?.name || 'Sistema'}</span>
                       </div>
