@@ -22,6 +22,7 @@ import {
   CheckCircle2,
   MessageSquare,
   Paperclip,
+  CheckSquare,
 } from 'lucide-react';
 import { format, differenceInDays, isPast, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -101,6 +102,14 @@ export function TaskCard({ task, onEdit, onDelete, onOpenProposal }: TaskCardPro
   };
 
   const dueDateStatus = getDueDateStatus();
+
+  const totalChecklistItems =
+    task.checklists?.reduce((sum, c) => sum + (c.items?.length || 0), 0) ?? 0;
+  const doneChecklistItems =
+    task.checklists?.reduce(
+      (sum, c) => sum + (c.items?.filter((it) => it.is_done).length || 0),
+      0,
+    ) ?? 0;
 
   const handleProposalClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -255,12 +264,18 @@ export function TaskCard({ task, onEdit, onDelete, onOpenProposal }: TaskCardPro
 
         {/* Bottom indicators */}
         <div className="mt-3 flex justify-end gap-2">
-          {task.comments && task.comments.length > 0 && (
-            <Badge variant="secondary" className="text-[11px] gap-1 bg-muted/60">
-              <MessageSquare className="h-3 w-3" />
-              {task.comments.length}
-            </Badge>
-          )}
+        {totalChecklistItems > 0 && (
+          <Badge variant="secondary" className="text-[11px] gap-1 bg-muted/60">
+            <CheckSquare className="h-3 w-3" />
+            {doneChecklistItems}/{totalChecklistItems}
+          </Badge>
+        )}
+        {task.comments && task.comments.length > 0 && (
+          <Badge variant="secondary" className="text-[11px] gap-1 bg-muted/60">
+            <MessageSquare className="h-3 w-3" />
+            {task.comments.length}
+          </Badge>
+        )}
           {task.files && task.files.length > 0 && (
             <Badge variant="secondary" className="text-[11px] gap-1 bg-muted/60">
               <Paperclip className="h-3 w-3" />

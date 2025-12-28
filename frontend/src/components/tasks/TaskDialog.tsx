@@ -23,7 +23,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { MessageSquare, MessageSquareOff, Plus, CheckSquare, Trash2, ChevronDown, ChevronUp, X, ArrowLeftRight, History, Slash, PlusCircle, ArrowRight, Clock, Upload, Eye, FileText, Loader2 } from 'lucide-react';
+import { MessageSquare, MessageSquareOff, Plus, CheckSquare, Trash2, ChevronDown, ChevronUp, X, ArrowLeftRight, History, Slash, PlusCircle, ArrowRight, Clock, Upload, Eye, FileText, Loader2, Paperclip, LayoutGrid, List } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   DropdownMenu,
@@ -96,6 +96,8 @@ export function TaskDialog({
   const [confirmDeleteChecklistId, setConfirmDeleteChecklistId] = useState<string | null>(null);
   const [confirmDeleteCommentId, setConfirmDeleteCommentId] = useState<string | null>(null);
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
+  const [showFilesPanel, setShowFilesPanel] = useState(false);
+  const [fileView, setFileView] = useState<'grid' | 'list'>('grid');
 
   useEffect(() => {
     if (open) {
@@ -120,6 +122,8 @@ export function TaskDialog({
       setHistories(task.histories || []);
       setChecklists(existingChecklists);
       setComments(existingComments);
+      setShowFilesPanel(false);
+      setFileView('grid');
       setShowChecklistPanel(existingChecklists.length > 0);
       setShowCommentsPanel(existingComments.length > 0);
       setShowHistoryPanel(false);
@@ -137,6 +141,7 @@ export function TaskDialog({
      setSelectedAssignees([]);
      setChecklists([]);
      setComments([]);
+     setShowFilesPanel(false);
      setHistories([]);
      setShowChecklistPanel(false);
      setShowCommentsPanel(false);
@@ -480,6 +485,33 @@ export function TaskDialog({
                   </Tooltip>
                 </TooltipProvider>
               )}
+              {task && (
+                <TooltipProvider delayDuration={0}>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <Button
+                        type="button"
+                        variant={showFilesPanel ? 'secondary' : 'outline'}
+                        size="icon"
+                        className="h-9 w-9"
+                        onClick={() => setShowFilesPanel((prev) => !prev)}
+                      >
+                        {showFilesPanel ? (
+                          <span className="relative inline-flex items-center justify-center">
+                            <Paperclip className="h-4 w-4 text-muted-foreground" />
+                            <Slash className="h-4 w-4 text-muted-foreground absolute inset-0 rotate-45" />
+                          </span>
+                        ) : (
+                          <Paperclip className="h-4 w-4 text-muted-foreground" />
+                        )}
+                      </Button>
+                    </TooltipTrigger>
+                    <TooltipContent side="bottom">
+                      {showFilesPanel ? 'Ocultar anexos' : 'Exibir anexos'}
+                    </TooltipContent>
+                  </Tooltip>
+                </TooltipProvider>
+              )}
               <Button
                 variant="outline"
                 size="sm"
@@ -572,6 +604,129 @@ export function TaskDialog({
                 );
               })}
             </div>
+          </div>
+        ) : task && showFilesPanel ? (
+          <div className="mt-4 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Paperclip className="h-4 w-4 text-primary" />
+                <h4 className="font-medium text-base">Arquivos</h4>
+              </div>
+              <div className="flex items-center gap-2">
+                <Button
+                  type="button"
+                  variant={fileView === 'grid' ? 'secondary' : 'outline'}
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => setFileView('grid')}
+                >
+                  <LayoutGrid className="h-4 w-4" />
+                </Button>
+                <Button
+                  type="button"
+                  variant={fileView === 'list' ? 'secondary' : 'outline'}
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => setFileView('list')}
+                >
+                  <List className="h-4 w-4" />
+                </Button>
+                <div>
+                  <input
+                    ref={fileInputRef}
+                    type="file"
+                    className="hidden"
+                    accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                    onChange={handleFileUpload}
+                  />
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => fileInputRef.current?.click()}
+                    disabled={isUploading}
+                    className="gap-2"
+                  >
+                    {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                    Enviar
+                  </Button>
+                </div>
+              </div>
+            </div>
+
+            {files.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Nenhum arquivo anexado.</p>
+            ) : fileView === 'grid' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {files.map((file) => (
+                  <Card key={file.id} className="overflow-hidden">
+                    <CardContent className="p-0">
+                      {file.url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                        <img src={file.url} alt={file.caption || 'Arquivo'} className="w-full h-24 object-cover" />
+                      ) : (
+                        <div className="w-full h-24 bg-muted flex items-center justify-center">
+                          <FileText className="w-8 h-8 text-muted-foreground" />
+                        </div>
+                      )}
+                      <div className="p-3 space-y-1">
+                        <p className="text-sm font-medium truncate">{file.caption || 'Arquivo'}</p>
+                        <p className="text-xs text-muted-foreground">
+                          {file.created_at ? format(new Date(file.created_at), "dd/MM/yyyy", { locale: ptBR }) : ''}
+                        </p>
+                        <div className="flex gap-2 mt-2">
+                          <Button variant="outline" size="sm" className="flex-1" onClick={() => handleOpenFile(file.url)}>
+                            <Eye className="w-3 h-3 mr-1" />
+                            Ver
+                          </Button>
+                          <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-destructive"
+                            disabled={isDeleting}
+                            onClick={() => handleDeleteFile(file.id)}
+                          >
+                            <Trash2 className="w-3 h-3" />
+                          </Button>
+                        </div>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            ) : (
+              <div className="border rounded-md divide-y">
+                <div className="grid grid-cols-12 text-xs font-medium text-muted-foreground px-3 py-2">
+                  <span className="col-span-6">Nome</span>
+                  <span className="col-span-3">Data</span>
+                  <span className="col-span-3 text-right">Ações</span>
+                </div>
+                {files.map((file) => (
+                  <div key={file.id} className="grid grid-cols-12 items-center px-3 py-2 text-sm">
+                    <div className="col-span-6 flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-muted-foreground" />
+                      <span className="truncate">{file.caption || 'Arquivo'}</span>
+                    </div>
+                    <div className="col-span-3 text-muted-foreground text-xs">
+                      {file.created_at ? format(new Date(file.created_at), "dd/MM/yyyy", { locale: ptBR }) : ''}
+                    </div>
+                    <div className="col-span-3 flex justify-end gap-2">
+                      <Button variant="outline" size="sm" onClick={() => handleOpenFile(file.url)}>
+                        <Eye className="w-3 h-3 mr-1" />
+                        Ver
+                      </Button>
+                      <Button
+                        variant="outline"
+                        size="sm"
+                        className="text-destructive"
+                        disabled={isDeleting}
+                        onClick={() => handleDeleteFile(file.id)}
+                      >
+                        <Trash2 className="w-3 h-3" />
+                      </Button>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         ) : (
         <form onSubmit={handleSubmit} className="space-y-4">
@@ -854,7 +1009,7 @@ export function TaskDialog({
                 </div>
               )}
 
-              {task && (
+              {task && showFilesPanel && (
                 <div className="space-y-3">
                   <Separator />
                   <div className="flex items-center justify-between">
