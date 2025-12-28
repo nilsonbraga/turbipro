@@ -1,9 +1,9 @@
-import { 
-  LayoutDashboard, 
-  Users, 
-  Building2, 
-  Handshake, 
-  Tags, 
+import {
+  LayoutDashboard,
+  Users,
+  Building2,
+  Handshake,
+  Tags,
   KanbanSquare,
   Calendar,
   LogOut,
@@ -30,12 +30,12 @@ import { useAuth } from '@/contexts/AuthContext';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
 import { useModuleAccess, ModuleKey } from '@/hooks/useModuleAccess';
 import { cn } from '@/lib/utils';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
+import { useThemePreference } from '@/hooks/useThemePreference';
 
-// Define navigation items with their module keys
 interface NavItem {
   title: string;
   url: string;
@@ -43,7 +43,6 @@ interface NavItem {
   moduleKey?: ModuleKey;
 }
 
-// Main navigation - organized logically
 const coreNavItems: NavItem[] = [
   { title: 'Dashboard', url: '/', icon: LayoutDashboard, moduleKey: 'dashboard' },
   { title: 'Leads', url: '/leads', icon: KanbanSquare, moduleKey: 'leads' },
@@ -74,35 +73,24 @@ const communicationNavItems: NavItem[] = [
   { title: 'WhatsApp', url: '/whatsapp', icon: MessageSquare },
 ];
 
-const adminNavItems: NavItem[] = [
-  { title: 'Agências', url: '/agencies', icon: Building2 },
-];
+const adminNavItems: NavItem[] = [{ title: 'Agências', url: '/agencies', icon: Building2 }];
 
-// Settings navigation items - separate pages
 const settingsNavItems: NavItem[] = [
   { title: 'Agência', url: '/settings/agency', icon: Building2 },
   { title: 'Perfil', url: '/settings/profile', icon: User },
 ];
 
-const settingsAdminNavItems: NavItem[] = [
-  { title: 'Usuários', url: '/settings/users', icon: Users },
-];
-
+const settingsAdminNavItems: NavItem[] = [{ title: 'Usuários', url: '/settings/users', icon: Users }];
 const settingsAllNavItems: NavItem[] = [
   { title: 'Notificações', url: '/settings/notifications', icon: Bell },
   { title: 'Pipeline', url: '/settings/pipeline', icon: Palette },
 ];
-
-const settingsIntegrationsNavItems: NavItem[] = [
-  { title: 'Integrações', url: '/settings/integrations', icon: Settings2 },
-];
-
+const settingsIntegrationsNavItems: NavItem[] = [{ title: 'Integrações', url: '/settings/integrations', icon: Settings2 }];
 const settingsSuperAdminNavItems: NavItem[] = [
   { title: 'Plataforma', url: '/settings/platform', icon: Globe },
   { title: 'Planos & Assinaturas', url: '/settings/plans', icon: CreditCard },
 ];
 
-// Map of available icons for the platform
 const iconMap: Record<string, any> = {
   plane: Plane,
   building2: Building2,
@@ -120,207 +108,107 @@ export function AppSidebar() {
   const { user, profile, agency, isSuperAdmin, role, logout } = useAuth();
   const { settings } = usePlatformSettings();
   const { hasAccess } = useModuleAccess();
+  useThemePreference(); // mantém sincronizado, mas força palette abaixo
   const [collapsed, setCollapsed] = useState(false);
-  
-  const isAdmin = role === 'admin' || isSuperAdmin;
 
+  const isAdmin = role === 'admin' || isSuperAdmin;
   const platformName = settings.platform_name || 'TravelCRM';
   const platformIconKey = (settings.platform_icon || 'plane').toLowerCase();
   const platformIconUrl = settings.platform_icon_url || agency?.logo_url || null;
   const PlatformIcon = iconMap[platformIconKey] || Plane;
 
-  const getInitials = (name: string) => {
-    return name
+  const getInitials = (name: string) =>
+    name
       .split(' ')
       .map((n) => n[0])
       .join('')
       .toUpperCase()
       .slice(0, 2);
-  };
 
-  // Filter items based on module access
-  const filterByAccess = (items: NavItem[]) => {
-    return items.filter(item => !item.moduleKey || hasAccess(item.moduleKey));
-  };
-
-  // Check if communication module is accessible
+  const filterByAccess = (items: NavItem[]) => items.filter((item) => !item.moduleKey || hasAccess(item.moduleKey));
   const hasCommunicationAccess = hasAccess('communication');
 
-  const renderNavItems = (items: NavItem[]) => {
-    return filterByAccess(items).map((item) => (
+  const renderNavItems = (items: NavItem[]) =>
+    filterByAccess(items).map((item) => (
       <NavLink
         key={item.url}
         to={item.url}
         end={item.url === '/'}
         className={cn(
-          "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-          "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent",
-          collapsed && "justify-center px-2"
+          'group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-300',
+          'text-white/80 hover:text-white hover:bg-emerald-500/10',
+          collapsed && 'justify-center px-2'
         )}
-        activeClassName="bg-sidebar-accent text-sidebar-foreground"
+        activeClassName={cn('bg-emerald-500/20 text-white', 'shadow-sm')}
       >
-        <item.icon className="w-5 h-5 flex-shrink-0" />
+        <item.icon className="w-5 h-5 flex-shrink-0 transition-colors duration-300 text-emerald-300" />
         {!collapsed && <span>{item.title}</span>}
       </NavLink>
     ));
-  };
 
   const renderSection = (label: string, items: NavItem[]) => {
-    const filteredItems = filterByAccess(items);
-    if (filteredItems.length === 0) return null;
-
+    const filtered = filterByAccess(items);
+    if (!filtered.length) return null;
     return (
       <>
-        <Separator className="my-3 bg-sidebar-border" />
-        <p className={cn("px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2", collapsed && "hidden")}>
-          {label}
-        </p>
+        <Separator className="my-3 bg-white/10" />
+        <p className={cn('px-3 text-xs font-semibold uppercase tracking-wider mb-2 text-white/60', collapsed && 'hidden')}>{label}</p>
         {renderNavItems(items)}
       </>
     );
   };
 
-  // Build settings items based on role
   const buildSettingsItems = () => {
     let items = [...settingsNavItems];
-    if (isAdmin) {
-      items = [...items, ...settingsAdminNavItems];
-    }
+    if (isAdmin) items = [...items, ...settingsAdminNavItems, ...settingsIntegrationsNavItems];
     items = [...items, ...settingsAllNavItems];
-    if (isAdmin) {
-      items = [...items, ...settingsIntegrationsNavItems];
-    }
-    if (isSuperAdmin) {
-      items = [...items, ...settingsSuperAdminNavItems];
-    }
+    if (isSuperAdmin) items = [...items, ...settingsSuperAdminNavItems];
     return items;
   };
 
   return (
-    <aside 
+    <aside
       className={cn(
-        "flex flex-col bg-sidebar text-sidebar-foreground border-r border-sidebar-border transition-all duration-300",
-        collapsed ? "w-16" : "w-64"
+        'flex flex-col transition-all duration-500 shadow-[4px_0_18px_rgba(0,0,0,0.12)]',
+        collapsed ? 'w-16' : 'w-64',
+        'bg-gradient-to-b from-[#0b1210] via-[#0c1512] to-[#0b1210] text-white'
       )}
     >
       {/* Logo */}
-      <div className="flex items-center gap-3 p-4 border-b border-sidebar-border">
+      <div className="flex items-center gap-3 p-4">
         {platformIconUrl ? (
-          <img 
-            src={platformIconUrl} 
-            alt={platformName} 
-            className="w-10 h-10 object-contain"
-          />
+          <img src={platformIconUrl} alt={platformName} className="w-10 h-10 object-contain" />
         ) : (
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary">
-            <PlatformIcon className="w-6 h-6 text-primary-foreground" />
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-200">
+            <PlatformIcon className="w-6 h-6" />
           </div>
         )}
         {!collapsed && (
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold truncate">{platformName}</h1>
-            {agency && (
-              <p className="text-xs text-sidebar-foreground/70 truncate">{agency.name}</p>
-            )}
+            <h1 className="text-lg font-bold truncate text-white">{platformName}</h1>
+            {agency && <p className="text-xs truncate text-emerald-100/70">{agency.name}</p>}
           </div>
         )}
       </div>
 
-      {/* Navigation */}
       <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-        {/* Core */}
         {renderNavItems(coreNavItems)}
-
-        {/* Products */}
         {renderSection('Produtos', productNavItems)}
-
-        {/* Registers */}
         {renderSection('Cadastros', registerNavItems)}
-
-        {/* Management */}
         {renderSection('Gestão', managementNavItems)}
-
-        {/* Communication */}
-        {hasCommunicationAccess && (
-          <>
-            <Separator className="my-3 bg-sidebar-border" />
-            <p className={cn("px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2", collapsed && "hidden")}>
-              Comunicação
-            </p>
-            {communicationNavItems.map((item) => (
-              <NavLink
-                key={item.url}
-                to={item.url}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                  "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent",
-                  collapsed && "justify-center px-2"
-                )}
-                activeClassName="bg-sidebar-accent text-sidebar-foreground"
-              >
-                <item.icon className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span>{item.title}</span>}
-              </NavLink>
-            ))}
-          </>
-        )}
-
-        {/* Admin */}
-        {isSuperAdmin && (
-          <>
-            <Separator className="my-3 bg-sidebar-border" />
-            <p className={cn("px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2", collapsed && "hidden")}>
-              Admin
-            </p>
-            {adminNavItems.map((item) => (
-              <NavLink
-                key={item.url}
-                to={item.url}
-                className={cn(
-                  "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-                  "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent",
-                  collapsed && "justify-center px-2"
-                )}
-                activeClassName="bg-sidebar-accent text-sidebar-foreground"
-              >
-                <item.icon className="w-5 h-5 flex-shrink-0" />
-                {!collapsed && <span>{item.title}</span>}
-              </NavLink>
-            ))}
-          </>
-        )}
-
-        {/* Configuration */}
-        <Separator className="my-3 bg-sidebar-border" />
-        <p className={cn("px-3 text-xs font-semibold text-sidebar-foreground/50 uppercase tracking-wider mb-2", collapsed && "hidden")}>
-          Configurações
-        </p>
-        {buildSettingsItems().map((item) => (
-          <NavLink
-            key={item.url}
-            to={item.url}
-            className={cn(
-              "flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors",
-              "text-sidebar-foreground/80 hover:text-sidebar-foreground hover:bg-sidebar-accent",
-              collapsed && "justify-center px-2"
-            )}
-            activeClassName="bg-sidebar-accent text-sidebar-foreground"
-          >
-            <item.icon className="w-5 h-5 flex-shrink-0" />
-            {!collapsed && <span>{item.title}</span>}
-          </NavLink>
-        ))}
+        {hasCommunicationAccess && renderSection('Comunicação', communicationNavItems)}
+        {isSuperAdmin && renderSection('Admin', adminNavItems)}
+        {renderSection('Configurações', buildSettingsItems())}
       </nav>
 
-      {/* Collapse toggle */}
-      <div className="p-3 border-t border-sidebar-border">
+      <div className="p-3 border-t border-emerald-500/20">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            "w-full justify-center text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent",
-            !collapsed && "justify-start"
+            'w-full justify-center transition-colors duration-300 text-emerald-100/70 hover:text-white hover:bg-emerald-500/10',
+            !collapsed && 'justify-start'
           )}
         >
           {collapsed ? <ChevronRight className="w-4 h-4" /> : <ChevronLeft className="w-4 h-4" />}
@@ -328,25 +216,24 @@ export function AppSidebar() {
         </Button>
       </div>
 
-      {/* User profile */}
-      <div className={cn("p-3 border-t border-sidebar-border", collapsed && "flex flex-col items-center")}>
-        <div className={cn("flex items-center gap-3", collapsed && "flex-col")}>
+      <div className={cn('p-3 border-t border-emerald-500/20', collapsed && 'flex flex-col items-center')}>
+        <div className={cn('flex items-center gap-3', collapsed && 'flex-col')}>
           <Avatar className="w-9 h-9">
-            <AvatarFallback className="bg-primary text-primary-foreground text-sm">
+            <AvatarFallback className="text-sm bg-emerald-500/20 text-emerald-200">
               {profile?.name ? getInitials(profile.name) : 'U'}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate">{profile?.name || 'Usuário'}</p>
-              <p className="text-xs text-sidebar-foreground/60 truncate">{user?.email}</p>
+              <p className="text-sm font-medium truncate text-white">{profile?.name || 'Usuário'}</p>
+              <p className="text-xs truncate text-emerald-100/70">{user?.email}</p>
             </div>
           )}
           <Button
             variant="ghost"
             size="icon"
             onClick={logout}
-            className="text-sidebar-foreground/70 hover:text-sidebar-foreground hover:bg-sidebar-accent"
+            className="transition-colors duration-300 text-emerald-100/70 hover:text-white hover:bg-emerald-500/10"
           >
             <LogOut className="w-4 h-4" />
           </Button>

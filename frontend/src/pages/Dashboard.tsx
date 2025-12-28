@@ -11,8 +11,7 @@ import {
   ShieldCheck,
   Compass,
   Activity,
-  Moon,
-  Sun,
+  Building2,
   User,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
@@ -108,7 +107,7 @@ function RefreshOverlay({ show, isDark }: { show: boolean; isDark: boolean }) {
 }
 
 export default function Dashboard() {
-  const { isSuperAdmin, profile } = useAuth();
+  const { isSuperAdmin, profile, role } = useAuth() as any;
   const [filters, setFilters] = useState<DashboardFilters>({});
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
@@ -130,21 +129,28 @@ export default function Dashboard() {
   const subtleCard = isDark ? 'bg-black/20 border-emerald-500/10' : 'bg-emerald-50 border-emerald-100';
   const textMuted = isDark ? 'text-emerald-100/70' : 'text-slate-500';
   const textStrong = isDark ? 'text-white' : 'text-slate-900';
+  const softShadow = isDark ? 'shadow-xl shadow-emerald-900/20' : 'shadow-none';
 
   // Hooks SEMPRE rodam (mesmo com loading)
-  const sellerSummary = useMemo(() => {
-    const name = profile?.name || profile?.full_name || 'Você';
-    return [
-      {
-        name,
-        proposals: metrics?.totalProposals || 0,
-        revenue: metrics?.totalRevenue || 0,
-        profit: metrics?.totalProfit || 0,
-        conversion: metrics?.conversionRate || 0,
-        isMe: true,
-      },
-    ];
-  }, [metrics, profile?.full_name, profile?.name]);
+  const sellerSummary = metrics?.sellerSummary ?? [];
+  const highlightedSellers = sellerSummary.length > 0 ? sellerSummary : [];
+  const mySeller = useMemo(() => {
+    const meId = profile?.id ?? (profile as any)?.user_id ?? null;
+    const name = profile?.name || (profile as any)?.full_name || profile?.email || 'Você';
+    const base = {
+      id: meId,
+      name,
+      email: profile?.email ?? null,
+      proposals: 0,
+      closed: 0,
+      revenue: 0,
+      profit: 0,
+      conversion: 0,
+    };
+    if (!meId) return base;
+    const found = highlightedSellers.find((s) => s.id === meId);
+    return found ? found : base;
+  }, [highlightedSellers, profile]);
 
   const updateFilter = (key: keyof DashboardFilters, value: string | number | undefined) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -179,6 +185,11 @@ export default function Dashboard() {
   const showRefreshing = isFetching && !showFullSkeleton;
   const LIGHT_PIPELINE_COLORS = ['#16a34a', '#22c55e', '#0ea5e9', '#f59e0b', '#10b981', '#047857'];
   const revenueData = displayMetrics?.revenueByMonth || [];
+  const closedCount = metrics?.closedProposalsCount ?? 0;
+  const ticketMedio = closedCount > 0 ? (metrics?.totalRevenue || 0) / closedCount : 0;
+  const agenciasAtivas = (agencies ?? []).length;
+  const pipelineValor = displayMetrics.openValue ?? 0;
+  const currentMonth = revenueData[revenueData.length - 1];
   const colorForStage = (stage: string, index: number) => {
     if (isDark) return STAGE_COLORS[stage] || GREEN_PALETTE[index % GREEN_PALETTE.length];
     return LIGHT_PIPELINE_COLORS[index % LIGHT_PIPELINE_COLORS.length];
@@ -267,7 +278,7 @@ export default function Dashboard() {
           : 'bg-gradient-to-b from-emerald-50 via-white to-emerald-50 text-slate-900'
       }`}
     >
-      <div className="max-w-7xl mx-auto p-6 space-y-6 transition-all duration-500 relative">
+      <div className="max-w-[1600px] mx-auto p-6 space-y-6 transition-all duration-500 relative">
         <RefreshOverlay show={showRefreshing} isDark={isDark} />
 
         {showFullSkeleton ? (
@@ -275,9 +286,9 @@ export default function Dashboard() {
         ) : (
           <>
             {/* Hero */}
-            <div className="grid gap-6 lg:grid-cols-[2fr,1fr]">
+            <div className="grid gap-6 lg:grid-cols-[2.2fr,1fr]">
               <div
-                className={`relative overflow-hidden rounded-2xl border p-6 shadow-xl transition-colors duration-500 ${
+                className={`relative overflow-hidden rounded-2xl border p-6 transition-colors duration-500 ${softShadow} ${
                   isDark
                     ? 'border-emerald-500/20 bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700'
                     : 'border-emerald-100 bg-gradient-to-r from-emerald-100 via-emerald-200 to-emerald-300 text-slate-900'
@@ -304,21 +315,43 @@ export default function Dashboard() {
                   </div>
 
                   <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
-                    <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-white/15' : 'bg-white/70'}`}>
-                      <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Faturamento</p>
-                      <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
-                        {showRefreshing ? <Skeleton className="h-6 w-32 rounded-md bg-white/30" /> : formatCurrency(metrics?.totalRevenue || 0)}
-                      </div>
-                      <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>YTD</span>
-                    </div>
-
-                    <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-black/20' : 'bg-emerald-200/70'}`}>
-                      <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Taxa de Conversão</p>
-                      <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
-                        {showRefreshing ? <Skeleton className="h-6 w-24 rounded-md bg-white/30" /> : `${metrics?.conversionRate ?? 0}%`}
-                      </div>
-                      <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Pipeline</span>
-                    </div>
+                    {isSuperAdmin ? (
+                      <>
+                        <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-white/15' : 'bg-white/70'}`}>
+                          <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Faturamento (todas as agências)</p>
+                          <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
+                            {showRefreshing ? <Skeleton className="h-6 w-32 rounded-md bg-white/30" /> : formatCurrency(metrics?.totalRevenue || 0)}
+                          </div>
+                          <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Base: recebimentos pagos</span>
+                        </div>
+                        <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-black/20' : 'bg-emerald-200/70'}`}>
+                          <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Lucro (todas as agências)</p>
+                          <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
+                            {showRefreshing ? <Skeleton className="h-6 w-32 rounded-md bg-white/30" /> : formatCurrency(metrics?.totalProfit || 0)}
+                          </div>
+                          <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Comissões confirmadas</span>
+                        </div>
+                      </>
+                    ) : role === 'admin' || role === 'agency_admin' ? (
+                      <>
+                        <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-white/15' : 'bg-white/70'}`}>
+                          <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Faturamento mensal</p>
+                          <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
+                            {showRefreshing ? <Skeleton className="h-6 w-32 rounded-md bg-white/30" /> : formatCurrency(currentMonth?.revenue || 0)}
+                          </div>
+                          <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>{currentMonth?.month || 'Mês atual'}</span>
+                        </div>
+                        <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-black/20' : 'bg-emerald-200/70'}`}>
+                          <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Lucro total</p>
+                          <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
+                            {showRefreshing ? <Skeleton className="h-6 w-32 rounded-md bg-white/30" /> : formatCurrency(metrics?.totalProfit || 0)}
+                          </div>
+                          <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Comissões confirmadas</span>
+                        </div>
+                      </>
+                    ) : (
+                      <div className="rounded-xl p-4 backdrop-blur-sm col-span-2 bg-white/10 text-white border border-emerald-500/20" />
+                    )}
                   </div>
                 </div>
               </div>
@@ -326,37 +359,63 @@ export default function Dashboard() {
               <div className={`rounded-2xl p-5 backdrop-blur-md border ${surfaceCard}`}>
                 <div className="flex items-center justify-between mb-4">
                   <div>
-                    <p className={`text-xs ${textMuted}`}>Status geral</p>
-                    <p className={`text-lg font-semibold ${textStrong}`}>Operação saudável</p>
+                    <p className={`text-xs ${textMuted}`}>Seu desempenho</p>
+                    <p className={`text-lg font-semibold ${textStrong}`}>{mySeller.name}</p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <button
-                      className={`flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium transition-colors ${
-                        isDark ? 'bg-white/10 text-white' : 'bg-emerald-50 text-emerald-800'
-                      }`}
-                      onClick={() => persistTheme(isDark ? 'light' : 'dark')}
-                    >
-                      {isDark ? <Sun size={16} /> : <Moon size={16} />}
-                      {isDark ? 'Modo Claro' : 'Modo Escuro'}
-                    </button>
-                    <Activity className="text-emerald-400" />
+                  <div
+                    className={`w-12 h-12 rounded-full overflow-hidden flex items-center justify-center text-lg font-semibold border ${
+                      isDark ? 'border-emerald-500/40 bg-emerald-500/20 text-white' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
+                    }`}
+                  >
+                    {(() => {
+                      const avatar =
+                        profile?.avatarUrl ||
+                        (profile as any)?.avatar_url ||
+                        (profile as any)?.avatarUrl ||
+                        null;
+                      if (avatar) {
+                        return <img src={avatar} alt={mySeller.name} className="w-full h-full object-cover" />;
+                      }
+                      const initials =
+                        (mySeller.name || 'U')
+                          .split(' ')
+                          .map((n) => n[0])
+                          .join('')
+                          .slice(0, 2)
+                          .toUpperCase() || 'U';
+                      return initials;
+                    })()}
                   </div>
                 </div>
 
-                <div className="grid grid-cols-3 gap-3 text-sm">
+                <div className="grid grid-cols-2 gap-3 text-sm">
                   <div className={`rounded-xl p-3 ${subtleCard}`}>
                     <p className={textMuted}>Propostas</p>
-                    <div className={`text-xl font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-12 rounded bg-white/20" /> : metrics?.totalProposals ?? 0}</div>
+                    <div className={`text-xl font-semibold ${textStrong}`}>
+                      {showRefreshing ? <Skeleton className="h-4 w-12 rounded bg-white/20" /> : mySeller.proposals}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Emitidas por você</p>
                   </div>
-
                   <div className={`rounded-xl p-3 ${subtleCard}`}>
-                    <p className={textMuted}>Lucro</p>
-                    <div className={`text-xl font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-16 rounded bg-white/20" /> : formatCurrency(metrics?.totalProfit || 0)}</div>
+                    <p className={textMuted}>Fechadas</p>
+                    <div className={`text-xl font-semibold ${textStrong}`}>
+                      {showRefreshing ? <Skeleton className="h-4 w-12 rounded bg-white/20" /> : mySeller.closed}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Entraram como vendas</p>
                   </div>
-
                   <div className={`rounded-xl p-3 ${subtleCard}`}>
-                    <p className={textMuted}>Clientes</p>
-                    <div className={`text-xl font-semibold ${textStrong}`}>{clients.length}</div>
+                    <p className={textMuted}>Faturamento</p>
+                    <div className={`text-xl font-semibold ${textStrong}`}>
+                      {showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(mySeller.revenue)}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Total vendido</p>
+                  </div>
+                  <div className={`rounded-xl p-3 ${subtleCard}`}>
+                    <p className={textMuted}>Conversão</p>
+                    <div className={`text-xl font-semibold ${textStrong}`}>
+                      {showRefreshing ? <Skeleton className="h-4 w-12 rounded bg-white/20" /> : `${mySeller.conversion}%`}
+                    </div>
+                    <p className="text-xs text-muted-foreground">Fechadas / emitidas</p>
                   </div>
                 </div>
               </div>
@@ -430,75 +489,35 @@ export default function Dashboard() {
               </div>
             </div>
 
-            {/* KPI cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
-              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
+            {/* KPIs principais - 6 cards em linha responsiva */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
+              {[
+                { label: 'Faturamento', value: metrics?.totalRevenue ?? 0, icon: DollarSign, hint: 'Propostas fechadas', fmt: (v: number) => formatCurrency(v) },
+                { label: 'Lucro estimado', value: metrics?.totalProfit ?? 0, icon: TrendingUp, hint: 'Comissões previstas', fmt: (v: number) => formatCurrency(v) },
+                { label: 'Propostas', value: metrics?.totalProposals ?? 0, icon: FileText, hint: 'Emitidas no período', fmt: (v: number) => v },
+                { label: 'Conversão', value: metrics?.conversionRate ?? 0, icon: Target, hint: 'Fechadas / total', fmt: (v: number) => `${v}%` },
+                { label: 'Ticket médio', value: ticketMedio, icon: DollarSign, hint: 'Por proposta emitida', fmt: (v: number) => formatCurrency(v) },
+                { label: 'Clientes ativos', value: clients.length, icon: Users, hint: 'Base cadastrada', fmt: (v: number) => v },
+              ].map((card) => (
+                <Card key={card.label} className={`backdrop-blur-lg border ${surfaceCard}`}>
+                  <CardContent className="p-5 flex items-center justify-between">
                     <div>
-                      <p className={`text-sm ${textMuted}`}>Faturamento</p>
+                      <p className={`text-sm ${textMuted}`}>{card.label}</p>
                       <div className={`text-2xl font-semibold ${textStrong}`}>
-                        {showRefreshing ? <Skeleton className="h-7 w-32 rounded bg-white/20" /> : formatCurrency(metrics?.totalRevenue || 0)}
+                        {showRefreshing ? <Skeleton className="h-7 w-24 rounded bg-white/20" /> : card.fmt(card.value)}
                       </div>
+                      <p className="text-xs text-muted-foreground mt-1">{card.hint}</p>
                     </div>
                     <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>
-                      <DollarSign className="w-6 h-6" />
+                      <card.icon className="w-6 h-6" />
                     </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={`text-sm ${textMuted}`}>Lucro</p>
-                      <div className={`text-2xl font-semibold ${textStrong}`}>
-                        {showRefreshing ? <Skeleton className="h-7 w-28 rounded bg-white/20" /> : formatCurrency(metrics?.totalProfit || 0)}
-                      </div>
-                    </div>
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>
-                      <TrendingUp className="w-6 h-6" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={`text-sm ${textMuted}`}>Propostas</p>
-                      <div className={`text-2xl font-semibold ${textStrong}`}>
-                        {showRefreshing ? <Skeleton className="h-7 w-14 rounded bg-white/20" /> : metrics?.totalProposals ?? 0}
-                      </div>
-                    </div>
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>
-                      <FileText className="w-6 h-6" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-
-              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
-                <CardContent className="p-5">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className={`text-sm ${textMuted}`}>Conversão</p>
-                      <div className={`text-2xl font-semibold ${textStrong}`}>
-                        {showRefreshing ? <Skeleton className="h-7 w-16 rounded bg-white/20" /> : `${metrics?.conversionRate ?? 0}%`}
-                      </div>
-                    </div>
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>
-                      <Target className="w-6 h-6" />
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+                  </CardContent>
+                </Card>
+              ))}
             </div>
 
             {/* Charts */}
-            <div className="grid grid-cols-1 xl:grid-cols-[2fr,1fr] gap-6">
+            <div className="grid grid-cols-1 xl:grid-cols-[3fr,2fr] gap-6">
               <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
                 <CardHeader>
                   <CardTitle className={`text-lg ${textStrong}`}>Faturamento x Lucro</CardTitle>
@@ -583,54 +602,9 @@ export default function Dashboard() {
               </Card>
             </div>
 
-            {/* Seller summary */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-              {sellerSummary.map((seller) => (
-                <Card key={seller.name} className={`backdrop-blur-lg border ${surfaceCard}`}>
-                  <CardContent className="p-5 space-y-3">
-                    <div className="flex items-center justify-between">
-                      <div className="flex items-center gap-3">
-                        <div className={`w-10 h-10 rounded-full flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-200' : 'bg-emerald-100 text-emerald-800'}`}>
-                          <User size={18} />
-                        </div>
-                        <div>
-                          <p className={`text-sm ${textMuted}`}>Resumo por vendedor</p>
-                          <p className={`font-semibold ${textStrong}`}>{seller.name}</p>
-                        </div>
-                      </div>
-                      {seller.isMe && (
-                        <span className={`rounded-full px-2 py-1 text-xs font-semibold ${isDark ? 'bg-emerald-500/20 text-emerald-100' : 'bg-emerald-100 text-emerald-800'}`}>
-                          Você
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-3 text-sm">
-                      <div className={`rounded-lg p-3 ${subtleCard}`}>
-                        <p className={textMuted}>Propostas</p>
-                        <div className={`text-lg font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-10 rounded bg-white/20" /> : seller.proposals}</div>
-                      </div>
-                      <div className={`rounded-lg p-3 ${subtleCard}`}>
-                        <p className={textMuted}>Conversão</p>
-                        <div className={`text-lg font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-12 rounded bg-white/20" /> : `${seller.conversion}%`}</div>
-                      </div>
-                      <div className={`rounded-lg p-3 ${subtleCard}`}>
-                        <p className={textMuted}>Faturamento</p>
-                        <div className={`text-lg font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(seller.revenue)}</div>
-                      </div>
-                      <div className={`rounded-lg p-3 ${subtleCard}`}>
-                        <p className={textMuted}>Lucro</p>
-                        <div className={`text-lg font-semibold ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(seller.profit)}</div>
-                      </div>
-                    </div>
-                  </CardContent>
-                </Card>
-              ))}
-            </div>
-
-            {/* Lists */}
-            <div className="grid grid-cols-1 xl:grid-cols-3 gap-6">
-              <Card className={`backdrop-blur-lg border ${surfaceCard} xl:col-span-2`}>
+            {/* Listas principais */}
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
                 <CardHeader>
                   <CardTitle className={`text-lg flex items-center gap-2 ${textStrong}`}>
                     <Users className={`${isDark ? 'text-emerald-300' : 'text-emerald-700'} w-5 h-5`} />

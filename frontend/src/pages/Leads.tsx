@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { useProposals, Proposal, ProposalInput } from '@/hooks/useProposals';
 import { usePipelineStages, PipelineStage } from '@/hooks/usePipelineStages';
@@ -120,6 +120,7 @@ function ProposalCard({ proposal, tags, serviceTotals, onView, onEdit, onDelete,
       .toUpperCase()
       .slice(0, 2);
   };
+  const sellerName = proposal.assigned_collaborator?.name || proposal.created_by?.name || 'Responsável não definido';
 
   return (
     <div 
@@ -194,6 +195,9 @@ function ProposalCard({ proposal, tags, serviceTotals, onView, onEdit, onDelete,
 
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <Badge variant="outline" className="text-xs">#{proposal.number}</Badge>
+        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
+          {sellerName}
+        </Badge>
       </div>
       
       {/* Valor e Lucro */}
@@ -372,6 +376,7 @@ export default function Leads() {
   const [selectedClientId, setSelectedClientId] = useState<string>('all');
   const [selectedStageId, setSelectedStageId] = useState<string>('all');
   const [selectedTagId, setSelectedTagId] = useState<string>('all');
+  const [selectedSellerId, setSelectedSellerId] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
 
   const logStageHistory = async (proposal: Proposal, fromStageId: string | null, toStageId: string | null) => {
@@ -514,6 +519,12 @@ export default function Leads() {
       if (!proposalTagIds.includes(selectedTagId)) return false;
     }
     
+    // Seller filter (responsável)
+    if (selectedSellerId !== 'all') {
+      const sellerId = proposal.assigned_collaborator?.id || proposal.created_by?.id || null;
+      if (sellerId !== selectedSellerId) return false;
+    }
+    
     // Date range filter
     if (dateRange?.from) {
       const proposalDate = new Date(proposal.created_at);
@@ -527,6 +538,16 @@ export default function Leads() {
   const getProposalsByStage = (stageId: string) => {
     return filteredProposals.filter(p => p.stage_id === stageId);
   };
+  const sellerOptions = useMemo(() => {
+    const map = new Map<string, string>();
+    filteredProposals.forEach((p) => {
+      const seller = p.assigned_collaborator || p.created_by;
+      if (seller?.id && seller.name) {
+        map.set(seller.id, seller.name);
+      }
+    });
+    return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
+  }, [filteredProposals]);
 
   const handleAddProposal = (stageId?: string) => {
     setEditingProposal(null);
@@ -739,10 +760,17 @@ export default function Leads() {
     setSelectedClientId('all');
     setSelectedStageId('all');
     setSelectedTagId('all');
+    setSelectedSellerId('all');
     setDateRange(undefined);
   };
 
-  const hasActiveFilters = (isSuperAdmin && selectedAgencyId !== 'all') || selectedClientId !== 'all' || selectedStageId !== 'all' || selectedTagId !== 'all' || dateRange;
+  const hasActiveFilters =
+    (isSuperAdmin && selectedAgencyId !== 'all') ||
+    selectedClientId !== 'all' ||
+    selectedStageId !== 'all' ||
+    selectedTagId !== 'all' ||
+    selectedSellerId !== 'all' ||
+    dateRange;
 
   // For non-super admin without agency
   if (!isSuperAdmin && !agency) {
@@ -836,6 +864,23 @@ export default function Leads() {
                 {clients?.map((client) => (
                   <SelectItem key={client.id} value={client.id}>
                     {client.name}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+
+            <Select
+              value={selectedSellerId}
+              onValueChange={setSelectedSellerId}
+            >
+              <SelectTrigger className="w-60 h-9">
+                <SelectValue placeholder="Responsável" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">Todos os responsáveis</SelectItem>
+                {sellerOptions.map((s) => (
+                  <SelectItem key={s.id} value={s.id}>
+                    {s.name}
                   </SelectItem>
                 ))}
               </SelectContent>

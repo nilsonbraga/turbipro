@@ -23,6 +23,7 @@ export interface Proposal {
   clients?: { id: string; name: string; email: string | null; phone: string | null; cpf: string | null; passport: string | null } | null;
   pipeline_stages?: { id: string; name: string; color: string; is_closed: boolean; is_lost: boolean } | null;
   assigned_collaborator?: { id: string; name: string } | null;
+  created_by?: { id: string; name: string; email: string | null } | null;
 }
 
 export interface ProposalInput {
@@ -58,12 +59,14 @@ export type BackendProposal = {
   client?: { id: string; name: string; email: string | null; phone: string | null; cpf: string | null; passport: string | null } | null;
   stage?: { id: string; name: string; color: string; isClosed: boolean; isLost: boolean } | null;
   assignedCollaborator?: { id: string; name: string } | null;
+  createdBy?: { id: string; name: string; email: string | null } | null;
 };
 
 export const proposalInclude = {
   client: { select: { id: true, name: true, email: true, phone: true, cpf: true, passport: true } },
   stage: { select: { id: true, name: true, color: true, isClosed: true, isLost: true } },
   assignedCollaborator: { select: { id: true, name: true } },
+  createdBy: { select: { id: true, name: true, email: true } },
 };
 
 export const mapBackendProposalToFront = (p: BackendProposal): Proposal => ({
@@ -101,6 +104,11 @@ export const mapBackendProposalToFront = (p: BackendProposal): Proposal => ({
   assigned_collaborator: p.assignedCollaborator ? {
     id: p.assignedCollaborator.id,
     name: p.assignedCollaborator.name,
+  } : null,
+  created_by: p.createdBy ? {
+    id: p.createdBy.id,
+    name: p.createdBy.name,
+    email: p.createdBy.email,
   } : null,
 });
 

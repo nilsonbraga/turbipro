@@ -16,6 +16,7 @@ export interface CalendarEvent {
   client_name: string | null;
   client_id: string | null;
   value: number;
+  details?: unknown;
 }
 
 export function useCalendarEvents() {
@@ -25,8 +26,8 @@ export function useCalendarEvents() {
   return useQuery({
     queryKey: ['calendar-events', userAgencyId, isSuperAdmin],
     queryFn: async () => {
-      // Get closed proposals
-      const proposalsWhere: Record<string, unknown> = { stage: { isClosed: true } };
+      // Get proposals (all stages, filtered by agency when needed)
+      const proposalsWhere: Record<string, unknown> = {};
       if (!isSuperAdmin && userAgencyId) {
         proposalsWhere.agencyId = userAgencyId;
       }
@@ -36,6 +37,7 @@ export function useCalendarEvents() {
         include: JSON.stringify({
           stage: { select: { isClosed: true } },
           client: { select: { name: true } },
+          agency: { select: { name: true } },
         }),
       });
 
@@ -70,6 +72,7 @@ export function useCalendarEvents() {
           client_name: proposal?.client?.name || null,
           client_id: proposal?.clientId || null,
           value: Number(service.value || 0),
+          details: service.details,
         };
       });
 
