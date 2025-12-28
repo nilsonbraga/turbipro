@@ -489,6 +489,7 @@ model Task {
   checklists TaskChecklist[]
   comments   TaskComment[]
   histories  TaskHistory[]
+  files      TaskFile[]
 
   @@index([agencyId])
   @@index([columnId])
@@ -574,6 +575,18 @@ model TaskComment {
 
   @@index([taskId])
   @@index([userId])
+}
+
+model TaskFile {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @db.Uuid
+  url       String
+  caption   String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+
+  @@index([taskId])
 }
 
 model ExpeditionGroup {

@@ -20,6 +20,8 @@ import {
   AlertCircle,
   Clock,
   CheckCircle2,
+  MessageSquare,
+  Paperclip,
 } from 'lucide-react';
 import { format, differenceInDays, isPast, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -250,6 +252,22 @@ export function TaskCard({ task, onEdit, onDelete, onOpenProposal }: TaskCardPro
             )}
           </div>
         )}
+
+        {/* Bottom indicators */}
+        <div className="mt-3 flex justify-end gap-2">
+          {task.comments && task.comments.length > 0 && (
+            <Badge variant="secondary" className="text-[11px] gap-1 bg-muted/60">
+              <MessageSquare className="h-3 w-3" />
+              {task.comments.length}
+            </Badge>
+          )}
+          {task.files && task.files.length > 0 && (
+            <Badge variant="secondary" className="text-[11px] gap-1 bg-muted/60">
+              <Paperclip className="h-3 w-3" />
+              {task.files.length}
+            </Badge>
+          )}
+        </div>
       </div>
     </Card>
   );

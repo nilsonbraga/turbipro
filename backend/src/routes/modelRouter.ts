@@ -30,6 +30,7 @@ const modelDelegates = {
   taskChecklist: prisma.taskChecklist,
   taskChecklistItem: prisma.taskChecklistItem,
   taskComment: prisma.taskComment,
+  taskFile: prisma.taskFile,
   expeditionGroup: prisma.expeditionGroup,
   expeditionRegistration: prisma.expeditionRegistration,
   customItinerary: prisma.customItinerary,
@@ -85,6 +86,7 @@ const primaryKeys: Record<ModelName, string[]> = {
   taskChecklist: ['id'],
   taskChecklistItem: ['id'],
   taskComment: ['id'],
+  taskFile: ['id'],
   expeditionGroup: ['id'],
   expeditionRegistration: ['id'],
   customItinerary: ['id'],
@@ -607,6 +609,12 @@ router.post(
           details: `Item adicionado: ${(created as any).content}`,
         });
       }
+      if (name === 'taskFile') {
+        const userId = (req.headers['x-user-id'] as string | undefined) ?? null;
+        void addTaskHistory(prisma, (created as any).taskId, userId, 'Arquivo', {
+          details: `Arquivo anexado: ${(created as any).caption ?? ''}`,
+        });
+      }
       return res.status(201).json(created);
     } catch (error) {
       if (name === 'proposalHistory') {
@@ -839,6 +847,15 @@ router.delete(
           'Checklist',
           { details: `Item removido: ${existing.content}` },
         );
+      }
+    }
+    if (name === 'taskFile') {
+      const existing = await prisma.taskFile.findUnique({ where });
+      if (existing) {
+        const userId = (req.headers['x-user-id'] as string | undefined) ?? null;
+        void addTaskHistory(prisma, existing.taskId, userId, 'Arquivo', {
+          details: `Arquivo removido: ${existing.caption ?? ''}`,
+        });
       }
     }
     await delegate.delete({ where });

@@ -44,6 +44,13 @@ export interface Task {
   histories?: TaskHistory[];
   checklists?: TaskChecklist[];
   comments?: TaskComment[];
+  files?: {
+    id: string;
+    task_id: string;
+    url: string;
+    caption: string | null;
+    created_at: string;
+  }[];
   client?: {
     id: string;
     name: string;
@@ -348,6 +355,13 @@ export function useTasks(filters?: {
         ? { id: h.user.id, name: h.user.name, email: h.user.email, avatarUrl: h.user.avatarUrl }
         : undefined,
     })),
+    files: (t.files || []).map((f: any) => ({
+      id: f.id,
+      task_id: f.taskId,
+      url: f.url,
+      caption: f.caption ?? null,
+      created_at: f.createdAt,
+    })),
   });
 
   const { data: tasks = [], isLoading, error } = useQuery({
@@ -368,6 +382,7 @@ export function useTasks(filters?: {
           checklists: { include: { items: true } },
           comments: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } } },
           histories: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } }, orderBy: { createdAt: 'desc' } },
+          files: true,
         }),
         orderBy: JSON.stringify({ createdAt: 'desc' }),
       });

@@ -13,6 +13,7 @@ import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
 import { Task, TaskChecklist, TaskComment, TaskColumn, TaskInput } from '@/hooks/useTasks';
+import { useTaskFiles } from '@/hooks/useTaskFiles';
 import { useClients } from '@/hooks/useClients';
 import { useProposals } from '@/hooks/useProposals';
 import { useAgencyUsers } from '@/hooks/useAgencyUsers';
@@ -20,8 +21,9 @@ import { useToast } from '@/hooks/use-toast';
 import { apiFetch } from '@/lib/api';
 import { useAuth } from '@/contexts/AuthContext';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Card, CardContent } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
-import { MessageSquare, MessageSquareOff, Plus, CheckSquare, Trash2, ChevronDown, ChevronUp, X, ArrowLeftRight, History, Slash, PlusCircle, ArrowRight, Clock } from 'lucide-react';
+import { MessageSquare, MessageSquareOff, Plus, CheckSquare, Trash2, ChevronDown, ChevronUp, X, ArrowLeftRight, History, Slash, PlusCircle, ArrowRight, Clock, Upload, Eye, FileText, Loader2 } from 'lucide-react';
 import { useQueryClient } from '@tanstack/react-query';
 import {
   DropdownMenu,
@@ -84,6 +86,7 @@ export function TaskDialog({
   const [newItems, setNewItems] = useState<Record<string, string>>({});
   const [comments, setComments] = useState<TaskComment[]>([]);
   const [newComment, setNewComment] = useState('');
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
   const [histories, setHistories] = useState(task?.histories || []);
   const checklistRef = useRef<HTMLDivElement | null>(null);
   const commentsRef = useRef<HTMLDivElement | null>(null);
@@ -217,6 +220,14 @@ export function TaskDialog({
       ref.current.scrollIntoView({ behavior: 'smooth', block: 'start' });
     }
   };
+
+  const {
+    files,
+    uploadFile,
+    deleteFile,
+    isUploading,
+    isDeleting,
+  } = useTaskFiles(task?.id ?? null);
 
   const handleAddChecklist = async () => {
     if (!task || !newChecklistTitle.trim() || !user?.id) return;
@@ -362,6 +373,49 @@ export function TaskDialog({
     }
   };
 
+  const handleFileUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    uploadFile(
+      { file, caption: file.name },
+      {
+        onSuccess: () => {
+          if (showHistoryPanel) refreshHistories();
+        },
+      },
+    );
+    e.target.value = '';
+  };
+
+  const handleOpenFile = (url: string) => {
+    // Mesma abordagem das leads/propostas: fetch -> blob -> object URL para evitar about:blank
+    fetch(url)
+      .then((res) => res.blob())
+      .then((blob) => {
+        const objectUrl = URL.createObjectURL(blob);
+        const link = document.createElement('a');
+        link.href = objectUrl;
+        link.target = '_blank';
+        link.rel = 'noreferrer noopener';
+        document.body.appendChild(link);
+        link.click();
+        document.body.removeChild(link);
+        setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
+      })
+      .catch((err) => {
+        console.error('Erro ao abrir arquivo', err);
+        window.open(url, '_blank', 'noopener,noreferrer');
+      });
+  };
+
+  const handleDeleteFile = (id: string) => {
+    deleteFile(id, {
+      onSuccess: () => {
+        if (showHistoryPanel) refreshHistories();
+      },
+    });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent className="max-w-6xl max-h-[90vh] overflow-y-auto">
@@ -474,9 +528,11 @@ export function TaskDialog({
                       ? MessageSquare
                       : h.action === 'Checklist'
                         ? CheckSquare
-                        : h.field === 'Coluna'
-                          ? ArrowRight
-                          : History;
+                        : h.action === 'Arquivo'
+                          ? FileText
+                          : h.field === 'Coluna'
+                            ? ArrowRight
+                            : History;
                 const isLast = idx === histories.length - 1;
                 const parsedDate = h.created_at ? new Date(h.created_at) : null;
                 const dateText =
@@ -795,6 +851,80 @@ export function TaskDialog({
                       <p className="text-sm text-muted-foreground">Nenhuma checklist adicionada.</p>
                     )}
                   </div>
+                </div>
+              )}
+
+              {task && (
+                <div className="space-y-3">
+                  <Separator />
+                  <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2">
+                      <FileText className="h-4 w-4 text-primary" />
+                      <h4 className="font-medium">Arquivos</h4>
+                    </div>
+                    <div>
+                      <input
+                        ref={fileInputRef}
+                        type="file"
+                        className="hidden"
+                        accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
+                        onChange={handleFileUpload}
+                      />
+                      <Button
+                        type="button"
+                        size="sm"
+                        onClick={() => fileInputRef.current?.click()}
+                        disabled={isUploading}
+                        className="gap-2"
+                      >
+                        {isUploading ? <Loader2 className="h-4 w-4 animate-spin" /> : <Upload className="h-4 w-4" />}
+                        Enviar Arquivo
+                      </Button>
+                    </div>
+                  </div>
+
+                  {files.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">Nenhum arquivo anexado.</p>
+                  ) : (
+                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                      {files.map((file) => (
+                        <Card key={file.id} className="overflow-hidden">
+                          <CardContent className="p-0">
+                            {file.url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
+                              <img src={file.url} alt={file.caption || 'Arquivo'} className="w-full h-32 object-cover" />
+                            ) : (
+                              <div className="w-full h-32 bg-muted flex items-center justify-center">
+                                <FileText className="w-10 h-10 text-muted-foreground" />
+                              </div>
+                            )}
+                            <div className="p-3 space-y-1">
+                              <p className="text-sm font-medium truncate">{file.caption || 'Arquivo'}</p>
+                              <p className="text-xs text-muted-foreground">
+                                {file.created_at
+                                  ? format(new Date(file.created_at), "dd/MM/yyyy", { locale: ptBR })
+                                  : ''}
+                              </p>
+                              <div className="flex gap-2 mt-2">
+                                <Button variant="outline" size="sm" className="flex-1" onClick={() => handleOpenFile(file.url)}>
+                                  <Eye className="w-3 h-3 mr-1" />
+                                  Ver
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  className="text-destructive"
+                                  disabled={isDeleting}
+                                  onClick={() => handleDeleteFile(file.id)}
+                                >
+                                  <Trash2 className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            </div>
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
                 </div>
               )}
             </div>
