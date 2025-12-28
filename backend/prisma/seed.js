@@ -80,9 +80,31 @@ async function ensureVoyuAgency(userId) {
   return agency;
 }
 
+async function ensureDefaultPipelineStages(agencyId) {
+  const defaults = [
+    { name: 'Captação', color: '#3B82F6', order: 0, isClosed: false, isLost: false },
+    { name: 'Contato', color: '#8B5CF6', order: 1, isClosed: false, isLost: false },
+    { name: 'Montagem da Proposta', color: '#6366F1', order: 2, isClosed: false, isLost: false },
+    { name: 'Proposta Enviada', color: '#0EA5E9', order: 3, isClosed: false, isLost: false },
+    { name: 'Negociação', color: '#F59E0B', order: 4, isClosed: false, isLost: false },
+    { name: 'Fechado', color: '#10B981', order: 5, isClosed: true, isLost: false },
+    { name: 'Perdido', color: '#EF4444', order: 6, isClosed: false, isLost: true },
+  ];
+
+  // Remove etapas antigas e recria na ordem correta para evitar conflitos de unique (agencyId, order)
+  await prisma.pipelineStage.deleteMany({ where: { agencyId } });
+
+  await prisma.pipelineStage.createMany({
+    data: defaults.map((stage) => ({ ...stage, agencyId })),
+  });
+
+  console.log('Seed: estágios de pipeline padrão recriados');
+}
+
 async function main() {
   const user = await upsertSuperAdmin();
-  await ensureVoyuAgency(user.id);
+  const agency = await ensureVoyuAgency(user.id);
+  await ensureDefaultPipelineStages(agency.id);
 }
 
 main()

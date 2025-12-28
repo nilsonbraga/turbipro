@@ -20,7 +20,6 @@ import {
   AlertCircle,
   Clock,
   CheckCircle2,
-  GripVertical,
 } from 'lucide-react';
 import { format, differenceInDays, isPast, isToday } from 'date-fns';
 import { ptBR } from 'date-fns/locale';

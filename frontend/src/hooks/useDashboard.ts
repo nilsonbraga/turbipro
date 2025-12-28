@@ -442,8 +442,7 @@ export function useDashboard(filters: DashboardFilters = {}) {
 
   // estados
   const isInitialLoading =
-    (proposalsQuery.isPending && (proposalsQuery.data?.length ?? 0) === 0) ||
-    (servicesQuery.isPending && (servicesQuery.data?.length ?? 0) === 0);
+    proposalsQuery.isLoading || servicesQuery.isLoading || financialQuery.isLoading;
 
   // refresh “de verdade” = proposals/services refetch
   const isRefreshing = proposalsQuery.isFetching || servicesQuery.isFetching;

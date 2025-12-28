@@ -56,6 +56,8 @@ model User {
   agencyEmails             AgencyEmail[]
   notificationPreferences  NotificationPreference[]
   taskAssignees            TaskAssignee[]
+  taskChecklistsCreated    TaskChecklist[]         @relation("TaskChecklistsCreatedBy")
+  taskComments             TaskComment[]
 }
 
 model Agency {
@@ -482,6 +484,8 @@ model Task {
   client    Client?        @relation(fields: [clientId], references: [id], onDelete: SetNull)
   createdBy User           @relation("TasksCreatedBy", fields: [createdById], references: [id], onDelete: Restrict)
   assignees TaskAssignee[]
+  checklists TaskChecklist[]
+  comments   TaskComment[]
 
   @@index([agencyId])
   @@index([columnId])
@@ -500,6 +504,51 @@ model TaskAssignee {
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
   @@unique([taskId, userId])
+  @@index([taskId])
+  @@index([userId])
+}
+
+model TaskChecklist {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @db.Uuid
+  title     String
+  order     Int      @default(0)
+  createdBy String   @db.Uuid
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  task     Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  items    TaskChecklistItem[]
+  creator  User @relation("TaskChecklistsCreatedBy", fields: [createdBy], references: [id], onDelete: Restrict)
+
+  @@index([taskId])
+}
+
+model TaskChecklistItem {
+  id           String   @id @default(uuid()) @db.Uuid
+  checklistId  String   @db.Uuid
+  content      String
+  isDone       Boolean  @default(false)
+  order        Int      @default(0)
+  createdAt    DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt    DateTime @updatedAt @db.Timestamptz(6)
+
+  checklist TaskChecklist @relation(fields: [checklistId], references: [id], onDelete: Cascade)
+
+  @@index([checklistId])
+}
+
+model TaskComment {
+  id        String   @id @default(uuid()) @db.Uuid
+  taskId    String   @db.Uuid
+  userId    String   @db.Uuid
+  content   String
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  task Task @relation(fields: [taskId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
   @@index([taskId])
   @@index([userId])
 }

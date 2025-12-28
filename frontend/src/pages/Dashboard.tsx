@@ -272,13 +272,13 @@ export default function Dashboard() {
 
   return (
     <div
-      className={`min-h-screen transition-colors duration-500 ${
+      className={`min-h-screen overflow-x-hidden transition-colors duration-500 ${
         isDark
           ? 'bg-gradient-to-b from-[#0b1410] via-[#0c1613] to-[#0b1410] text-slate-50'
           : 'bg-gradient-to-b from-emerald-50 via-white to-emerald-50 text-slate-900'
       }`}
     >
-      <div className="max-w-[1600px] mx-auto p-6 space-y-6 transition-all duration-500 relative">
+      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 transition-all duration-500 relative">
         <RefreshOverlay show={showRefreshing} isDark={isDark} />
 
         {showFullSkeleton ? (
@@ -517,12 +517,12 @@ export default function Dashboard() {
             </div>
 
             {/* Charts */}
-            <div className="grid grid-cols-1 xl:grid-cols-[3fr,2fr] gap-6">
-              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
+            <div className="grid grid-cols-1 xl:grid-cols-[3fr,2fr] gap-6 overflow-hidden">
+              <Card className={`backdrop-blur-lg border ${surfaceCard} min-w-0`}>
                 <CardHeader>
                   <CardTitle className={`text-lg ${textStrong}`}>Faturamento x Lucro</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="overflow-hidden">
                   {revenueData.length ? (
                     <ChartContainer
                       config={
@@ -531,22 +531,24 @@ export default function Dashboard() {
                           profit: { label: 'Lucro', color: isDark ? '#34d399' : '#86efac' },
                         } satisfies ChartConfig
                       }
-                      className="h-[320px]"
+                      className="h-[320px] w-full"
                     >
-                      <BarChart accessibilityLayer data={revenueData}>
-                        <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'} />
-                        <XAxis
-                          dataKey="month"
-                          tickLine={false}
-                          tickMargin={10}
-                          axisLine={false}
-                          tick={{ fill: isDark ? '#e5e7eb' : '#0f172a' }}
-                        />
-                        <ChartTooltip content={<ChartTooltipContent formatter={(v) => formatCurrency(Number(v))} />} />
-                        <ChartLegend content={<ChartLegendContent />} />
-                        <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} isAnimationActive={!showRefreshing} />
-                        <Bar dataKey="profit" fill="var(--color-profit)" radius={[0, 0, 4, 4]} isAnimationActive={!showRefreshing} />
-                      </BarChart>
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart accessibilityLayer data={revenueData}>
+                          <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'} />
+                          <XAxis
+                            dataKey="month"
+                            tickLine={false}
+                            tickMargin={10}
+                            axisLine={false}
+                            tick={{ fill: isDark ? '#e5e7eb' : '#0f172a' }}
+                          />
+                          <ChartTooltip content={<ChartTooltipContent formatter={(v) => formatCurrency(Number(v))} />} />
+                          <ChartLegend content={<ChartLegendContent />} />
+                          <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} isAnimationActive={!showRefreshing} />
+                          <Bar dataKey="profit" fill="var(--color-profit)" radius={[0, 0, 4, 4]} isAnimationActive={!showRefreshing} />
+                        </BarChart>
+                      </ResponsiveContainer>
                     </ChartContainer>
                   ) : (
                     <div className={`h-[320px] flex items-center justify-center ${textMuted}`}>Sem dados para exibir</div>
@@ -554,11 +556,11 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
+              <Card className={`backdrop-blur-lg border ${surfaceCard} min-w-0`}>
                 <CardHeader>
                   <CardTitle className={`text-lg ${textStrong}`}>Pipeline por estágio</CardTitle>
                 </CardHeader>
-                <CardContent>
+                <CardContent className="overflow-hidden">
                   {pipelineData.length ? (
                     <ChartContainer
                       config={
@@ -567,33 +569,35 @@ export default function Dashboard() {
                           label: { color: 'var(--background)' },
                         } satisfies ChartConfig
                       }
-                      className="h-[320px]"
+                      className="h-[320px] w-full"
                     >
-                      <BarChart
-                        accessibilityLayer
-                        data={pipelineData}
-                        layout="vertical"
-                        margin={{ right: 16, left: 16 }}
-                      >
-                        <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke={isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'} />
-                        <YAxis dataKey="stage" type="category" hide />
-                        <XAxis dataKey="count" type="number" hide />
-                        <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                        <Bar
-                          dataKey="count"
+                      <ResponsiveContainer width="100%" height="100%">
+                        <BarChart
+                          accessibilityLayer
+                          data={pipelineData}
                           layout="vertical"
-                          radius={4}
-                          barSize={26}
-                          minPointSize={2}
-                          isAnimationActive={!showRefreshing}
+                          margin={{ right: 12, left: 8 }}
                         >
-                          <LabelList dataKey="stage" content={pipelineStageLabel} />
-                          <LabelList dataKey="count" content={pipelineCountLabel} />
-                          {pipelineData.map((entry, idx) => (
-                            <Cell key={entry.stage} fill={entry.color || colorForStage(entry.stage, idx)} fillOpacity={entry.count === 0 ? 0.15 : 1} />
-                          ))}
-                        </Bar>
-                      </BarChart>
+                          <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke={isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'} />
+                          <YAxis dataKey="stage" type="category" hide />
+                          <XAxis dataKey="count" type="number" hide />
+                          <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
+                          <Bar
+                            dataKey="count"
+                            layout="vertical"
+                            radius={4}
+                            barSize={26}
+                            minPointSize={2}
+                            isAnimationActive={!showRefreshing}
+                          >
+                            <LabelList dataKey="stage" content={pipelineStageLabel} />
+                            <LabelList dataKey="count" content={pipelineCountLabel} />
+                            {pipelineData.map((entry, idx) => (
+                              <Cell key={entry.stage} fill={entry.color || colorForStage(entry.stage, idx)} fillOpacity={entry.count === 0 ? 0.15 : 1} />
+                            ))}
+                          </Bar>
+                        </BarChart>
+                      </ResponsiveContainer>
                     </ChartContainer>
                   ) : (
                     <div className={`h-[320px] flex items-center justify-center ${textMuted}`}>Sem dados para exibir</div>

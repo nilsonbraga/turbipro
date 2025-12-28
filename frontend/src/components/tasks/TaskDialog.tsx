@@ -12,10 +12,18 @@ import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { cn } from '@/lib/utils';
-import { Task, TaskColumn, TaskInput } from '@/hooks/useTasks';
+import { Task, TaskChecklist, TaskComment, TaskColumn, TaskInput } from '@/hooks/useTasks';
 import { useClients } from '@/hooks/useClients';
 import { useProposals } from '@/hooks/useProposals';
 import { useAgencyUsers } from '@/hooks/useAgencyUsers';
+import { useToast } from '@/hooks/use-toast';
+import { apiFetch } from '@/lib/api';
+import { useAuth } from '@/contexts/AuthContext';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Separator } from '@/components/ui/separator';
+import { Checkbox as ShadCheckbox } from '@/components/ui/checkbox';
+import { MessageSquare, Plus, CheckSquare, Trash2 } from 'lucide-react';
+import { useQueryClient } from '@tanstack/react-query';
 
 interface TaskDialogProps {
   open: boolean;
@@ -41,6 +49,9 @@ export function TaskDialog({
   const { clients } = useClients();
   const { proposals } = useProposals();
   const { users } = useAgencyUsers();
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -51,6 +62,11 @@ export function TaskDialog({
   const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
   const [tags, setTags] = useState<string>('');
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
+  const [checklists, setChecklists] = useState<TaskChecklist[]>([]);
+  const [newChecklistTitle, setNewChecklistTitle] = useState('');
+  const [newItems, setNewItems] = useState<Record<string, string>>({});
+  const [comments, setComments] = useState<TaskComment[]>([]);
+  const [newComment, setNewComment] = useState('');
 
   useEffect(() => {
     if (task) {
@@ -63,6 +79,8 @@ export function TaskDialog({
       setPriority(task.priority || 'medium');
       setTags((task.tags || []).join(', '));
       setSelectedAssignees(task.assignees?.map(a => a.user_id) || []);
+      setChecklists(task.checklists || []);
+      setComments(task.comments || []);
     } else {
       setTitle(prefillData?.title || '');
       setDescription(prefillData?.description || '');
@@ -73,6 +91,8 @@ export function TaskDialog({
       setPriority('medium');
       setTags('');
       setSelectedAssignees([]);
+      setChecklists([]);
+      setComments([]);
     }
   }, [task, defaultColumnId, columns, prefillData]);
 
@@ -104,6 +124,139 @@ export function TaskDialog({
         ? prev.filter(id => id !== userId)
         : [...prev, userId]
     );
+  };
+
+  const handleAddChecklist = async () => {
+    if (!task || !newChecklistTitle.trim() || !user?.id) return;
+    try {
+      const order = checklists.length;
+      const created = await apiFetch<any>('/api/taskChecklist', {
+        method: 'POST',
+        body: JSON.stringify({
+          taskId: task.id,
+          title: newChecklistTitle.trim(),
+          order,
+          createdBy: user.id,
+        }),
+      });
+      setChecklists((prev) => [...prev, {
+        id: created.id,
+        task_id: created.taskId,
+        title: created.title,
+        order: created.order,
+        created_by: created.createdBy,
+        items: [],
+      }]);
+      setNewChecklistTitle('');
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    } catch (error: any) {
+      toast({ title: 'Erro ao adicionar checklist', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleAddItem = async (checklistId: string) => {
+    const content = (newItems[checklistId] || '').trim();
+    if (!content) return;
+    try {
+      const checklist = checklists.find((c) => c.id === checklistId);
+      const order = checklist ? checklist.items.length : 0;
+      const created = await apiFetch<any>('/api/taskChecklistItem', {
+        method: 'POST',
+        body: JSON.stringify({ checklistId, content, order }),
+      });
+      setChecklists((prev) =>
+        prev.map((c) =>
+          c.id === checklistId
+            ? {
+                ...c,
+                items: [
+                  ...c.items,
+                  {
+                    id: created.id,
+                    checklist_id: created.checklistId,
+                    content: created.content,
+                    is_done: created.isDone,
+                    order: created.order,
+                  },
+                ],
+              }
+            : c,
+        ),
+      );
+      setNewItems((prev) => ({ ...prev, [checklistId]: '' }));
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    } catch (error: any) {
+      toast({ title: 'Erro ao adicionar item', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleToggleItem = async (itemId: string, isDone: boolean) => {
+    try {
+      await apiFetch(`/api/taskChecklistItem/${itemId}`, {
+        method: 'PUT',
+        body: JSON.stringify({ isDone }),
+      });
+      setChecklists((prev) =>
+        prev.map((c) => ({
+          ...c,
+          items: c.items.map((it) => (it.id === itemId ? { ...it, is_done: isDone } : it)),
+        })),
+      );
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    } catch (error: any) {
+      toast({ title: 'Erro ao atualizar item', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteItem = async (itemId: string) => {
+    try {
+      await apiFetch(`/api/taskChecklistItem/${itemId}`, { method: 'DELETE' });
+      setChecklists((prev) =>
+        prev.map((c) => ({ ...c, items: c.items.filter((it) => it.id !== itemId) })),
+      );
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    } catch (error: any) {
+      toast({ title: 'Erro ao excluir item', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleDeleteChecklist = async (checklistId: string) => {
+    try {
+      await apiFetch(`/api/taskChecklist/${checklistId}`, { method: 'DELETE' });
+      setChecklists((prev) => prev.filter((c) => c.id !== checklistId));
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    } catch (error: any) {
+      toast({ title: 'Erro ao excluir checklist', description: error.message, variant: 'destructive' });
+    }
+  };
+
+  const handleAddComment = async () => {
+    if (!task || !user?.id || !newComment.trim()) return;
+    try {
+      const created = await apiFetch<any>('/api/taskComment', {
+        method: 'POST',
+        body: JSON.stringify({
+          taskId: task.id,
+          userId: user.id,
+          content: newComment.trim(),
+        }),
+      });
+      setComments((prev) => [
+        ...prev,
+        {
+          id: created.id,
+          task_id: created.taskId,
+          user_id: created.userId,
+          content: created.content,
+          created_at: created.createdAt,
+          user: { id: user.id, name: user.name || '', email: user.email || '', avatarUrl: user.avatarUrl },
+        },
+      ]);
+      setNewComment('');
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    } catch (error: any) {
+      toast({ title: 'Erro ao adicionar comentário', description: error.message, variant: 'destructive' });
+    }
   };
 
   return (
@@ -269,6 +422,152 @@ export function TaskDialog({
                 ))}
               </div>
             </div>
+          )}
+
+          {task && (
+            <>
+              <Separator />
+              <div className="space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-2">
+                    <CheckSquare className="h-4 w-4 text-primary" />
+                    <h4 className="font-medium">Checklists</h4>
+                  </div>
+                  <div className="flex gap-2">
+                    <Input
+                      placeholder="Nova checklist"
+                      value={newChecklistTitle}
+                      onChange={(e) => setNewChecklistTitle(e.target.value)}
+                      className="h-9"
+                    />
+                    <Button type="button" size="sm" onClick={handleAddChecklist} disabled={!newChecklistTitle.trim()}>
+                      <Plus className="h-4 w-4 mr-1" />
+                      Adicionar
+                    </Button>
+                  </div>
+                </div>
+
+                <div className="space-y-3 max-h-60 overflow-y-auto pr-1">
+                  {checklists.map((checklist) => (
+                    <div key={checklist.id} className="rounded-md border border-border/70 p-3 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <p className="font-medium text-sm">{checklist.title}</p>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground"
+                          onClick={() => handleDeleteChecklist(checklist.id)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </div>
+                      <div className="space-y-2">
+                        {checklist.items.map((item) => (
+                          <div key={item.id} className="flex items-center gap-2">
+                            <ShadCheckbox
+                              checked={item.is_done}
+                              onCheckedChange={(checked) => handleToggleItem(item.id, !!checked)}
+                            />
+                            <span className={cn('text-sm flex-1', item.is_done && 'line-through text-muted-foreground')}>
+                              {item.content}
+                            </span>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground"
+                              onClick={() => handleDeleteItem(item.id)}
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </div>
+                        ))}
+                        <div className="flex items-center gap-2">
+                          <Input
+                            placeholder="Nova subtarefa"
+                            value={newItems[checklist.id] || ''}
+                            onChange={(e) =>
+                              setNewItems((prev) => ({
+                                ...prev,
+                                [checklist.id]: e.target.value,
+                              }))
+                            }
+                            className="h-9"
+                          />
+                          <Button
+                            type="button"
+                            size="sm"
+                            variant="secondary"
+                            onClick={() => handleAddItem(checklist.id)}
+                            disabled={!newItems[checklist.id]?.trim()}
+                          >
+                            Adicionar
+                          </Button>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                  {checklists.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Nenhuma checklist adicionada.</p>
+                  )}
+                </div>
+              </div>
+
+              <Separator />
+              <div className="space-y-3">
+                <div className="flex items-center gap-2">
+                  <MessageSquare className="h-4 w-4 text-primary" />
+                  <h4 className="font-medium">Comentários</h4>
+                </div>
+                <div className="space-y-3 max-h-56 overflow-y-auto pr-1">
+                  {comments.map((comment) => (
+                    <div key={comment.id} className="flex gap-2">
+                      <Avatar className="h-9 w-9">
+                        {comment.user?.avatarUrl ? (
+                          <AvatarImage src={comment.user.avatarUrl} alt={comment.user.name || ''} />
+                        ) : (
+                          <AvatarFallback>
+                            {(comment.user?.name || 'U')
+                              .split(' ')
+                              .map((n) => n[0])
+                              .join('')
+                              .toUpperCase()
+                              .slice(0, 2)}
+                          </AvatarFallback>
+                        )}
+                      </Avatar>
+                      <div className="flex-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+                        <div className="flex items-center justify-between">
+                          <span className="font-medium text-sm">{comment.user?.name || 'Usuário'}</span>
+                          <span className="text-[11px] text-muted-foreground">
+                            {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                          </span>
+                        </div>
+                        <p className="text-sm text-foreground mt-1 whitespace-pre-line">{comment.content}</p>
+                      </div>
+                    </div>
+                  ))}
+                  {comments.length === 0 && (
+                    <p className="text-sm text-muted-foreground">Nenhum comentário ainda.</p>
+                  )}
+                </div>
+                <div className="space-y-2">
+                  <Label>Adicionar comentário</Label>
+                  <Textarea
+                    value={newComment}
+                    onChange={(e) => setNewComment(e.target.value)}
+                    rows={2}
+                    placeholder="Escreva um comentário"
+                  />
+                  <div className="flex justify-end">
+                    <Button type="button" size="sm" onClick={handleAddComment} disabled={!newComment.trim()}>
+                      Enviar
+                    </Button>
+                  </div>
+                </div>
+              </div>
+            </>
           )}
 
           <div className="flex justify-end gap-2 pt-4">

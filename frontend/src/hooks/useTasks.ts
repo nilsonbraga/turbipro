@@ -40,6 +40,8 @@ export interface Task {
   created_by: string | null;
   created_at: string;
   updated_at: string;
+  checklists?: TaskChecklist[];
+  comments?: TaskComment[];
   client?: {
     id: string;
     name: string;
@@ -50,6 +52,37 @@ export interface Task {
     number: number;
   } | null;
   assignees?: TaskAssignee[];
+}
+
+export interface TaskChecklistItem {
+  id: string;
+  checklist_id: string;
+  content: string;
+  is_done: boolean;
+  order: number;
+}
+
+export interface TaskChecklist {
+  id: string;
+  task_id: string;
+  title: string;
+  order: number;
+  items: TaskChecklistItem[];
+  created_by: string;
+}
+
+export interface TaskComment {
+  id: string;
+  task_id: string;
+  user_id: string;
+  content: string;
+  created_at: string;
+  user?: {
+    id: string;
+    name: string | null;
+    email: string | null;
+    avatarUrl?: string | null;
+  };
 }
 
 export interface TaskInput {
@@ -255,6 +288,30 @@ export function useTasks(filters?: {
       created_at: a.createdAt,
       user: a.user ? { id: a.user.id, name: a.user.name, email: a.user.email } : undefined,
     })),
+    checklists: (t.checklists || []).map((c: any) => ({
+      id: c.id,
+      task_id: c.taskId,
+      title: c.title,
+      order: c.order,
+      created_by: c.createdBy,
+      items: (c.items || []).map((it: any) => ({
+        id: it.id,
+        checklist_id: it.checklistId,
+        content: it.content,
+        is_done: it.isDone,
+        order: it.order,
+      })),
+    })),
+    comments: (t.comments || []).map((c: any) => ({
+      id: c.id,
+      task_id: c.taskId,
+      user_id: c.userId,
+      content: c.content,
+      created_at: c.createdAt,
+      user: c.user
+        ? { id: c.user.id, name: c.user.name, email: c.user.email, avatarUrl: c.user.avatarUrl }
+        : undefined,
+    })),
   });
 
   const { data: tasks = [], isLoading, error } = useQuery({
@@ -272,6 +329,8 @@ export function useTasks(filters?: {
           client: { select: { id: true, name: true } },
           proposal: { select: { id: true, title: true, number: true } },
           assignees: { include: { user: { select: { id: true, name: true, email: true } } } },
+          checklists: { include: { items: true } },
+          comments: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } } },
         }),
         orderBy: JSON.stringify({ createdAt: 'desc' }),
       });
@@ -427,6 +486,105 @@ export function useTasks(filters?: {
     },
   });
 
+  const addChecklist = useMutation({
+    mutationFn: async ({ taskId, title, order }: { taskId: string; title: string; order: number }) => {
+      if (!user?.id) throw new Error('Usuário não encontrado');
+      return apiFetch('/api/taskChecklist', {
+        method: 'POST',
+        body: JSON.stringify({
+          taskId,
+          title,
+          order,
+          createdBy: user.id,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao adicionar checklist', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteChecklist = useMutation({
+    mutationFn: async (id: string) => {
+      await apiFetch(`/api/taskChecklist/${id}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao excluir checklist', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const addChecklistItem = useMutation({
+    mutationFn: async ({ checklistId, content, order }: { checklistId: string; content: string; order: number }) => {
+      return apiFetch('/api/taskChecklistItem', {
+        method: 'POST',
+        body: JSON.stringify({
+          checklistId,
+          content,
+          order,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao adicionar item', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const updateChecklistItem = useMutation({
+    mutationFn: async ({ id, data }: { id: string; data: Partial<{ content: string; isDone: boolean; order: number }> }) => {
+      return apiFetch(`/api/taskChecklistItem/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao atualizar item', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const deleteChecklistItem = useMutation({
+    mutationFn: async (id: string) => {
+      await apiFetch(`/api/taskChecklistItem/${id}`, { method: 'DELETE' });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao excluir item', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  const addComment = useMutation({
+    mutationFn: async ({ taskId, content }: { taskId: string; content: string }) => {
+      if (!user?.id) throw new Error('Usuário não encontrado');
+      return apiFetch('/api/taskComment', {
+        method: 'POST',
+        body: JSON.stringify({
+          taskId,
+          userId: user.id,
+          content,
+        }),
+      });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Erro ao adicionar comentário', description: error.message, variant: 'destructive' });
+    },
+  });
+
   return {
     tasks,
     isLoading,
@@ -435,5 +593,11 @@ export function useTasks(filters?: {
     updateTask,
     moveTask,
     deleteTask,
+    addChecklist,
+    deleteChecklist,
+    addChecklistItem,
+    updateChecklistItem,
+    deleteChecklistItem,
+    addComment,
   };
 }
