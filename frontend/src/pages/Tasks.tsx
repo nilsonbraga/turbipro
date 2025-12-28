@@ -1,18 +1,31 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useMemo } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
-import { DndContext, DragEndEvent, DragOverlay, pointerWithin } from '@dnd-kit/core';
+import {
+  DndContext,
+  DragEndEvent,
+  DragOverlay,
+  pointerWithin,
+  PointerSensor,
+  useSensor,
+  useSensors,
+  DragStartEvent,
+  DragCancelEvent,
+} from '@dnd-kit/core';
+
 import { useTasks, useTaskColumns, Task, TaskColumn, TaskInput } from '@/hooks/useTasks';
 import { useClients } from '@/hooks/useClients';
 import { useAgencyUsers } from '@/hooks/useAgencyUsers';
 import { useProposals } from '@/hooks/useProposals';
 import { useAgencies } from '@/hooks/useAgencies';
 import { useAuth } from '@/contexts/AuthContext';
+
 import { TaskColumnComponent } from '@/components/tasks/TaskColumn';
 import { TaskCard } from '@/components/tasks/TaskCard';
 import { TaskDialog } from '@/components/tasks/TaskDialog';
 import { ColumnDialog } from '@/components/tasks/ColumnDialog';
 import { TaskListView } from '@/components/tasks/TaskListView';
 import { TaskViewToggle, TaskViewMode } from '@/components/tasks/TaskViewToggle';
+
 import { ProposalDetail } from '@/components/proposals/ProposalDetail';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
@@ -21,6 +34,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -31,6 +45,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+
 import { Plus, Filter, CalendarIcon, X, Search, Settings, Building2 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -63,8 +78,20 @@ export default function Tasks() {
   const effectiveAgencyId = isSuperAdmin ? selectedAgencyId : agency?.id;
 
   const { agencies } = useAgencies();
-  const { columns, isLoading: columnsLoading, createColumn, updateColumn, deleteColumn, initializeDefaultColumns } = useTaskColumns(effectiveAgencyId);
-  const { tasks, isLoading: tasksLoading, createTask, updateTask, moveTask, deleteTask } = useTasks({ ...filters, agencyId: effectiveAgencyId });
+  const { columns, isLoading: columnsLoading, createColumn, updateColumn, deleteColumn, initializeDefaultColumns } =
+    useTaskColumns(effectiveAgencyId);
+
+  const {
+    tasks,
+    isLoading: tasksLoading,
+    createTask,
+    updateTask,
+    moveTask,
+    deleteTask,
+  } = useTasks({ ...filters, agencyId: effectiveAgencyId });
+
+  const tasksList = tasks ?? [];
+
   const { clients } = useClients();
   const { users } = useAgencyUsers();
   const { proposals } = useProposals();
@@ -76,11 +103,27 @@ export default function Tasks() {
   const [defaultColumnId, setDefaultColumnId] = useState<string>('');
   const [deleteTaskId, setDeleteTaskId] = useState<string | null>(null);
   const [deleteColumnId, setDeleteColumnId] = useState<string | null>(null);
+
   const [activeTask, setActiveTask] = useState<Task | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
+
   const [showFilters, setShowFilters] = useState(false);
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [prefillData, setPrefillData] = useState<PrefillTaskData | null>(null);
+
+  /**
+   * ✅ CORREÇÃO PRINCIPAL:
+   * Só inicia drag depois de mover X px.
+   * Isso faz o click “passar” e abrir o modal normalmente.
+   */
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: {
+        distance: 8, // ajuste fino: 6~12 costuma ficar ótimo
+      },
+    }),
+  );
 
   // Set default agency for super admin
   useEffect(() => {
@@ -94,7 +137,7 @@ export default function Tasks() {
     if (!columnsLoading && columns.length === 0 && effectiveAgencyId) {
       initializeDefaultColumns.mutate(effectiveAgencyId);
     }
-  }, [columnsLoading, columns.length, effectiveAgencyId]);
+  }, [columnsLoading, columns.length, effectiveAgencyId, initializeDefaultColumns]);
 
   // Handle prefill data from navigation state
   useEffect(() => {
@@ -104,17 +147,17 @@ export default function Tasks() {
       setTaskDialogOpen(true);
       navigate(location.pathname, { replace: true, state: {} });
     }
-  }, [prefillTask, columns]);
+  }, [prefillTask, columns, navigate, location.pathname]);
 
   useEffect(() => {
     if (dateRange?.from) {
-      setFilters(prev => ({
+      setFilters((prev) => ({
         ...prev,
         startDate: dateRange.from?.toISOString(),
         endDate: dateRange.to?.toISOString(),
       }));
     } else {
-      setFilters(prev => ({
+      setFilters((prev) => ({
         ...prev,
         startDate: undefined,
         endDate: undefined,
@@ -123,20 +166,34 @@ export default function Tasks() {
   }, [dateRange]);
 
   // Filter tasks by search query
-  const filteredTasks = tasks.filter(task => 
-    searchQuery === '' || 
-    task.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    task.description?.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const filteredTasks = useMemo(() => {
+    const q = searchQuery.trim().toLowerCase();
+    if (!q) return tasksList;
 
-  const handleDragStart = (event: any) => {
+    return tasksList.filter((task) => {
+      const title = (task.title || '').toLowerCase();
+      const desc = (task.description || '').toLowerCase();
+      return title.includes(q) || desc.includes(q);
+    });
+  }, [tasksList, searchQuery]);
+
+  const handleDragStart = (event: DragStartEvent) => {
+    setIsDragging(true);
+
     const { active } = event;
-    const task = tasks.find(t => t.id === active.id);
+    const task = tasksList.find((t) => t.id === (active.id as string));
     if (task) setActiveTask(task);
+  };
+
+  const handleDragCancel = (_event: DragCancelEvent) => {
+    setIsDragging(false);
+    setActiveTask(null);
   };
 
   const handleDragEnd = (event: DragEndEvent) => {
     const { active, over } = event;
+
+    setIsDragging(false);
     setActiveTask(null);
 
     if (!over) return;
@@ -144,9 +201,9 @@ export default function Tasks() {
     const taskId = active.id as string;
     const overId = over.id as string;
 
-    const targetColumn = columns.find(c => c.id === overId);
+    const targetColumn = columns.find((c) => c.id === overId);
     if (targetColumn) {
-      const task = tasks.find(t => t.id === taskId);
+      const task = tasksList.find((t) => t.id === taskId);
       if (task && task.column_id !== targetColumn.id) {
         moveTask.mutate({ taskId, columnId: targetColumn.id });
       }
@@ -156,6 +213,16 @@ export default function Tasks() {
   const handleAddTask = (columnId: string) => {
     setSelectedTask(null);
     setDefaultColumnId(columnId);
+    setTaskDialogOpen(true);
+  };
+
+  // ✅ “Abrir” no clique: aqui você decide se quer abrir no modo editar (TaskDialog) ou outro modal de detalhe.
+  const handleOpenTask = (task: Task) => {
+    // Se estava arrastando, não abre (proteção extra)
+    if (isDragging) return;
+
+    setSelectedTask(task);
+    setDefaultColumnId(task.column_id);
     setTaskDialogOpen(true);
   };
 
@@ -203,8 +270,8 @@ export default function Tasks() {
     setSelectedProposalId(proposalId);
   };
 
-  const selectedProposal = proposals?.find(p => p.id === selectedProposalId);
-  const hasActiveFilters = filters.clientId || filters.assigneeId || filters.status || dateRange;
+  const selectedProposal = proposals?.find((p) => p.id === selectedProposalId);
+  const hasActiveFilters = !!(filters.clientId || filters.assigneeId || filters.status || dateRange);
 
   if (columnsLoading && effectiveAgencyId) {
     return (
@@ -227,18 +294,15 @@ export default function Tasks() {
             {/* Agency Selector for Super Admin */}
             {isSuperAdmin && (
               <>
-                <Select
-                  value={selectedAgencyId || ''}
-                  onValueChange={(value) => setSelectedAgencyId(value)}
-                >
+                <Select value={selectedAgencyId || ''} onValueChange={(value) => setSelectedAgencyId(value)}>
                   <SelectTrigger className="w-56 h-9">
                     <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
                     <SelectValue placeholder="Selecionar agência" />
                   </SelectTrigger>
                   <SelectContent>
-                    {agencies.map((agency) => (
-                      <SelectItem key={agency.id} value={agency.id}>
-                        {agency.name}
+                    {agencies.map((a) => (
+                      <SelectItem key={a.id} value={a.id}>
+                        {a.name}
                       </SelectItem>
                     ))}
                   </SelectContent>
@@ -248,21 +312,19 @@ export default function Tasks() {
             )}
 
             <TaskViewToggle view={view} onViewChange={setView} />
-            
+
             <div className="h-6 w-px bg-border" />
-            
+
             <Button
               variant="ghost"
               size="sm"
-              className={cn("gap-1.5", hasActiveFilters && "text-primary")}
+              className={cn('gap-1.5', hasActiveFilters && 'text-primary')}
               onClick={() => setShowFilters(!showFilters)}
             >
               <Filter className="h-4 w-4" />
               Filter
               {hasActiveFilters && (
-                <span className="ml-1 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full">
-                  !
-                </span>
+                <span className="ml-1 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full">!</span>
               )}
             </Button>
           </div>
@@ -277,7 +339,7 @@ export default function Tasks() {
                 onChange={(e) => setSearchQuery(e.target.value)}
               />
             </div>
-            
+
             <Button
               variant="outline"
               size="sm"
@@ -311,16 +373,18 @@ export default function Tasks() {
           <div className="flex flex-wrap gap-3 px-4 pb-4">
             <Select
               value={filters.clientId || 'all'}
-              onValueChange={(value) => setFilters(prev => ({ ...prev, clientId: value === 'all' ? undefined : value }))}
+              onValueChange={(value) =>
+                setFilters((prev) => ({ ...prev, clientId: value === 'all' ? undefined : value }))
+              }
             >
               <SelectTrigger className="w-44 h-9">
                 <SelectValue placeholder="Client" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Clients</SelectItem>
-                {clients?.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
+                {clients?.map((c) => (
+                  <SelectItem key={c.id} value={c.id}>
+                    {c.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -328,16 +392,18 @@ export default function Tasks() {
 
             <Select
               value={filters.assigneeId || 'all'}
-              onValueChange={(value) => setFilters(prev => ({ ...prev, assigneeId: value === 'all' ? undefined : value }))}
+              onValueChange={(value) =>
+                setFilters((prev) => ({ ...prev, assigneeId: value === 'all' ? undefined : value }))
+              }
             >
               <SelectTrigger className="w-44 h-9">
                 <SelectValue placeholder="Assignee" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="all">All Assignees</SelectItem>
-                {users?.map((user) => (
-                  <SelectItem key={user.id} value={user.id}>
-                    {user.name}
+                {users?.map((u) => (
+                  <SelectItem key={u.id} value={u.id}>
+                    {u.name}
                   </SelectItem>
                 ))}
               </SelectContent>
@@ -345,7 +411,9 @@ export default function Tasks() {
 
             <Select
               value={filters.status || 'all'}
-              onValueChange={(value) => setFilters(prev => ({ ...prev, status: value === 'all' ? undefined : value as any }))}
+              onValueChange={(value) =>
+                setFilters((prev) => ({ ...prev, status: value === 'all' ? undefined : (value as any) }))
+              }
             >
               <SelectTrigger className="w-44 h-9">
                 <SelectValue placeholder="Due Status" />
@@ -361,25 +429,23 @@ export default function Tasks() {
 
             <Popover>
               <PopoverTrigger asChild>
-                <Button 
-                  variant="outline" 
-                  size="sm" 
-                  className={cn(
-                    "h-9 w-52 justify-start text-left font-normal", 
-                    !dateRange && "text-muted-foreground"
-                  )}
+                <Button
+                  variant="outline"
+                  size="sm"
+                  className={cn('h-9 w-52 justify-start text-left font-normal', !dateRange && 'text-muted-foreground')}
                 >
                   <CalendarIcon className="mr-2 h-4 w-4" />
                   {dateRange?.from ? (
                     dateRange.to ? (
                       <>
-                        {format(dateRange.from, "dd/MM/yy", { locale: ptBR })} - {format(dateRange.to, "dd/MM/yy", { locale: ptBR })}
+                        {format(dateRange.from, 'dd/MM/yy', { locale: ptBR })} -{' '}
+                        {format(dateRange.to, 'dd/MM/yy', { locale: ptBR })}
                       </>
                     ) : (
-                      format(dateRange.from, "dd/MM/yyyy", { locale: ptBR })
+                      format(dateRange.from, 'dd/MM/yyyy', { locale: ptBR })
                     )
                   ) : (
-                    "Date Range"
+                    'Date Range'
                   )}
                 </Button>
               </PopoverTrigger>
@@ -419,10 +485,12 @@ export default function Tasks() {
       {effectiveAgencyId && (
         <>
           {view === 'board' ? (
-            <div className="flex-1 overflow-x-auto p-6">
+            <div className="flex-1 overflow-x-auto px-4 py-4 lg:px-6">
               <DndContext
+                sensors={sensors}
                 collisionDetection={pointerWithin}
                 onDragStart={handleDragStart}
+                onDragCancel={handleDragCancel}
                 onDragEnd={handleDragEnd}
               >
                 <div className="flex gap-4 h-full">
@@ -430,13 +498,19 @@ export default function Tasks() {
                     <TaskColumnComponent
                       key={column.id}
                       column={column}
-                      tasks={filteredTasks.filter(t => t.column_id === column.id)}
+                      tasks={filteredTasks.filter((t) => t.column_id === column.id)}
                       onAddTask={handleAddTask}
                       onEditTask={handleEditTask}
                       onDeleteTask={(id) => setDeleteTaskId(id)}
                       onEditColumn={handleEditColumn}
                       onDeleteColumn={(id) => setDeleteColumnId(id)}
                       onOpenProposal={handleOpenProposal}
+                      /**
+                       * ✅ Se o seu TaskColumn/TaskCard aceitar isso, use para abrir no clique.
+                       * Se não aceitar, o clique vai voltar a funcionar só com o activationConstraint,
+                       * e o TaskCard continuará chamando onEditTask como já fazia.
+                       */
+                      onOpenTask={handleOpenTask as any}
                     />
                   ))}
                 </div>
@@ -495,9 +569,7 @@ export default function Tasks() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir tarefa?</AlertDialogTitle>
-            <AlertDialogDescription>
-              Esta ação não pode ser desfeita.
-            </AlertDialogDescription>
+            <AlertDialogDescription>Esta ação não pode ser desfeita.</AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
@@ -546,8 +618,8 @@ export default function Tasks() {
       <Dialog open={!!selectedProposalId} onOpenChange={() => setSelectedProposalId(null)}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
           {selectedProposal && (
-            <ProposalDetail 
-              proposal={selectedProposal} 
+            <ProposalDetail
+              proposal={selectedProposal}
               onClose={() => setSelectedProposalId(null)}
               onEdit={() => setSelectedProposalId(null)}
               onProposalUpdate={() => {}}

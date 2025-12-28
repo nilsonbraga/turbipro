@@ -974,7 +974,7 @@ export default function Leads() {
 
       {/* Content */}
       {view === 'board' ? (
-        <div className="flex-1 overflow-x-auto p-6">
+        <div className="flex-1 overflow-x-auto px-3 py-4 md:px-4 lg:px-5">
           {isLoading ? (
             <div className="flex items-center justify-center h-full">
               <Loader2 className="w-8 h-8 animate-spin text-primary" />

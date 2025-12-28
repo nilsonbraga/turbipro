@@ -48,6 +48,8 @@ export function TaskDialog({
   const [columnId, setColumnId] = useState('');
   const [clientId, setClientId] = useState<string>('');
   const [proposalId, setProposalId] = useState<string>('');
+  const [priority, setPriority] = useState<'low' | 'medium' | 'high'>('medium');
+  const [tags, setTags] = useState<string>('');
   const [selectedAssignees, setSelectedAssignees] = useState<string[]>([]);
 
   useEffect(() => {
@@ -58,6 +60,8 @@ export function TaskDialog({
       setColumnId(task.column_id);
       setClientId(task.client_id || '');
       setProposalId(task.proposal_id || '');
+      setPriority(task.priority || 'medium');
+      setTags((task.tags || []).join(', '));
       setSelectedAssignees(task.assignees?.map(a => a.user_id) || []);
     } else {
       setTitle(prefillData?.title || '');
@@ -66,6 +70,8 @@ export function TaskDialog({
       setColumnId(defaultColumnId || columns[0]?.id || '');
       setClientId('');
       setProposalId('');
+      setPriority('medium');
+      setTags('');
       setSelectedAssignees([]);
     }
   }, [task, defaultColumnId, columns, prefillData]);
@@ -84,6 +90,11 @@ export function TaskDialog({
       client_id: clientId || null,
       proposal_id: proposalId || null,
       assignee_ids: selectedAssignees,
+      priority,
+      tags: tags
+        .split(',')
+        .map((t) => t.trim())
+        .filter(Boolean),
     });
   };
 
@@ -173,6 +184,31 @@ export function TaskDialog({
                   />
                 </PopoverContent>
               </Popover>
+            </div>
+          </div>
+
+          <div className="grid grid-cols-2 gap-4">
+            <div className="space-y-2">
+              <Label>Prioridade</Label>
+              <Select value={priority} onValueChange={(val) => setPriority(val as 'low' | 'medium' | 'high')}>
+                <SelectTrigger>
+                  <SelectValue />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="high">Alta</SelectItem>
+                  <SelectItem value="medium">Média</SelectItem>
+                  <SelectItem value="low">Baixa</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            <div className="space-y-2">
+              <Label>Tags (separe por vírgula)</Label>
+              <Input
+                value={tags}
+                onChange={(e) => setTags(e.target.value)}
+                placeholder="ex: UI, Financeiro, Urgente"
+              />
             </div>
           </div>
 

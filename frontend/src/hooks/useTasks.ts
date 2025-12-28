@@ -30,6 +30,8 @@ export interface Task {
   id: string;
   agency_id: string;
   column_id: string;
+  priority: 'low' | 'medium' | 'high';
+  tags: string[];
   title: string;
   description: string | null;
   due_date: string | null;
@@ -52,6 +54,8 @@ export interface Task {
 
 export interface TaskInput {
   title: string;
+  priority?: 'low' | 'medium' | 'high';
+  tags?: string[];
   description?: string;
   due_date?: string | null;
   client_id?: string | null;
@@ -230,6 +234,8 @@ export function useTasks(filters?: {
     id: t.id,
     agency_id: t.agencyId,
     column_id: t.columnId,
+    priority: (t.priority as 'low' | 'medium' | 'high') ?? 'medium',
+    tags: Array.isArray(t.tags) ? t.tags : [],
     proposal_id: t.proposalId ?? null,
     client_id: t.clientId ?? null,
     created_by: t.createdById ?? null,
@@ -330,6 +336,8 @@ export function useTasks(filters?: {
       const payload = {
         agencyId,
         columnId: input.column_id,
+        priority: input.priority ?? 'medium',
+        tags: input.tags ?? [],
         proposalId: input.proposal_id ?? null,
         clientId: input.client_id ?? null,
         createdById: user?.id,
@@ -361,6 +369,8 @@ export function useTasks(filters?: {
     mutationFn: async ({ id, assignee_ids, ...input }: { id: string; assignee_ids?: string[] } & Partial<TaskInput>) => {
       const payload: Record<string, any> = {
         title: input.title,
+        priority: input.priority ?? 'medium',
+        tags: input.tags ?? [],
         description: input.description,
         dueDate: input.due_date,
         clientId: input.client_id ?? null,

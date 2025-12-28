@@ -468,6 +468,8 @@ model Task {
   proposalId  String?   @db.Uuid
   clientId    String?   @db.Uuid
   createdById String    @db.Uuid
+  priority    String    @default("medium")
+  tags        String[]  @default([])
   title       String
   description String?
   dueDate     DateTime? @db.Timestamptz(6)
