@@ -164,7 +164,8 @@ export function useProposals() {
       return mapBackendProposalToFront(created);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: ['proposals'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'], exact: false });
       toast({ title: 'Proposta criada com sucesso!' });
     },
     onError: (error) => {
@@ -186,7 +187,8 @@ export function useProposals() {
       return mapBackendProposalToFront(updated);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: ['proposals'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'], exact: false });
       toast({ title: 'Proposta atualizada com sucesso!' });
     },
     onError: (error) => {
@@ -203,7 +205,8 @@ export function useProposals() {
       return mapBackendProposalToFront(updated);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: ['proposals'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'], exact: false });
     },
     onError: (error) => {
       toast({ title: 'Erro ao mover proposta', description: error.message, variant: 'destructive' });
@@ -215,7 +218,8 @@ export function useProposals() {
       await apiFetch(`/api/proposal/${id}`, { method: 'DELETE' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
+      queryClient.invalidateQueries({ queryKey: ['proposals'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'], exact: false });
       toast({ title: 'Proposta excluída com sucesso!' });
     },
     onError: (error) => {

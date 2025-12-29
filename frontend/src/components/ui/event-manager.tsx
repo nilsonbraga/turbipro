@@ -52,6 +52,7 @@ export interface EventManagerProps {
   className?: string
   availableTags?: string[]
   clientOptions?: string[]
+  onEventClickOverride?: (event: Event) => boolean | void
 }
 
 const defaultColors = [
@@ -74,6 +75,7 @@ export function EventManager({
   className,
   availableTags = ["Important", "Urgent", "Work", "Personal", "Team", "Client"],
   clientOptions = [],
+  onEventClickOverride,
 }: EventManagerProps) {
   const [events, setEvents] = useState<Event[]>(initialEvents)
   const [currentDate, setCurrentDate] = useState(new Date())
@@ -94,6 +96,7 @@ export function EventManager({
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [clientFilter, setClientFilter] = useState("")
   const [clientSearch, setClientSearch] = useState("")
+  const [dayModalEvents, setDayModalEvents] = useState<Event[] | null>(null)
 
   // Keep internal state in sync when parent updates events
   useEffect(() => {
@@ -265,6 +268,16 @@ export function EventManager({
       )
     }
   }
+
+  const handleEventSelection = useCallback(
+    (event: Event) => {
+      const intercepted = onEventClickOverride?.(event)
+      if (intercepted) return
+      setSelectedEvent(event)
+      setIsDialogOpen(true)
+    },
+    [onEventClickOverride],
+  )
 
   return (
     <div className={cn("flex flex-col gap-4", className)}>
@@ -529,9 +542,10 @@ export function EventManager({
         <MonthView
           currentDate={currentDate}
           events={filteredEvents}
+          dayModalEvents={dayModalEvents}
+          setDayModalEvents={setDayModalEvents}
           onEventClick={(event) => {
-            setSelectedEvent(event)
-            setIsDialogOpen(true)
+            handleEventSelection(event)
           }}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
@@ -544,9 +558,9 @@ export function EventManager({
         <WeekView
           currentDate={currentDate}
           events={filteredEvents}
+          setDayModalEvents={setDayModalEvents}
           onEventClick={(event) => {
-            setSelectedEvent(event)
-            setIsDialogOpen(true)
+            handleEventSelection(event)
           }}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
@@ -560,8 +574,7 @@ export function EventManager({
           currentDate={currentDate}
           events={filteredEvents}
           onEventClick={(event) => {
-            setSelectedEvent(event)
-            setIsDialogOpen(true)
+            handleEventSelection(event)
           }}
           onDragStart={handleDragStart}
           onDragEnd={handleDragEnd}
@@ -574,8 +587,7 @@ export function EventManager({
         <ListView
           events={filteredEvents}
           onEventClick={(event) => {
-            setSelectedEvent(event)
-            setIsDialogOpen(true)
+            handleEventSelection(event)
           }}
           getColorClasses={getColorClasses}
         />
@@ -974,6 +986,8 @@ function EventCard({
 function MonthView({
   currentDate,
   events,
+  dayModalEvents,
+  setDayModalEvents,
   onEventClick,
   onDragStart,
   onDragEnd,
@@ -982,32 +996,47 @@ function MonthView({
 }: {
   currentDate: Date
   events: Event[]
+  dayModalEvents: Event[] | null
+  setDayModalEvents: (events: Event[] | null) => void
   onEventClick: (event: Event) => void
   onDragStart: (event: Event) => void
   onDragEnd: () => void
   onDrop: (date: Date) => void
   getColorClasses: (color: string) => { bg: string; text: string }
 }) {
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
+  const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
+  const dayDiff = (a: Date, b: Date) =>
+    Math.floor((startOfDay(b).getTime() - startOfDay(a).getTime()) / (24 * 60 * 60 * 1000))
+
   const firstDayOfMonth = new Date(currentDate.getFullYear(), currentDate.getMonth(), 1)
   const startDate = new Date(firstDayOfMonth)
   startDate.setDate(startDate.getDate() - startDate.getDay())
 
   const days: Date[] = []
-  const currentDay = new Date(startDate)
-
+  const cursor = new Date(startDate)
   for (let i = 0; i < 42; i++) {
-    days.push(new Date(currentDay))
-    currentDay.setDate(currentDay.getDate() + 1)
+    days.push(new Date(cursor))
+    cursor.setDate(cursor.getDate() + 1)
   }
 
-  const getEventsForDay = (date: Date) =>
-    events.filter((event) => {
-      const eventDate = new Date(event.startTime)
-      return (
-        eventDate.getDate() === date.getDate() &&
-        eventDate.getMonth() === date.getMonth() &&
-        eventDate.getFullYear() === date.getFullYear()
-      )
+  const singleDayEvents = events.filter((event) => isSameDay(event.startTime, event.endTime))
+  const multidayEvents = events.filter((event) => !isSameDay(event.startTime, event.endTime))
+
+  const weeks: Date[][] = []
+  for (let i = 0; i < 6; i++) {
+    weeks.push(days.slice(i * 7, i * 7 + 7))
+  }
+
+  const eventsForDay = (day: Date) =>
+    singleDayEvents.filter((event) => {
+      const dayStart = startOfDay(day)
+      const dayEnd = endOfDay(day)
+      const start = new Date(event.startTime)
+      const end = new Date(event.endTime)
+      return start <= dayEnd && end >= dayStart
     })
 
   return (
@@ -1020,51 +1049,164 @@ function MonthView({
           </div>
         ))}
       </div>
-      <div className="grid grid-cols-7">
-        {days.map((day, index) => {
-          const dayEvents = getEventsForDay(day)
-          const isCurrentMonth = day.getMonth() === currentDate.getMonth()
-          const isToday = day.toDateString() === new Date().toDateString()
+
+      <div className="space-y-[1px]">
+        {weeks.map((week, weekIndex) => {
+          const weekStart = startOfDay(week[0])
+          const weekEnd = endOfDay(week[6])
+          const weekMultis = multidayEvents.filter(
+            (event) => startOfDay(event.startTime) <= weekEnd && endOfDay(event.endTime) >= weekStart,
+          )
+          const barHeight = 22
+          const barGap = 6
+          const barTopOffset = 36
+          const barsStackHeight = weekMultis.length > 0 ? weekMultis.length * (barHeight + barGap) + barTopOffset : 0
 
           return (
-            <div
-              key={index}
-              className={cn(
-                "min-h-20 border-b border-r p-1 transition-colors last:border-r-0 sm:min-h-24 sm:p-2",
-                !isCurrentMonth && "bg-muted/30",
-                "hover:bg-accent/50",
+            <div key={weekIndex} className="relative border-b last:border-b-0">
+              <div className="grid grid-cols-7">
+                {week.map((day, dayIdx) => {
+                  const dayEvents = eventsForDay(day)
+                  const isCurrentMonth = day.getMonth() === currentDate.getMonth()
+                  const isToday = isSameDay(day, new Date())
+                  const overflow = dayEvents.length > 3
+
+                  return (
+                    <div
+                      key={dayIdx}
+                      className={cn(
+                        "min-h-24 border-r p-1 sm:p-2 last:border-r-0 transition-colors hover:bg-accent/50",
+                        !isCurrentMonth && "bg-muted/30",
+                      )}
+                      onDragOver={(e) => e.preventDefault()}
+                      onDrop={() => onDrop(day)}
+                    >
+                      <div
+                        className={cn(
+                          "mb-1 flex h-5 w-5 items-center justify-center rounded-full text-xs sm:h-6 sm:w-6 sm:text-sm",
+                          isToday && "bg-primary text-primary-foreground font-semibold",
+                        )}
+                      >
+                        {day.getDate()}
+                      </div>
+                      <div className="space-y-1" style={barsStackHeight ? { marginTop: barsStackHeight } : undefined}>
+                        {dayEvents.slice(0, 3).map((event) => (
+                          <EventCard
+                            key={event.id}
+                            event={event}
+                            onEventClick={onEventClick}
+                            onDragStart={onDragStart}
+                            onDragEnd={onDragEnd}
+                            getColorClasses={getColorClasses}
+                            variant="compact"
+                          />
+                        ))}
+                        {overflow && (
+                          <button
+                            type="button"
+                            className="text-[10px] text-muted-foreground underline sm:text-xs"
+                            onClick={() => setDayModalEvents(dayEvents)}
+                          >
+                            +{dayEvents.length - 3} mais
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                  )
+                })}
+              </div>
+
+              {weekMultis.length > 0 && (
+                <div className="pointer-events-none absolute left-0 right-0 px-1 sm:px-2" style={{ top: barTopOffset }}>
+                  {weekMultis.map((event, idx) => {
+                    const clippedStart =
+                      startOfDay(event.startTime) < weekStart ? weekStart : startOfDay(event.startTime)
+                    const clippedEnd = endOfDay(event.endTime) > weekEnd ? weekEnd : endOfDay(event.endTime)
+
+                    const startIdx = Math.max(0, Math.min(6, dayDiff(weekStart, clippedStart)))
+                    const endIdx = Math.max(startIdx, Math.min(6, dayDiff(weekStart, clippedEnd)))
+
+                    const left = (startIdx / 7) * 100
+                    const width = ((endIdx - startIdx + 1) / 7) * 100
+                    const color = getColorClasses(event.color)
+                    const leftStyle = `calc(${left}% + 2px)`
+                    const widthStyle = `calc(${width}% - 4px)`
+
+                    return (
+                      <button
+                        key={`${event.id}-w${weekIndex}`}
+                        type="button"
+                        className="pointer-events-auto absolute overflow-hidden rounded-md text-[11px] font-medium text-white focus:outline-none"
+                        style={{
+                          top: idx * (barHeight + barGap),
+                          left: leftStyle,
+                          width: widthStyle,
+                          height: barHeight,
+                        }}
+                        onClick={() => onEventClick(event)}
+                        title={event.title}
+                      >
+                        <div
+                          className={cn(
+                            "flex h-full items-center gap-2 whitespace-nowrap px-2 text-white",
+                            color.bg,
+                            "hover:opacity-90"
+                          )}
+                        >
+                          <span className="truncate">{event.title}</span>
+                          <span className="opacity-85 text-[10px]">
+                            {new Date(event.startTime).toLocaleDateString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                            })}{" "}
+                            -{" "}
+                            {new Date(event.endTime).toLocaleDateString("pt-BR", {
+                              day: "2-digit",
+                              month: "2-digit",
+                            })}
+                          </span>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
               )}
-              onDragOver={(e) => e.preventDefault()}
-              onDrop={() => onDrop(day)}
-            >
-              <div
-                className={cn(
-                  "mb-1 flex h-5 w-5 items-center justify-center rounded-full text-xs sm:h-6 sm:w-6 sm:text-sm",
-                  isToday && "bg-primary text-primary-foreground font-semibold",
-                )}
-              >
-                {day.getDate()}
-              </div>
-              <div className="space-y-1">
-                {dayEvents.slice(0, 3).map((event) => (
-                  <EventCard
-                    key={event.id}
-                    event={event}
-                    onEventClick={onEventClick}
-                    onDragStart={onDragStart}
-                    onDragEnd={onDragEnd}
-                    getColorClasses={getColorClasses}
-                    variant="compact"
-                  />
-                ))}
-                {dayEvents.length > 3 && (
-                  <div className="text-[10px] text-muted-foreground sm:text-xs">+{dayEvents.length - 3} more</div>
-                )}
-              </div>
             </div>
           )
         })}
       </div>
+
+      {dayModalEvents && (
+        <Dialog open onOpenChange={(open) => !open && setDayModalEvents(null)}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader>
+              <DialogTitle>Eventos do dia</DialogTitle>
+              <DialogDescription>Lista completa de eventos selecionados.</DialogDescription>
+            </DialogHeader>
+            <div className="space-y-2">
+              {dayModalEvents.map((event) => (
+                <EventCard
+                  key={event.id}
+                  event={event}
+                  onEventClick={(e) => {
+                    setDayModalEvents(null)
+                    onEventClick(e)
+                  }}
+                  onDragStart={onDragStart}
+                  onDragEnd={onDragEnd}
+                  getColorClasses={getColorClasses}
+                  variant="default"
+                />
+              ))}
+            </div>
+            <DialogFooter>
+              <Button variant="outline" onClick={() => setDayModalEvents(null)}>
+                Fechar
+              </Button>
+            </DialogFooter>
+          </DialogContent>
+        </Dialog>
+      )}
     </Card>
   )
 }
@@ -1073,6 +1215,7 @@ function MonthView({
 function WeekView({
   currentDate,
   events,
+  setDayModalEvents,
   onEventClick,
   onDragStart,
   onDragEnd,
@@ -1081,6 +1224,7 @@ function WeekView({
 }: {
   currentDate: Date
   events: Event[]
+  setDayModalEvents: (events: Event[] | null) => void
   onEventClick: (event: Event) => void
   onDragStart: (event: Event) => void
   onDragEnd: () => void
@@ -1098,21 +1242,91 @@ function WeekView({
 
   const hours = Array.from({ length: 24 }, (_, i) => i)
 
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
+  const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+  const dayDiff = (a: Date, b: Date) =>
+    Math.floor((startOfDay(b).getTime() - startOfDay(a).getTime()) / (24 * 60 * 60 * 1000))
+
+  const weekStart = startOfDay(weekDays[0])
+  const weekEnd = endOfDay(weekDays[6])
+
+  const singleDayEvents = events.filter((event) => isSameDay(event.startTime, event.endTime))
+  const multidayEvents = events.filter(
+    (event) =>
+      !isSameDay(event.startTime, event.endTime) &&
+      startOfDay(event.startTime) <= weekEnd &&
+      endOfDay(event.endTime) >= weekStart,
+  )
+
+  const getEventsForDay = (date: Date) =>
+    singleDayEvents.filter((event) => {
+      const dayStart = startOfDay(date)
+      const dayEnd = endOfDay(date)
+      const start = new Date(event.startTime)
+      const end = new Date(event.endTime)
+      return start <= dayEnd && end >= dayStart
+    })
+
   const getEventsForDayAndHour = (date: Date, hour: number) =>
-    events.filter((event) => {
-      const eventDate = new Date(event.startTime)
-      const eventHour = eventDate.getHours()
-      return (
-        eventDate.getDate() === date.getDate() &&
-        eventDate.getMonth() === date.getMonth() &&
-        eventDate.getFullYear() === date.getFullYear() &&
-        eventHour === hour
-      )
+    singleDayEvents.filter((event) => {
+      const start = new Date(event.startTime)
+      const end = new Date(event.endTime)
+      const dayStart = startOfDay(date)
+      const dayEnd = endOfDay(date)
+      const isWithinDay = start <= dayEnd && end >= dayStart
+      if (!isWithinDay) return false
+      // Same-day or boundary day: show at start hour (default 0 if invalid)
+      const eventHour = start.getHours()
+      return hour === (Number.isNaN(eventHour) ? 0 : eventHour)
     })
 
   return (
-    <Card className="overflow-auto">
+    <Card className="overflow-auto relative">
+      {/* Linha all-day para eventos multiday */}
       <div className="grid grid-cols-8 border-b">
+        <div className="border-r p-2 text-center text-xs font-medium sm:text-sm">All-day</div>
+        <div className="col-span-7 relative min-h-[36px] px-1 sm:px-2">
+          {multidayEvents.map((event, idx) => {
+            const color = getColorClasses(event.color)
+            const start = new Date(event.startTime)
+            const end = new Date(event.endTime)
+            const clippedStart = start < weekStart ? weekStart : start
+            const clippedEnd = end > weekEnd ? weekEnd : end
+            const startIdx = Math.max(0, Math.min(6, dayDiff(weekStart, clippedStart)))
+            const endIdx = Math.max(startIdx, Math.min(6, dayDiff(weekStart, clippedEnd)))
+            const left = (startIdx / 7) * 100
+            const width = ((endIdx - startIdx + 1) / 7) * 100
+
+            return (
+              <button
+                key={`${event.id}-${idx}`}
+                type="button"
+                onClick={() => onEventClick(event)}
+                className="absolute"
+                style={{ left: `${left}%`, width: `${width}%`, top: idx * 28 }}
+                title={event.title}
+              >
+                <div
+                  className={cn(
+                    "h-6 rounded-md text-[11px] font-medium text-white flex items-center px-2 shadow-sm",
+                    color.bg,
+                    "overflow-hidden whitespace-nowrap hover:opacity-90",
+                  )}
+                >
+                  <span className="truncate">{event.title}</span>
+                  <span className="ml-2 opacity-85">
+                    {start.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} -{" "}
+                    {end.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
+                  </span>
+                </div>
+              </button>
+            )
+          })}
+        </div>
+      </div>
+    <div className="grid grid-cols-8 border-b">
         <div className="border-r p-2 text-center text-xs font-medium sm:text-sm">Time</div>
         {weekDays.map((day) => (
           <div
@@ -1124,6 +1338,15 @@ function WeekView({
             <div className="text-[10px] text-muted-foreground sm:text-xs">
               {day.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
             </div>
+            {getEventsForDay(day).length > 3 && (
+              <button
+                type="button"
+                className="mt-1 text-[10px] text-muted-foreground underline"
+                onClick={() => setDayModalEvents(getEventsForDay(day))}
+              >
+                +{getEventsForDay(day).length - 3} mais
+              </button>
+            )}
           </div>
         ))}
       </div>
@@ -1185,16 +1408,32 @@ function DayView({
 }) {
   const hours = Array.from({ length: 24 }, (_, i) => i)
 
+  const startOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 0, 0, 0, 0)
+  const endOfDay = (d: Date) => new Date(d.getFullYear(), d.getMonth(), d.getDate(), 23, 59, 59, 999)
+  const isSameDay = (a: Date, b: Date) =>
+    a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
+
   const getEventsForHour = (hour: number) =>
     events.filter((event) => {
-      const eventDate = new Date(event.startTime)
-      const eventHour = eventDate.getHours()
-      return (
-        eventDate.getDate() === currentDate.getDate() &&
-        eventDate.getMonth() === currentDate.getMonth() &&
-        eventDate.getFullYear() === currentDate.getFullYear() &&
-        eventHour === hour
-      )
+      const start = new Date(event.startTime)
+      const end = new Date(event.endTime)
+      const dayStart = startOfDay(currentDate)
+      const dayEnd = endOfDay(currentDate)
+      const isWithinDay = start <= dayEnd && end >= dayStart
+      if (!isWithinDay) return false
+      const spansMultiple = end.getTime() - start.getTime() > 24 * 60 * 60 * 1000
+      if (spansMultiple) {
+        // Mostrar a faixa em todos os dias do intervalo na linha das 00h
+        return hour === 0
+      }
+      // if spans previous/next day, pin at hour 0
+      const sameDay =
+        start.getFullYear() === currentDate.getFullYear() &&
+        start.getMonth() === currentDate.getMonth() &&
+        start.getDate() === currentDate.getDate()
+      if (!sameDay) return hour === 0
+      const eventHour = start.getHours()
+      return hour === (Number.isNaN(eventHour) ? 0 : eventHour)
     })
 
   return (

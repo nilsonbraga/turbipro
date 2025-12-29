@@ -197,12 +197,12 @@ const normalizeDateFilters = (where: Record<string, unknown> | null | undefined,
   return where;
 };
 
-const toDateTime = (date: any, time?: any): Date | null => {
+const toDateTime = (date: any, time?: any, defaultTime = '00:00'): Date | null => {
   if (!date) return null;
   if (typeof date === 'string' && date.trim() === '') return null;
   const dateStr = typeof date === 'string' ? date : new Date(date).toISOString();
   const onlyDate = dateStr.slice(0, 10);
-  const timeStr = typeof time === 'string' && time.trim().length > 0 ? time.trim() : '00:00';
+  const timeStr = typeof time === 'string' && time.trim().length > 0 ? time.trim() : defaultTime;
   // Use local parsing then convert to UTC ISO
   const iso = new Date(`${onlyDate}T${timeStr}`).toISOString();
   return new Date(iso);
@@ -210,10 +210,10 @@ const toDateTime = (date: any, time?: any): Date | null => {
 
 const normalizeProposalServiceDates = (data: Record<string, unknown>) => {
   if (data.startDate !== undefined || data.startTime !== undefined) {
-    data.startDate = toDateTime(data.startDate, data.startTime) ?? null;
+    data.startDate = toDateTime(data.startDate, data.startTime, '12:00') ?? null;
   }
   if (data.endDate !== undefined || data.endTime !== undefined) {
-    data.endDate = toDateTime(data.endDate, data.endTime) ?? null;
+    data.endDate = toDateTime(data.endDate, data.endTime, '12:00') ?? null;
   }
   if (data.startTime === '') data.startTime = null;
   if (data.endTime === '') data.endTime = null;

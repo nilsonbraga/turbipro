@@ -17,6 +17,9 @@ export interface CalendarEvent {
   client_id: string | null;
   value: number;
   details?: unknown;
+  priority?: string | null;
+  column_name?: string | null;
+  assignees?: string[];
 }
 
 export function useCalendarEvents() {
@@ -76,7 +79,71 @@ export function useCalendarEvents() {
         };
       });
 
-      return events;
+      // Tasks com início/prazo para o calendário
+      const tasksWhere: Record<string, unknown> = {};
+      if (!isSuperAdmin && userAgencyId) {
+        tasksWhere.agencyId = userAgencyId;
+      }
+
+      const tasksQuery = new URLSearchParams({
+        where: JSON.stringify(tasksWhere),
+        include: JSON.stringify({
+          column: { select: { name: true, color: true } },
+          assignees: { include: { user: { select: { id: true, name: true } } } },
+          client: { select: { id: true, name: true } },
+          proposal: { select: { id: true, title: true, number: true } },
+        }),
+        orderBy: JSON.stringify({ startDate: 'asc' }),
+      });
+
+      const { data: tasks } = await apiFetch<{ data: any[] }>(`/api/task?${tasksQuery.toString()}`);
+
+      const taskEvents: CalendarEvent[] = (tasks || [])
+        .filter((t) => t.startDate || t.dueDate)
+        .map((task) => {
+          const start = task.startDate ? new Date(task.startDate) : task.dueDate ? new Date(task.dueDate) : null;
+          if (!start || Number.isNaN(start.getTime())) return null;
+
+          const hasStart = Boolean(task.startDate);
+          const hasDue = Boolean(task.dueDate);
+          let end = new Date(start.getTime() + 60 * 60 * 1000);
+          if (hasStart && hasDue) {
+            const tmp = new Date(task.dueDate);
+            if (!Number.isNaN(tmp.getTime())) end = tmp;
+          } else if (!hasStart && hasDue) {
+            const tmp = new Date(task.dueDate);
+            if (!Number.isNaN(tmp.getTime())) end = new Date(tmp.getTime() + 60 * 60 * 1000);
+          }
+
+          return {
+            id: task.id,
+            type: 'task',
+          description: task.description || '',
+          start_date: start.toISOString(),
+          end_date: end && !Number.isNaN(end.getTime()) ? end.toISOString() : start.toISOString(),
+            origin: null,
+            destination: null,
+            proposal_id: task.proposalId ?? '',
+            proposal_title: task.proposal?.title ?? '',
+            proposal_number: task.proposal?.number ?? 0,
+            client_name: task.client?.name ?? null,
+            client_id: task.clientId ?? null,
+            value: 0,
+            details: {
+              column: task.column?.name ?? '',
+              priority: task.priority ?? 'medium',
+              taskTitle: task.title,
+            },
+            priority: task.priority ?? 'medium',
+            column_name: task.column?.name ?? null,
+            assignees: (task.assignees || [])
+              .map((a: any) => a.user?.name)
+              .filter(Boolean),
+          } as CalendarEvent;
+        })
+        .filter(Boolean) as CalendarEvent[];
+
+      return [...events, ...taskEvents];
     },
   });
 }

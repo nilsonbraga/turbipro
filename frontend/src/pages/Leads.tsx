@@ -20,7 +20,9 @@ import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { 
   Dialog, 
-  DialogContent
+  DialogContent,
+  DialogHeader,
+  DialogTitle
 } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -404,10 +406,22 @@ export default function Leads() {
     const d = service.details || {};
     const type = service.type;
 
-    const toISO = (val?: string | null) => {
-      if (!val) return null;
-      const dt = new Date(val);
+    const toLocalISO = (date?: string | null, time?: string | null, fallbackTime = '12:00') => {
+      if (!date) return null;
+      // If already has time component, keep it; otherwise append fallbackTime
+      const hasTime = date.includes('T');
+      const base = hasTime ? date : `${date}T${time || fallbackTime}`;
+      const dt = new Date(base);
       return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+    };
+
+    const toISO = (val?: string | null, time?: string | null) => {
+      if (!val) return null;
+      if (val.includes('T')) {
+        const dt = new Date(val);
+        return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+      }
+      return toLocalISO(val, time);
     };
 
     if (type === 'flight') {
@@ -421,8 +435,8 @@ export default function Leads() {
     }
     if (type === 'hotel') {
       return {
-        startDate: d.checkIn ? `${d.checkIn}T${d.checkInTime || '12:00'}:00Z` : null,
-        endDate: d.checkOut ? `${d.checkOut}T${d.checkOutTime || '12:00'}:00Z` : null,
+        startDate: toISO(d.checkIn, d.checkInTime),
+        endDate: toISO(d.checkOut, d.checkOutTime),
       };
     }
     if (type === 'car') {
@@ -439,8 +453,8 @@ export default function Leads() {
     }
     if (type === 'package' || type === 'tour') {
       return {
-        startDate: d.startDate ? `${d.startDate}T00:00:00Z` : null,
-        endDate: d.endDate ? `${d.endDate}T23:59:00Z` : null,
+        startDate: toLocalISO(d.startDate, '00:00'),
+        endDate: toLocalISO(d.endDate, '23:59'),
       };
     }
     return { startDate: toISO(service.startDate), endDate: toISO(service.endDate) };
@@ -1052,6 +1066,9 @@ export default function Leads() {
       {/* View Proposal Dialog - Full Detail */}
       <Dialog open={!!viewingProposal} onOpenChange={() => setViewingProposal(null)}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Detalhes da proposta</DialogTitle>
+          </DialogHeader>
           {viewingProposal && (
             <ProposalDetail 
               proposal={viewingProposal} 

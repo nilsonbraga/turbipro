@@ -287,6 +287,10 @@ export function useTasks(filters?: {
   const { agency, user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
+  const invalidateTasksAndCalendar = () => {
+    queryClient.invalidateQueries({ queryKey: ['tasks'] });
+    queryClient.invalidateQueries({ queryKey: ['calendar-events'] });
+  };
 
   // Sempre usa agência específica para evitar tarefas duplicadas
   const targetAgencyId = filters?.agencyId || agency?.id;
@@ -470,7 +474,7 @@ export function useTasks(filters?: {
       return mapBackendTask(created);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      invalidateTasksAndCalendar();
       toast({ title: 'Tarefa criada com sucesso' });
     },
     onError: (error: Error) => {
@@ -506,7 +510,7 @@ export function useTasks(filters?: {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      invalidateTasksAndCalendar();
       toast({ title: 'Tarefa atualizada com sucesso' });
     },
     onError: (error: Error) => {
@@ -523,7 +527,7 @@ export function useTasks(filters?: {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      invalidateTasksAndCalendar();
     },
     onError: (error: Error) => {
       toast({ title: 'Erro ao mover tarefa', description: error.message, variant: 'destructive' });
@@ -535,7 +539,7 @@ export function useTasks(filters?: {
       await apiFetch(`/api/task/${id}`, { method: 'DELETE', headers: user?.id ? { 'x-user-id': user.id } : undefined });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      invalidateTasksAndCalendar();
       toast({ title: 'Tarefa excluída com sucesso' });
     },
     onError: (error: Error) => {
@@ -558,7 +562,7 @@ export function useTasks(filters?: {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      invalidateTasksAndCalendar();
     },
     onError: (error: Error) => {
       toast({ title: 'Erro ao adicionar checklist', description: error.message, variant: 'destructive' });
@@ -570,7 +574,7 @@ export function useTasks(filters?: {
       await apiFetch(`/api/taskChecklist/${id}`, { method: 'DELETE', headers: user?.id ? { 'x-user-id': user.id } : undefined });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      invalidateTasksAndCalendar();
     },
     onError: (error: Error) => {
       toast({ title: 'Erro ao excluir checklist', description: error.message, variant: 'destructive' });
@@ -590,7 +594,7 @@ export function useTasks(filters?: {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      invalidateTasksAndCalendar();
     },
     onError: (error: Error) => {
       toast({ title: 'Erro ao adicionar item', description: error.message, variant: 'destructive' });
@@ -606,7 +610,7 @@ export function useTasks(filters?: {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      invalidateTasksAndCalendar();
     },
     onError: (error: Error) => {
       toast({ title: 'Erro ao atualizar item', description: error.message, variant: 'destructive' });
@@ -618,7 +622,7 @@ export function useTasks(filters?: {
       await apiFetch(`/api/taskChecklistItem/${id}`, { method: 'DELETE', headers: user?.id ? { 'x-user-id': user.id } : undefined });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      invalidateTasksAndCalendar();
     },
     onError: (error: Error) => {
       toast({ title: 'Erro ao excluir item', description: error.message, variant: 'destructive' });
@@ -639,7 +643,7 @@ export function useTasks(filters?: {
       });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] });
+      invalidateTasksAndCalendar();
     },
     onError: (error: Error) => {
       toast({ title: 'Erro ao adicionar comentário', description: error.message, variant: 'destructive' });

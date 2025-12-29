@@ -1,5 +1,5 @@
 import { useState, useEffect, useMemo } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import { useLocation, useNavigate, useSearchParams } from 'react-router-dom';
 import {
   DndContext,
   DragEndEvent,
@@ -27,7 +27,7 @@ import { TaskListView } from '@/components/tasks/TaskListView';
 import { TaskViewToggle, TaskViewMode } from '@/components/tasks/TaskViewToggle';
 
 import { ProposalDetail } from '@/components/proposals/ProposalDetail';
-import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -60,6 +60,7 @@ interface PrefillTaskData {
 export default function Tasks() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams, setSearchParams] = useSearchParams();
   const { isSuperAdmin, agency } = useAuth();
   const prefillTask = (location.state as { prefillTask?: PrefillTaskData })?.prefillTask;
 
@@ -164,6 +165,23 @@ export default function Tasks() {
       }));
     }
   }, [dateRange]);
+
+  // Abrir modal de tarefa quando vindo do calendário (?taskId=...)
+  useEffect(() => {
+    const taskId = searchParams.get('taskId');
+    if (!taskId || !tasksList.length) return;
+    const task = tasksList.find((t) => t.id === taskId);
+    if (task) {
+      setSelectedTask(task);
+      setDefaultColumnId(task.column_id);
+      setTaskDialogOpen(true);
+      setSearchParams((prev) => {
+        const next = new URLSearchParams(prev);
+        next.delete('taskId');
+        return next;
+      }, { replace: true });
+    }
+  }, [searchParams, tasksList, setSearchParams]);
 
   // Filter tasks by search query
   const filteredTasks = useMemo(() => {
@@ -617,6 +635,9 @@ export default function Tasks() {
       {/* Proposal Detail Modal */}
       <Dialog open={!!selectedProposalId} onOpenChange={() => setSelectedProposalId(null)}>
         <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Detalhes da proposta</DialogTitle>
+          </DialogHeader>
           {selectedProposal && (
             <ProposalDetail
               proposal={selectedProposal}

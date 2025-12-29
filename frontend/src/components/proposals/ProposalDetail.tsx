@@ -72,6 +72,7 @@ import {
   Check
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { format as formatDateFns, parseISO, parse } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
 
 interface ProposalDetailProps {
@@ -88,22 +89,30 @@ const formatCurrency = (value: number) => {
   }).format(value);
 };
 
-const formatDate = (date: string) => {
-  return new Date(date).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-  });
+const formatDate = (value?: string | null) => {
+  if (!value) return '';
+  try {
+    const date =
+      value.length <= 10
+        ? parse(value, 'yyyy-MM-dd', new Date())
+        : parseISO(value);
+    return formatDateFns(date, 'dd MMM yyyy');
+  } catch {
+    return value;
+  }
 };
 
-const formatDateTime = (date: string) => {
-  return new Date(date).toLocaleString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric',
-    hour: '2-digit',
-    minute: '2-digit',
-  });
+const formatDateTime = (value?: string | null) => {
+  if (!value) return '';
+  try {
+    const date =
+      value.length <= 10
+        ? parse(value, 'yyyy-MM-dd', new Date())
+        : parseISO(value);
+    return formatDateFns(date, 'dd MMM yyyy, HH:mm');
+  } catch {
+    return value;
+  }
 };
 
 const serviceIcons: Record<string, typeof Plane> = {

@@ -1,7 +1,15 @@
-import { useMemo } from 'react';
+import { useMemo, useState, useEffect } from 'react';
 import { useCalendarEvents } from '@/hooks/useCalendarEvents';
 import { EventManager, type Event as UiEvent } from '@/components/ui/event-manager';
 import { Skeleton } from '@/components/ui/skeleton';
+import { useNavigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useTasks, useTaskColumns, Task, TaskInput } from '@/hooks/useTasks';
+import { TaskDialog } from '@/components/tasks/TaskDialog';
+import { useAgencies } from '@/hooks/useAgencies';
+import { useProposals } from '@/hooks/useProposals';
+import { ProposalDetail } from '@/components/proposals/ProposalDetail';
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 
 const TYPE_LABELS: Record<string, string> = {
   flight: 'Voo',
@@ -13,6 +21,7 @@ const TYPE_LABELS: Record<string, string> = {
   insurance: 'Seguro',
   transfer: 'Transfer',
   other: 'Outro',
+  task: 'Tarefa',
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -25,10 +34,33 @@ const TYPE_COLORS: Record<string, string> = {
   insurance: 'green',
   transfer: 'orange',
   other: 'blue',
+  task: 'green',
 };
 
 export default function CalendarPage() {
+  const navigate = useNavigate();
   const { data: events = [], isLoading } = useCalendarEvents();
+  const { user } = useAuth();
+  const { agencies } = useAgencies();
+
+  const defaultAgencyId = user?.isSuperAdmin ? agencies[0]?.id : user?.agencyId;
+  const [selectedAgencyId, setSelectedAgencyId] = useState<string | undefined>(defaultAgencyId);
+
+  useEffect(() => {
+    if (!selectedAgencyId && defaultAgencyId) setSelectedAgencyId(defaultAgencyId);
+  }, [defaultAgencyId, selectedAgencyId]);
+
+  const {
+    tasks = [],
+    createTask,
+    updateTask,
+  } = useTasks({ agencyId: selectedAgencyId });
+
+  const { columns = [] } = useTaskColumns(selectedAgencyId);
+  const { proposals = [] } = useProposals();
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
 
   const formatTime = (dateStr: string | null) => {
     if (!dateStr) return '';
@@ -55,6 +87,13 @@ export default function CalendarPage() {
       return [client, hotelName].filter(Boolean).join(' - ');
     }
 
+    if (evt.type === 'task') {
+      const column = evt.column_name || details.column;
+      const priority = evt.priority ? `Prioridade: ${evt.priority}` : '';
+      const taskTitle = details.taskTitle || evt.proposal_title || 'Tarefa';
+      return [taskTitle, column, priority].filter(Boolean).join(' - ') || 'Tarefa';
+    }
+
     if (evt.type === 'car') {
       const carModel = details.carModel || details.model || '';
       return [client, carModel || label, timeLabel].filter(Boolean).join(' - ');
@@ -63,12 +102,25 @@ export default function CalendarPage() {
     return [client, label, timeLabel].filter(Boolean).join(' - ');
   };
 
+  const priorityColor = (priority?: string | null) => {
+    if (priority === 'high') return 'red';
+    if (priority === 'medium') return 'orange';
+    return 'green';
+  };
+
   const uiEvents: UiEvent[] = useMemo(() => {
     return events.map((evt) => {
       const start = new Date(evt.start_date);
       const end = evt.end_date ? new Date(evt.end_date) : new Date(start.getTime() + 60 * 60 * 1000);
-      const color = TYPE_COLORS[evt.type] || 'green';
-      const tags = [TYPE_LABELS[evt.type] || 'Evento', evt.client_name, evt.proposal_title].filter(Boolean) as string[];
+      const isTask = evt.type === 'task';
+      const color = isTask ? priorityColor(evt.priority) : TYPE_COLORS[evt.type] || 'green';
+      const tags = [
+        TYPE_LABELS[evt.type] || 'Evento',
+        evt.client_name,
+        evt.proposal_title,
+        evt.column_name,
+        ...(evt.assignees || []),
+      ].filter(Boolean) as string[];
 
       return {
         id: evt.id,
@@ -115,7 +167,65 @@ export default function CalendarPage() {
         clientOptions={clientOptions}
         defaultView="month"
         className="min-h-[calc(100vh-180px)] rounded-2xl border bg-card p-4 shadow-sm"
+        onEventClickOverride={(event) => {
+          if (event.category === 'Tarefa') {
+            const task = tasks.find((t) => t.id === event.id);
+            if (task) {
+              setSelectedTask(task);
+              setTaskDialogOpen(true);
+              return true;
+            }
+            return false;
+          }
+          // Eventos de leads/propostas: abre o modal da lead
+          const proposalId = (events.find((e) => e.id === event.id)?.proposal_id) || (event as any).proposal_id;
+          if (proposalId) {
+            setSelectedProposalId(proposalId);
+            return true;
+          }
+          return false;
+        }}
       />
+      <TaskDialog
+        open={taskDialogOpen}
+        onOpenChange={(open) => {
+          setTaskDialogOpen(open);
+          if (!open) setSelectedTask(null);
+        }}
+        task={selectedTask}
+        columns={columns}
+        defaultColumnId={columns[0]?.id}
+        onSave={(data: TaskInput & { id?: string }) => {
+          if (data.id) {
+            updateTask.mutate(data as any, {
+              onSuccess: () => setTaskDialogOpen(false),
+            });
+          } else {
+            createTask.mutate(data, {
+              onSuccess: () => setTaskDialogOpen(false),
+            });
+          }
+        }}
+        isLoading={createTask.isPending || updateTask.isPending}
+        prefillData={null}
+      />
+
+      {/* Modal de Lead/Proposta */}
+      <Dialog open={!!selectedProposalId} onOpenChange={() => setSelectedProposalId(null)}>
+        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Detalhes da proposta</DialogTitle>
+          </DialogHeader>
+          {selectedProposalId && (
+            <ProposalDetail
+              proposal={proposals.find((p) => p.id === selectedProposalId)!}
+              onClose={() => setSelectedProposalId(null)}
+              onEdit={() => setSelectedProposalId(null)}
+              onProposalUpdate={() => {}}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

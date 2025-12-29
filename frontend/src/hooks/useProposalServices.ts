@@ -39,13 +39,66 @@ export interface ServiceInput {
   details?: Record<string, any>;
 }
 
-const toDateOnly = (val?: string | null) => (val ? val.slice(0, 10) : null);
+const normalizeDateInput = (date?: string | null, time?: string | null) => {
+  if (!date) return null;
+  const timePart = time && time.trim() ? time.trim() : '12:00';
+  const dt = new Date(`${date}T${timePart}`);
+  if (Number.isNaN(dt.getTime())) return null;
+  // use local time to avoid timezone rollback (ex: -03:00)
+  return dt.toISOString();
+};
 const extractDate = (val?: string | null) => (val ? val.slice(0, 10) : null);
 const extractTime = (val?: string | null) => {
   if (!val) return null;
   // If already coming from startTime column, return as is; else derive from ISO string
   if (val.includes(':') && val.length <= 8) return val;
-  return val.slice(11, 16);
+  const t = val.slice(11, 16);
+  return t && t.includes(':') ? t : null;
+};
+
+const computeDatesFromDetails = (type: string, details?: Record<string, any>) => {
+  if (!details) return { startDate: null as string | null, endDate: null as string | null, startTime: null as string | null, endTime: null as string | null };
+
+  const toIso = (date?: string | null, time?: string | null) => {
+    if (!date) return null;
+    const hasTime = time && time.trim().length > 0;
+    // If already in ISO, keep as is
+    if (date.includes('T')) {
+      const d = new Date(date);
+      return Number.isNaN(d.getTime()) ? null : d.toISOString();
+    }
+    return normalizeDateInput(date, hasTime ? time! : '12:00');
+  };
+
+  // Flight: use first departure and last arrival
+  if (type === 'flight' && Array.isArray(details.segments) && details.segments.length > 0) {
+    const first = details.segments[0];
+    const last = details.segments[details.segments.length - 1];
+    const startDate = toIso(first?.departureAt?.slice(0, 10) ?? first?.departureAt, first?.departureAt?.slice(11, 16));
+    const endDate = toIso(last?.arrivalAt?.slice(0, 10) ?? last?.arrivalAt, last?.arrivalAt?.slice(11, 16));
+    const startTime = extractTime(first?.departureAt);
+    const endTime = extractTime(last?.arrivalAt);
+    return { startDate, endDate, startTime, endTime };
+  }
+
+  // Hotel: check-in/out
+  if (type === 'hotel') {
+    const startDate = toIso(details.checkIn, details.checkInTime);
+    const endDate = toIso(details.checkOut, details.checkOutTime);
+    const startTime = details.checkInTime || null;
+    const endTime = details.checkOutTime || null;
+    return { startDate, endDate, startTime, endTime };
+  }
+
+  // Generic fallbacks
+  const start = details.startDate || details.start_date || details.date || details.pickupAt || details.departureAt || null;
+  const end = details.endDate || details.end_date || details.returnDate || details.dropoffAt || details.arrivalAt || null;
+  const startDate = toIso(start?.slice?.(0, 10) ?? start, extractTime(start));
+  const endDate = toIso(end?.slice?.(0, 10) ?? end, extractTime(end));
+  const startTime = extractTime(start);
+  const endTime = extractTime(end);
+
+  return { startDate, endDate, startTime, endTime };
 };
 
 const mapBackendToFront = (s: any): ProposalService => ({
@@ -54,8 +107,8 @@ const mapBackendToFront = (s: any): ProposalService => ({
   partner_id: s.partnerId ?? null,
   type: s.type,
   description: s.description ?? null,
-  start_date: extractDate(s.startDate) ?? null,
-  end_date: extractDate(s.endDate) ?? null,
+  start_date: s.startDate ?? null,
+  end_date: s.endDate ?? null,
   start_time: s.startTime ?? extractTime(s.startDate) ?? null,
   end_time: s.endTime ?? extractTime(s.endDate) ?? null,
   origin: s.origin ?? null,
@@ -69,14 +122,17 @@ const mapBackendToFront = (s: any): ProposalService => ({
 });
 
 const mapFrontToBackend = (input: ServiceInput, options?: { includeProposalId?: boolean }) => {
+  const normalizedStart = normalizeDateInput(input.start_date, input.start_time);
+  const normalizedEnd = normalizeDateInput(input.end_date, input.end_time);
+  const derived = computeDatesFromDetails(input.type, input.details);
   const base = {
     partnerId: input.partner_id ?? null,
     type: input.type,
     description: input.description ?? null,
-    startDate: toDateOnly(input.start_date),
-    endDate: toDateOnly(input.end_date),
-    startTime: input.start_time || null,
-    endTime: input.end_time || null,
+    startDate: derived.startDate ?? normalizedStart,
+    endDate: derived.endDate ?? normalizedEnd,
+    startTime: derived.startTime ?? input.start_time ?? (input.start_date ? '12:00' : null),
+    endTime: derived.endTime ?? input.end_time ?? (input.end_date ? '12:00' : null),
     origin: input.origin ?? null,
     destination: input.destination ?? null,
     value: input.value ?? 0,
@@ -123,9 +179,10 @@ export function useProposalServices(proposalId: string | null) {
       return mapBackendToFront(created);
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['proposal-services'] });
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
-      queryClient.invalidateQueries({ queryKey: ['proposal-services-totals'] });
+      queryClient.invalidateQueries({ queryKey: ['proposal-services'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['proposals'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['proposal-services-totals'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'], exact: false });
       toast({ title: 'Serviço adicionado!' });
     },
     onError: (error) => {
@@ -144,10 +201,19 @@ export function useProposalServices(proposalId: string | null) {
       });
       return mapBackendToFront(updated);
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['proposal-services'] });
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
-      queryClient.invalidateQueries({ queryKey: ['proposal-services-totals'] });
+    onSuccess: (updated, variables) => {
+      // Update cache immediately for the current proposal
+      if (variables.proposal_id) {
+        queryClient.setQueryData<ProposalService[] | undefined>(
+          ['proposal-services', variables.proposal_id],
+          (old) => (old ? old.map((s) => (s.id === updated.id ? updated : s)) : old),
+        );
+      }
+      queryClient.invalidateQueries({ queryKey: ['proposal-services'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['proposals'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['proposal'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['proposal-services-totals'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'], exact: false });
       toast({ title: 'Serviço atualizado!' });
     },
     onError: (error) => {
@@ -160,9 +226,10 @@ export function useProposalServices(proposalId: string | null) {
       await apiFetch(`/api/proposalService/${id}`, { method: 'DELETE' });
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['proposal-services'] });
-      queryClient.invalidateQueries({ queryKey: ['proposals'] });
-      queryClient.invalidateQueries({ queryKey: ['proposal-services-totals'] });
+      queryClient.invalidateQueries({ queryKey: ['proposal-services'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['proposals'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['proposal-services-totals'], exact: false });
+      queryClient.invalidateQueries({ queryKey: ['calendar-events'], exact: false });
       toast({ title: 'Serviço removido!' });
     },
     onError: (error) => {

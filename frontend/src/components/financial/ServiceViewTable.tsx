@@ -13,7 +13,7 @@ import {
 } from "@/components/ui/table";
 import { FinancialService, useServiceTotals } from "@/hooks/useFinancialServices";
 import { ProposalDetail } from "@/components/proposals/ProposalDetail";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
 import { BackendProposal, Proposal, mapBackendProposalToFront, proposalInclude } from "@/hooks/useProposals";
@@ -211,6 +211,9 @@ export function ServiceViewTable({ services, isLoading, isSuperAdmin }: ServiceV
         }}
       >
         <DialogContent className="max-w-6xl w-[95vw] h-[90vh] overflow-auto p-6">
+          <DialogHeader className="sr-only">
+            <DialogTitle>Detalhes da proposta</DialogTitle>
+          </DialogHeader>
           {selectedProposal && (
             <ProposalDetail
               proposal={selectedProposal}
