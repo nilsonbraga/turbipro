@@ -18,6 +18,8 @@ import {
 import { Badge } from "@/components/ui/badge"
 import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Grid3X3, List, Search, Filter, X } from "lucide-react"
 import { cn } from "@/lib/utils"
+import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
+import { ClipboardList, Briefcase, Slash } from "lucide-react"
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -93,6 +95,8 @@ export function EventManager({
   })
 
   const [searchQuery, setSearchQuery] = useState("")
+  const [showTasks, setShowTasks] = useState(true)
+  const [showLeads, setShowLeads] = useState(true)
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [clientFilter, setClientFilter] = useState("")
   const [clientSearch, setClientSearch] = useState("")
@@ -105,6 +109,10 @@ export function EventManager({
 
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
+      const isTask = (event.category || "").toLowerCase() === "tarefa"
+      if (!showTasks && isTask) return false
+      if (!showLeads && !isTask) return false
+
       // Search filter
       if (searchQuery) {
         const query = searchQuery.toLowerCase()
@@ -130,7 +138,7 @@ export function EventManager({
 
       return true
     })
-  }, [events, searchQuery, selectedCategories, clientFilter])
+  }, [events, searchQuery, selectedCategories, clientFilter, showTasks, showLeads])
 
   const hasActiveFilters = selectedCategories.length > 0 || Boolean(clientFilter)
 
@@ -425,6 +433,58 @@ export function EventManager({
               <X className="h-4 w-4" />
             </Button>
           )}
+        </div>
+
+        <div className="flex items-center gap-2">
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={showTasks ? "secondary" : "outline"}
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => setShowTasks((v) => !v)}
+                >
+                  {showTasks ? (
+                    <ClipboardList className="h-4 w-4 text-foreground" />
+                  ) : (
+                    <span className="relative inline-flex items-center justify-center">
+                      <ClipboardList className="h-4 w-4 text-muted-foreground" />
+                      <Slash className="h-4 w-4 absolute inset-0 rotate-45 text-muted-foreground" />
+                    </span>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {showTasks ? "Ocultar tarefas" : "Exibir tarefas"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
+
+          <TooltipProvider delayDuration={0}>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <Button
+                  variant={showLeads ? "secondary" : "outline"}
+                  size="icon"
+                  className="h-9 w-9"
+                  onClick={() => setShowLeads((v) => !v)}
+                >
+                  {showLeads ? (
+                    <Briefcase className="h-4 w-4 text-foreground" />
+                  ) : (
+                    <span className="relative inline-flex items-center justify-center">
+                      <Briefcase className="h-4 w-4 text-muted-foreground" />
+                      <Slash className="h-4 w-4 absolute inset-0 rotate-45 text-muted-foreground" />
+                    </span>
+                  )}
+                </Button>
+              </TooltipTrigger>
+              <TooltipContent side="bottom">
+                {showLeads ? "Ocultar leads" : "Exibir leads"}
+              </TooltipContent>
+            </Tooltip>
+          </TooltipProvider>
         </div>
 
         {/* Client Filter */}
@@ -1282,12 +1342,17 @@ function WeekView({
       return hour === (Number.isNaN(eventHour) ? 0 : eventHour)
     })
 
+  const allDayHeight = Math.max(32, multidayEvents.length * 32 + 12)
+
   return (
     <Card className="overflow-auto relative">
       {/* Linha all-day para eventos multiday */}
       <div className="grid grid-cols-8 border-b">
         <div className="border-r p-2 text-center text-xs font-medium sm:text-sm">All-day</div>
-        <div className="col-span-7 relative min-h-[36px] px-1 sm:px-2">
+        <div
+          className="col-span-7 relative px-1 sm:px-2"
+          style={{ minHeight: allDayHeight }}
+        >
           {multidayEvents.map((event, idx) => {
             const color = getColorClasses(event.color)
             const start = new Date(event.startTime)
@@ -1305,7 +1370,7 @@ function WeekView({
                 type="button"
                 onClick={() => onEventClick(event)}
                 className="absolute"
-                style={{ left: `${left}%`, width: `${width}%`, top: idx * 28 }}
+                style={{ left: `${left}%`, width: `${width}%`, top: 6 + idx * 32 }}
                 title={event.title}
               >
                 <div

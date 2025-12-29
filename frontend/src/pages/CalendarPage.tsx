@@ -157,12 +157,14 @@ export default function CalendarPage() {
     );
   }
 
+  const serviceCategories = Object.values(TYPE_LABELS).filter((c) => c !== 'Tarefa');
+
   return (
     <div className="mx-auto max-w-7xl space-y-4 px-4 pb-6 pt-2">
       <EventManager
         key={uiEvents.length}
         events={uiEvents}
-        categories={Object.values(TYPE_LABELS)}
+        categories={serviceCategories}
         availableTags={availableTags}
         clientOptions={clientOptions}
         defaultView="month"
