@@ -66,6 +66,12 @@ const defaultColors = [
   { name: "Red", value: "red", bg: "bg-red-500", text: "text-red-700" },
 ]
 
+const formatRange = (start: Date, end: Date) =>
+  `${start.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} - ${end.toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  })}`
+
 export function EventManager({
   events: initialEvents = [],
   onEventCreate,
@@ -294,30 +300,30 @@ export function EventManager({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <h2 className="text-xl font-semibold sm:text-2xl">
             {view === "month" &&
-              currentDate.toLocaleDateString("en-US", {
+              currentDate.toLocaleDateString("pt-BR", {
                 month: "long",
                 year: "numeric",
               })}
             {view === "week" &&
-              `Week of ${currentDate.toLocaleDateString("en-US", {
-                month: "short",
+              `Semana de ${currentDate.toLocaleDateString("pt-BR", {
                 day: "numeric",
+                month: "short",
               })}`}
             {view === "day" &&
-              currentDate.toLocaleDateString("en-US", {
+              currentDate.toLocaleDateString("pt-BR", {
                 weekday: "long",
                 month: "long",
                 day: "numeric",
                 year: "numeric",
               })}
-            {view === "list" && "All Events"}
+            {view === "list" && "Todos os eventos"}
           </h2>
           <div className="flex items-center gap-2">
             <Button variant="outline" size="icon" onClick={() => navigateDate("prev")} className="h-8 w-8">
               <ChevronLeft className="h-4 w-4" />
             </Button>
             <Button variant="outline" size="sm" onClick={() => setCurrentDate(new Date())}>
-              Today
+              Hoje
             </Button>
             <Button variant="outline" size="icon" onClick={() => navigateDate("next")} className="h-8 w-8">
               <ChevronRight className="h-4 w-4" />
@@ -336,25 +342,25 @@ export function EventManager({
                 <SelectItem value="month">
                   <div className="flex items-center gap-2">
                     <Calendar className="h-4 w-4" />
-                    Month View
+                    Visão mensal
                   </div>
                 </SelectItem>
                 <SelectItem value="week">
                   <div className="flex items-center gap-2">
                     <Grid3X3 className="h-4 w-4" />
-                    Week View
+                    Visão semanal
                   </div>
                 </SelectItem>
                 <SelectItem value="day">
                   <div className="flex items-center gap-2">
                     <Clock className="h-4 w-4" />
-                    Day View
+                    Visão diária
                   </div>
                 </SelectItem>
                 <SelectItem value="list">
                   <div className="flex items-center gap-2">
                     <List className="h-4 w-4" />
-                    List View
+                    Lista
                   </div>
                 </SelectItem>
               </SelectContent>
@@ -370,7 +376,7 @@ export function EventManager({
               className="h-8"
             >
               <Calendar className="h-4 w-4" />
-              <span className="ml-1">Month</span>
+              <span className="ml-1">Mês</span>
             </Button>
             <Button
               variant={view === "week" ? "secondary" : "ghost"}
@@ -379,7 +385,7 @@ export function EventManager({
               className="h-8"
             >
               <Grid3X3 className="h-4 w-4" />
-              <span className="ml-1">Week</span>
+              <span className="ml-1">Semana</span>
             </Button>
             <Button
               variant={view === "day" ? "secondary" : "ghost"}
@@ -388,7 +394,7 @@ export function EventManager({
               className="h-8"
             >
               <Clock className="h-4 w-4" />
-              <span className="ml-1">Day</span>
+              <span className="ml-1">Dia</span>
             </Button>
             <Button
               variant={view === "list" ? "secondary" : "ghost"}
@@ -397,7 +403,7 @@ export function EventManager({
               className="h-8"
             >
               <List className="h-4 w-4" />
-              <span className="ml-1">List</span>
+              <span className="ml-1">Lista</span>
             </Button>
           </div>
 
@@ -409,7 +415,7 @@ export function EventManager({
             className="w-full sm:w-auto"
           >
             <Plus className="mr-2 h-4 w-4" />
-            New Event
+            Novo evento
           </Button>
         </div>
       </div>
@@ -1102,7 +1108,7 @@ function MonthView({
   return (
     <Card className="overflow-hidden">
       <div className="grid grid-cols-7 border-b">
-        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map((day) => (
+        {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
           <div key={day} className="border-r p-2 text-center text-xs font-medium last:border-r-0 sm:text-sm">
             <span className="hidden sm:inline">{day}</span>
             <span className="sm:hidden">{day.charAt(0)}</span>
@@ -1193,40 +1199,60 @@ function MonthView({
                     const widthStyle = `calc(${width}% - 4px)`
 
                     return (
-                      <button
-                        key={`${event.id}-w${weekIndex}`}
-                        type="button"
-                        className="pointer-events-auto absolute overflow-hidden rounded-md text-[11px] font-medium text-white focus:outline-none"
-                        style={{
-                          top: idx * (barHeight + barGap),
-                          left: leftStyle,
-                          width: widthStyle,
-                          height: barHeight,
-                        }}
-                        onClick={() => onEventClick(event)}
-                        title={event.title}
-                      >
-                        <div
-                          className={cn(
-                            "flex h-full items-center gap-2 whitespace-nowrap px-2 text-white",
-                            color.bg,
-                            "hover:opacity-90"
-                          )}
-                        >
-                          <span className="truncate">{event.title}</span>
-                          <span className="opacity-85 text-[10px]">
-                            {new Date(event.startTime).toLocaleDateString("pt-BR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                            })}{" "}
-                            -{" "}
-                            {new Date(event.endTime).toLocaleDateString("pt-BR", {
-                              day: "2-digit",
-                              month: "2-digit",
-                            })}
-                          </span>
-                        </div>
-                      </button>
+                      <TooltipProvider delayDuration={0} key={`${event.id}-w${weekIndex}`}>
+                        <Tooltip>
+                          <TooltipTrigger asChild>
+                            <button
+                              type="button"
+                              className="pointer-events-auto absolute overflow-hidden rounded-md text-[11px] font-medium text-white focus:outline-none"
+                              style={{
+                                top: idx * (barHeight + barGap),
+                                left: leftStyle,
+                                width: widthStyle,
+                                height: barHeight,
+                              }}
+                              onClick={() => onEventClick(event)}
+                              title={event.title}
+                            >
+                              <div
+                                className={cn(
+                                  "flex h-full items-center gap-2 whitespace-nowrap px-2 text-white",
+                                  color.bg,
+                                  "hover:opacity-90"
+                                )}
+                              >
+                                <span className="truncate">{event.title}</span>
+                                <span className="opacity-85 text-[10px]">{formatRange(event.startTime, event.endTime)}</span>
+                              </div>
+                            </button>
+                          </TooltipTrigger>
+                          <TooltipContent className="max-w-xs">
+                            <div className="space-y-2">
+                              <div className="font-medium leading-tight">{event.title}</div>
+                              {event.description && (
+                                <p className="text-sm text-muted-foreground">{event.description}</p>
+                              )}
+                              <div className="text-xs text-muted-foreground">
+                                {formatRange(event.startTime, event.endTime)}
+                              </div>
+                              {(event.tags?.length || event.category) && (
+                                <div className="flex flex-wrap gap-1">
+                                  {event.category && (
+                                    <Badge variant="secondary" className="text-[10px]">
+                                      {event.category}
+                                    </Badge>
+                                  )}
+                                  {event.tags?.map((tag) => (
+                                    <Badge key={tag} variant="outline" className="text-[10px]">
+                                      {tag}
+                                    </Badge>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          </TooltipContent>
+                        </Tooltip>
+                      </TooltipProvider>
                     )
                   })}
                 </div>
@@ -1365,28 +1391,53 @@ function WeekView({
             const width = ((endIdx - startIdx + 1) / 7) * 100
 
             return (
-              <button
-                key={`${event.id}-${idx}`}
-                type="button"
-                onClick={() => onEventClick(event)}
-                className="absolute"
-                style={{ left: `${left}%`, width: `${width}%`, top: 6 + idx * 32 }}
-                title={event.title}
-              >
-                <div
-                  className={cn(
-                    "h-6 rounded-md text-[11px] font-medium text-white flex items-center px-2 shadow-sm",
-                    color.bg,
-                    "overflow-hidden whitespace-nowrap hover:opacity-90",
-                  )}
-                >
-                  <span className="truncate">{event.title}</span>
-                  <span className="ml-2 opacity-85">
-                    {start.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} -{" "}
-                    {end.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
-                  </span>
-                </div>
-              </button>
+              <TooltipProvider delayDuration={0} key={`${event.id}-${idx}`}>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <button
+                      type="button"
+                      onClick={() => onEventClick(event)}
+                      className="absolute"
+                      style={{ left: `${left}%`, width: `${width}%`, top: 6 + idx * 32 }}
+                      title={event.title}
+                    >
+                      <div
+                        className={cn(
+                          "h-6 rounded-md text-[11px] font-medium text-white flex items-center px-2 shadow-sm",
+                          color.bg,
+                          "overflow-hidden whitespace-nowrap hover:opacity-90",
+                        )}
+                      >
+                        <span className="truncate">{event.title}</span>
+                        <span className="ml-2 opacity-85">{formatRange(start, end)}</span>
+                      </div>
+                    </button>
+                  </TooltipTrigger>
+                  <TooltipContent className="max-w-xs">
+                    <div className="space-y-2">
+                      <div className="font-medium leading-tight">{event.title}</div>
+                      {event.description && (
+                        <p className="text-sm text-muted-foreground">{event.description}</p>
+                      )}
+                      <div className="text-xs text-muted-foreground">{formatRange(start, end)}</div>
+                      {(event.tags?.length || event.category) && (
+                        <div className="flex flex-wrap gap-1">
+                          {event.category && (
+                            <Badge variant="secondary" className="text-[10px]">
+                              {event.category}
+                            </Badge>
+                          )}
+                          {event.tags?.map((tag) => (
+                            <Badge key={tag} variant="outline" className="text-[10px]">
+                              {tag}
+                            </Badge>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             )
           })}
         </div>
@@ -1398,10 +1449,10 @@ function WeekView({
             key={day.toISOString()}
             className="border-r p-2 text-center text-xs font-medium last:border-r-0 sm:text-sm"
           >
-            <div className="hidden sm:block">{day.toLocaleDateString("en-US", { weekday: "short" })}</div>
-            <div className="sm:hidden">{day.toLocaleDateString("en-US", { weekday: "narrow" })}</div>
+            <div className="hidden sm:block">{day.toLocaleDateString("pt-BR", { weekday: "short" })}</div>
+            <div className="sm:hidden">{day.toLocaleDateString("pt-BR", { weekday: "narrow" })}</div>
             <div className="text-[10px] text-muted-foreground sm:text-xs">
-              {day.toLocaleDateString("en-US", { month: "short", day: "numeric" })}
+              {day.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })}
             </div>
             {getEventsForDay(day).length > 3 && (
               <button
