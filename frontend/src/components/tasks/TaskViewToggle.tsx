@@ -1,8 +1,8 @@
 import { Button } from '@/components/ui/button';
-import { Kanban, List } from 'lucide-react';
+import { Kanban, List, CheckSquare } from 'lucide-react';
 import { cn } from '@/lib/utils';
 
-export type TaskViewMode = 'board' | 'list';
+export type TaskViewMode = 'board' | 'list' | 'todo';
 
 interface TaskViewToggleProps {
   view: TaskViewMode;
@@ -35,6 +35,18 @@ export function TaskViewToggle({ view, onViewChange }: TaskViewToggleProps) {
       >
         <List className="h-4 w-4" />
         <span className="hidden sm:inline">List</span>
+      </Button>
+      <Button
+        variant="ghost"
+        size="sm"
+        className={cn(
+          "h-8 gap-1.5 px-3",
+          view === 'todo' && "bg-background shadow-sm"
+        )}
+        onClick={() => onViewChange('todo')}
+      >
+        <CheckSquare className="h-4 w-4" />
+        <span className="hidden sm:inline">To-do</span>
       </Button>
     </div>
   );

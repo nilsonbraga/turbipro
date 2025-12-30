@@ -24,6 +24,7 @@ import { TaskCard } from '@/components/tasks/TaskCard';
 import { TaskDialog } from '@/components/tasks/TaskDialog';
 import { ColumnDialog } from '@/components/tasks/ColumnDialog';
 import { TaskListView } from '@/components/tasks/TaskListView';
+import { TaskTodoListView } from '@/components/tasks/TaskTodoListView';
 import { TaskViewToggle, TaskViewMode } from '@/components/tasks/TaskViewToggle';
 
 import { ProposalDetail } from '@/components/proposals/ProposalDetail';
@@ -112,6 +113,7 @@ export default function Tasks() {
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
   const [prefillData, setPrefillData] = useState<PrefillTaskData | null>(null);
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
 
   /**
    * ✅ CORREÇÃO PRINCIPAL:
@@ -195,6 +197,35 @@ export default function Tasks() {
     });
   }, [tasksList, searchQuery]);
 
+  const completedColumn = useMemo(() => {
+    if (columns.length === 0) return undefined;
+
+    const normalize = (value: string) =>
+      value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+
+    const keywords = ['feito', 'concluido', 'concluida', 'done', 'completed'];
+
+    return (
+      columns.find((column) => {
+        const normalizedName = normalize(column.name);
+        return keywords.some((keyword) => normalizedName.includes(keyword));
+      }) || columns[columns.length - 1]
+    );
+  }, [columns]);
+
+  const incompleteTasks = useMemo(() => {
+    if (!completedColumn) return filteredTasks;
+    return filteredTasks.filter((task) => task.column_id !== completedColumn.id);
+  }, [filteredTasks, completedColumn]);
+
+  const completedTasks = useMemo(() => {
+    if (!completedColumn) return [];
+    return filteredTasks.filter((task) => task.column_id === completedColumn.id);
+  }, [filteredTasks, completedColumn]);
+
   const handleDragStart = (event: DragStartEvent) => {
     setIsDragging(true);
 
@@ -277,6 +308,18 @@ export default function Tasks() {
         onSuccess: () => setColumnDialogOpen(false),
       });
     }
+  };
+
+  const handleCompleteTask = (taskId: string) => {
+    if (!completedColumn?.id) return;
+
+    setCompletingTaskId(taskId);
+    moveTask.mutate(
+      { taskId, columnId: completedColumn.id },
+      {
+        onSettled: () => setCompletingTaskId(null),
+      },
+    );
   };
 
   const clearFilters = () => {
@@ -544,7 +587,7 @@ export default function Tasks() {
                 </DragOverlay>
               </DndContext>
             </div>
-          ) : (
+          ) : view === 'list' ? (
             <div className="flex-1 overflow-y-auto">
               <TaskListView
                 columns={columns}
@@ -552,6 +595,19 @@ export default function Tasks() {
                 onEditTask={handleEditTask}
                 onDeleteTask={(id) => setDeleteTaskId(id)}
                 onOpenProposal={handleOpenProposal}
+              />
+            </div>
+          ) : (
+            <div className="flex-1 overflow-y-auto">
+              <TaskTodoListView
+                columns={columns}
+                tasks={incompleteTasks}
+                completedColumnId={completedColumn?.id}
+                completedColumnName={completedColumn?.name}
+                completedTasks={completedTasks}
+                completingTaskId={completingTaskId}
+                onEditTask={handleEditTask}
+                onCompleteTask={handleCompleteTask}
               />
             </div>
           )}

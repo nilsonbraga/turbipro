@@ -23,6 +23,7 @@ export interface TaskAssignee {
     id: string;
     name: string;
     email: string;
+    avatarUrl?: string | null;
   };
 }
 
@@ -319,7 +320,9 @@ export function useTasks(filters?: {
       task_id: a.taskId,
       user_id: a.userId,
       created_at: a.createdAt,
-      user: a.user ? { id: a.user.id, name: a.user.name, email: a.user.email } : undefined,
+      user: a.user
+        ? { id: a.user.id, name: a.user.name, email: a.user.email, avatarUrl: a.user.avatarUrl }
+        : undefined,
     })),
     checklists: (t.checklists || []).map((c: any) => ({
       id: c.id,
@@ -382,7 +385,7 @@ export function useTasks(filters?: {
         include: JSON.stringify({
           client: { select: { id: true, name: true } },
           proposal: { select: { id: true, title: true, number: true } },
-          assignees: { include: { user: { select: { id: true, name: true, email: true } } } },
+          assignees: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } } },
           checklists: { include: { items: true } },
           comments: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } } },
           histories: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } }, orderBy: { createdAt: 'desc' } },

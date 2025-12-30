@@ -245,20 +245,24 @@ export function TaskCard({ task, onEdit, onDelete, onOpenProposal }: TaskCardPro
         )}
 
         {/* Assignees */}
-        {task.assignees && task.assignees.length > 0 && (
-          <div className="flex items-center gap-1 mt-2 -space-x-1">
-            {task.assignees.slice(0, 3).map((assignee) => (
-              <Avatar key={assignee.id} className="h-6 w-6 border-2 border-background">
-                <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
-                  {assignee.user?.name ? getInitials(assignee.user.name) : '?'}
-                </AvatarFallback>
-              </Avatar>
-            ))}
-            {task.assignees.length > 3 && (
-              <span className="text-xs text-muted-foreground ml-2">
-                +{task.assignees.length - 3}
-              </span>
-            )}
+          {task.assignees && task.assignees.length > 0 && (
+            <div className="flex items-center gap-1 mt-2 -space-x-1">
+              {task.assignees.slice(0, 3).map((assignee) => (
+                <Avatar key={assignee.id} className="h-6 w-6 border-2 border-background">
+                  {assignee.user?.avatarUrl ? (
+                    <img src={assignee.user.avatarUrl} alt={assignee.user.name} className="w-full h-full object-cover" />
+                  ) : (
+                    <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
+                      {assignee.user?.name ? getInitials(assignee.user.name) : '?'}
+                    </AvatarFallback>
+                  )}
+                </Avatar>
+              ))}
+              {task.assignees.length > 3 && (
+                <span className="text-xs text-muted-foreground ml-2">
+                  +{task.assignees.length - 3}
+                </span>
+              )}
           </div>
         )}
 

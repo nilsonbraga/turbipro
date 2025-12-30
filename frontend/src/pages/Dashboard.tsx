@@ -1,4 +1,5 @@
 import { useMemo, useState, useEffect } from 'react';
+import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
@@ -21,6 +22,8 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { ChartContainer, ChartLegend, ChartLegendContent, ChartTooltip, ChartTooltipContent, type ChartConfig } from '@/components/ui/chart';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { apiFetch } from '@/lib/api';
+import { useTeamPerformance } from '@/hooks/useTeamPerformance';
+import { PerformanceCard } from '@/components/team/PerformanceCard';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -107,12 +110,44 @@ function RefreshOverlay({ show, isDark }: { show: boolean; isDark: boolean }) {
 }
 
 export default function Dashboard() {
-  const { isSuperAdmin, profile, role } = useAuth() as any;
+  const { isSuperAdmin, profile, role, user } = useAuth() as any;
   const [filters, setFilters] = useState<DashboardFilters>({});
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
 
   const { agencies, clients, metrics, isLoading, isFetching } = useDashboard(filters);
   const { stages: pipelineStages } = usePipelineStages();
+  const now = useMemo(() => new Date(), []);
+  const effectiveMonth = filters.month ?? now.getMonth() + 1;
+  const effectiveYear = filters.year ?? now.getFullYear();
+  const myUserId = user?.id ?? profile?.id ?? (profile as any)?.user_id ?? null;
+  const { collaboratorPerformance, isLoading: perfLoading } = useTeamPerformance({
+    month: effectiveMonth,
+    year: effectiveYear,
+    agencyIdFilter: filters.agencyId,
+  });
+  const { data: myProposals = [] } = useQuery({
+    queryKey: ['dashboard-my-proposals', filters, myUserId],
+    queryFn: async () => {
+      if (!myUserId) return [];
+
+      const where: Record<string, unknown> = {};
+      if (!isSuperAdmin && profile?.agency_id) where.agencyId = profile.agency_id;
+      else if (filters.agencyId) where.agencyId = filters.agencyId;
+      if (filters.clientId) where.clientId = filters.clientId;
+
+      const startDate = new Date(effectiveYear, effectiveMonth - 1, 1);
+      const endDate = new Date(effectiveYear, effectiveMonth, 0, 23, 59, 59);
+      where.createdAt = { gte: startDate.toISOString(), lte: endDate.toISOString() };
+
+      const params = new URLSearchParams({
+        where: JSON.stringify(where),
+        include: JSON.stringify({ stage: { select: { isClosed: true } } }),
+      });
+      const { data } = await apiFetch<{ data: any[] }>(`/api/proposal?${params.toString()}`);
+      return data || [];
+    },
+    enabled: !!myUserId,
+  });
   const displayMetrics = metrics ?? {
     revenueByMonth: [],
     proposalsByStage: [],
@@ -131,26 +166,17 @@ export default function Dashboard() {
   const textStrong = isDark ? 'text-white' : 'text-slate-900';
   const softShadow = isDark ? 'shadow-xl shadow-emerald-900/20' : 'shadow-none';
 
-  // Hooks SEMPRE rodam (mesmo com loading)
-  const sellerSummary = metrics?.sellerSummary ?? [];
-  const highlightedSellers = sellerSummary.length > 0 ? sellerSummary : [];
-  const mySeller = useMemo(() => {
-    const meId = profile?.id ?? (profile as any)?.user_id ?? null;
-    const name = profile?.name || (profile as any)?.full_name || profile?.email || 'Você';
-    const base = {
-      id: meId,
-      name,
-      email: profile?.email ?? null,
-      proposals: 0,
-      closed: 0,
-      revenue: 0,
-      profit: 0,
-      conversion: 0,
-    };
-    if (!meId) return base;
-    const found = highlightedSellers.find((s) => s.id === meId);
-    return found ? found : base;
-  }, [highlightedSellers, profile]);
+  const myPerformance = useMemo(() => {
+    const meEmail = profile?.email ?? null;
+    const perf = collaboratorPerformance.find(
+      (c) => c.collaborator.user_id === myUserId || (meEmail && c.collaborator.email === meEmail),
+    );
+
+    if (!perf) return null;
+    const leadsCount = myProposals.filter((p: any) => p.userId === myUserId).length;
+
+    return { ...perf, leadsCount } as any;
+  }, [collaboratorPerformance, myProposals, myUserId, profile?.email]);
 
   const updateFilter = (key: keyof DashboardFilters, value: string | number | undefined) => {
     setFilters((prev) => ({ ...prev, [key]: value }));
@@ -285,21 +311,21 @@ export default function Dashboard() {
           <FullPageSkeleton />
         ) : (
           <>
-            {/* Hero */}
-            <div className="grid gap-6 lg:grid-cols-[2.2fr,1fr]">
+            {/* Hero + Performance side by side */}
+            <div className="grid gap-3 lg:grid-cols-[7fr,3fr] items-stretch">
               <div
-                className={`relative overflow-hidden rounded-2xl border p-6 transition-colors duration-500 ${softShadow} ${
+                className={`relative overflow-hidden rounded-2xl border p-6 transition-colors duration-500 w-full ${softShadow} ${
                   isDark
                     ? 'border-emerald-500/20 bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700'
                     : 'border-emerald-100 bg-gradient-to-r from-emerald-100 via-emerald-200 to-emerald-300 text-slate-900'
                 }`}
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.12),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.1),transparent_30%)]" />
-                <div className="relative flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                <div className="relative flex flex-col gap-4">
                   <div className="space-y-2">
                     <p className={`text-sm font-medium ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Painel Inteligente</p>
                     <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-emerald-950'}`}>Performance em tempo real</h1>
-                    <p className={`${isDark ? 'text-white/80' : 'text-emerald-900/80'} max-w-xl`}>
+                    <p className={`${isDark ? 'text-white/80' : 'text-emerald-900/80'} max-w-3xl`}>
                       Acompanhe faturamento, margens e conversões de todas as agências em um só lugar.
                     </p>
                     <div className="flex flex-wrap gap-3">
@@ -313,111 +339,23 @@ export default function Dashboard() {
                       </div>
                     </div>
                   </div>
-
-                  <div className="grid grid-cols-2 gap-3 lg:grid-cols-1">
-                    {isSuperAdmin ? (
-                      <>
-                        <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-white/15' : 'bg-white/70'}`}>
-                          <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Faturamento (todas as agências)</p>
-                          <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
-                            {showRefreshing ? <Skeleton className="h-6 w-32 rounded-md bg-white/30" /> : formatCurrency(metrics?.totalRevenue || 0)}
-                          </div>
-                          <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Base: recebimentos pagos</span>
-                        </div>
-                        <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-black/20' : 'bg-emerald-200/70'}`}>
-                          <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Lucro (todas as agências)</p>
-                          <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
-                            {showRefreshing ? <Skeleton className="h-6 w-32 rounded-md bg-white/30" /> : formatCurrency(metrics?.totalProfit || 0)}
-                          </div>
-                          <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Comissões confirmadas</span>
-                        </div>
-                      </>
-                    ) : role === 'admin' || role === 'agency_admin' ? (
-                      <>
-                        <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-white/15' : 'bg-white/70'}`}>
-                          <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Faturamento mensal</p>
-                          <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
-                            {showRefreshing ? <Skeleton className="h-6 w-32 rounded-md bg-white/30" /> : formatCurrency(currentMonth?.revenue || 0)}
-                          </div>
-                          <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>{currentMonth?.month || 'Mês atual'}</span>
-                        </div>
-                        <div className={`rounded-xl p-4 backdrop-blur-sm ${isDark ? 'bg-black/20' : 'bg-emerald-200/70'}`}>
-                          <p className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Lucro total</p>
-                          <div className={`text-2xl font-semibold ${isDark ? 'text-white' : 'text-emerald-950'}`}>
-                            {showRefreshing ? <Skeleton className="h-6 w-32 rounded-md bg-white/30" /> : formatCurrency(metrics?.totalProfit || 0)}
-                          </div>
-                          <span className={`text-xs ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Comissões confirmadas</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="rounded-xl p-4 backdrop-blur-sm col-span-2 bg-white/10 text-white border border-emerald-500/20" />
-                    )}
-                  </div>
                 </div>
               </div>
 
-              <div className={`rounded-2xl p-5 backdrop-blur-md border ${surfaceCard}`}>
-                <div className="flex items-center justify-between mb-4">
-                  <div>
-                    <p className={`text-xs ${textMuted}`}>Seu desempenho</p>
-                    <p className={`text-lg font-semibold ${textStrong}`}>{mySeller.name}</p>
+              <div className="flex h-full w-full">
+                {perfLoading ? (
+                  <Skeleton className="h-[280px] w-full rounded-2xl" />
+                ) : myPerformance ? (
+                  <div className="h-full w-full">
+                    <PerformanceCard performance={myPerformance} formatCurrency={formatCurrency} />
                   </div>
-                  <div
-                    className={`w-12 h-12 rounded-full overflow-hidden flex items-center justify-center text-lg font-semibold border ${
-                      isDark ? 'border-emerald-500/40 bg-emerald-500/20 text-white' : 'border-emerald-200 bg-emerald-50 text-emerald-700'
-                    }`}
-                  >
-                    {(() => {
-                      const avatar =
-                        profile?.avatarUrl ||
-                        (profile as any)?.avatar_url ||
-                        (profile as any)?.avatarUrl ||
-                        null;
-                      if (avatar) {
-                        return <img src={avatar} alt={mySeller.name} className="w-full h-full object-cover" />;
-                      }
-                      const initials =
-                        (mySeller.name || 'U')
-                          .split(' ')
-                          .map((n) => n[0])
-                          .join('')
-                          .slice(0, 2)
-                          .toUpperCase() || 'U';
-                      return initials;
-                    })()}
-                  </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 text-sm">
-                  <div className={`rounded-xl p-3 ${subtleCard}`}>
-                    <p className={textMuted}>Propostas</p>
-                    <div className={`text-xl font-semibold ${textStrong}`}>
-                      {showRefreshing ? <Skeleton className="h-4 w-12 rounded bg-white/20" /> : mySeller.proposals}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Emitidas por você</p>
-                  </div>
-                  <div className={`rounded-xl p-3 ${subtleCard}`}>
-                    <p className={textMuted}>Fechadas</p>
-                    <div className={`text-xl font-semibold ${textStrong}`}>
-                      {showRefreshing ? <Skeleton className="h-4 w-12 rounded bg-white/20" /> : mySeller.closed}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Entraram como vendas</p>
-                  </div>
-                  <div className={`rounded-xl p-3 ${subtleCard}`}>
-                    <p className={textMuted}>Faturamento</p>
-                    <div className={`text-xl font-semibold ${textStrong}`}>
-                      {showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(mySeller.revenue)}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Total vendido</p>
-                  </div>
-                  <div className={`rounded-xl p-3 ${subtleCard}`}>
-                    <p className={textMuted}>Conversão</p>
-                    <div className={`text-xl font-semibold ${textStrong}`}>
-                      {showRefreshing ? <Skeleton className="h-4 w-12 rounded bg-white/20" /> : `${mySeller.conversion}%`}
-                    </div>
-                    <p className="text-xs text-muted-foreground">Fechadas / emitidas</p>
-                  </div>
-                </div>
+                ) : (
+                  <Card className="h-full w-full flex items-center justify-center flex-1">
+                    <CardContent className="text-sm text-muted-foreground">
+                      Nenhum dado de performance para você neste período.
+                    </CardContent>
+                  </Card>
+                )}
               </div>
             </div>
 

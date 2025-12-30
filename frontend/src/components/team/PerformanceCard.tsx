@@ -3,7 +3,7 @@ import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { CollaboratorPerformance } from '@/hooks/useTeamPerformance';
-import { Trophy, TrendingUp, DollarSign, Target, Users } from 'lucide-react';
+import { Trophy, TrendingUp, DollarSign, Users } from 'lucide-react';
 
 interface PerformanceCardProps {
   performance: CollaboratorPerformance;
@@ -13,7 +13,7 @@ interface PerformanceCardProps {
 }
 
 export function PerformanceCard({ performance, rank, formatCurrency, onCardClick }: PerformanceCardProps) {
-  const { collaborator, totalSales, totalProfit, totalCommissions, dealsCount, conversionRate, goal, goalProgress } = performance;
+  const { collaborator, totalSales, totalProfit, totalCommissions, dealsCount, goal, goalProgress, leadsCount } = performance as any;
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -67,9 +67,9 @@ export function PerformanceCard({ performance, rank, formatCurrency, onCardClick
           </div>
           <div className="space-y-1">
             <p className="text-xs text-muted-foreground flex items-center gap-1">
-              <Target className="h-3 w-3" /> Taxa Conversão
+              <Users className="h-3 w-3" /> Leads Captados
             </p>
-            <p className="text-lg font-semibold">{conversionRate.toFixed(1)}%</p>
+            <p className="text-lg font-semibold">{leadsCount ?? 0}</p>
           </div>
         </div>
 
