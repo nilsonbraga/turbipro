@@ -78,6 +78,9 @@ interface FlightDetails {
 interface FlightFieldsProps {
   details: FlightDetails;
   onChange: (details: FlightDetails) => void;
+  partnerId?: string | null;
+  partners?: { id: string; name: string }[];
+  onPartnerChange?: (id: string | null) => void;
 }
 
 const defaultSegment: FlightSegment = {
@@ -281,9 +284,6 @@ const DatePickerField = ({
 
 /**
  * Timeline that does NOT distort when connections change.
- * - No "Transfer" label on the line.
- * - Adds stop dots according to number of connections.
- * - If a connection IATA is filled, shows it in smaller type under the dot.
  */
 const StopTimeline = ({
   from,
@@ -294,21 +294,17 @@ const StopTimeline = ({
   to: string;
   connectionIatas: string[];
 }) => {
-  const stops = connectionIatas; // may contain empty strings, that's ok
+  const stops = connectionIatas;
   const count = stops.length;
 
-  // positions: equally spaced along the track between endpoints
   const stopPositions = useMemo(() => {
     if (count <= 0) return [];
-    // distribute between endpoints: 1..count on a (count+1) partition
     return Array.from({ length: count }).map((_, i) => ((i + 1) / (count + 1)) * 100);
   }, [count]);
 
   return (
     <div className="space-y-2">
-      {/* fixed-height track */}
       <div className="relative rounded-md border bg-background/60 px-3 py-2">
-        {/* Top row: endpoints + track */}
         <div className="relative h-9">
           <div className="absolute left-0 top-1/2 -translate-y-1/2 text-xs font-semibold">
             {from || "___"}
@@ -317,15 +313,12 @@ const StopTimeline = ({
             {to || "___"}
           </div>
 
-          {/* Track area between labels */}
           <div className="absolute left-14 right-14 top-1/2 -translate-y-1/2">
             <div className="relative">
               <div className="h-1 rounded-full bg-border" />
-              {/* endpoint dots */}
               <div className="absolute left-0 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-primary" />
               <div className="absolute right-0 top-1/2 -translate-y-1/2 h-2.5 w-2.5 rounded-full bg-primary" />
 
-              {/* connection dots */}
               {stopPositions.map((pct, idx) => {
                 const label = (stops[idx] || "").toUpperCase();
                 return (
@@ -334,9 +327,7 @@ const StopTimeline = ({
                     className="absolute top-1/2 -translate-y-1/2"
                     style={{ left: `${pct}%` }}
                   >
-                    {/* dot */}
                     <div className="h-2 w-2 rounded-full bg-amber-500" />
-                    {/* label under dot (won't change height of track) */}
                     <div className="absolute left-1/2 top-3 -translate-x-1/2 whitespace-nowrap">
                       <span className="font-mono text-[10px] text-muted-foreground uppercase">
                         {label || "—"}
@@ -349,7 +340,6 @@ const StopTimeline = ({
           </div>
         </div>
 
-        {/* Bottom row: optional summary line, compact and wrap-safe */}
         {count > 0 && (
           <div className="mt-1 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
             <span className="inline-flex items-center gap-1">
@@ -369,7 +359,13 @@ const StopTimeline = ({
   );
 };
 
-export function FlightFields({ details, onChange }: FlightFieldsProps) {
+export function FlightFields({
+  details,
+  onChange,
+  partnerId,
+  partners = [],
+  onPartnerChange,
+}: FlightFieldsProps) {
   const data: FlightDetails = {
     tripType: details?.tripType || "roundtrip",
     cabinClass: details?.cabinClass || "economy",
@@ -393,11 +389,7 @@ export function FlightFields({ details, onChange }: FlightFieldsProps) {
 
   const addSegment = () => {
     const lastSegment = data.segments[data.segments.length - 1];
-    const newSegment = {
-      ...defaultSegment,
-      fromIata: lastSegment?.toIata || "",
-      connections: [],
-    };
+    const newSegment = { ...defaultSegment, fromIata: lastSegment?.toIata || "", connections: [] };
     updateField("segments", [...data.segments, newSegment]);
   };
 
@@ -493,26 +485,46 @@ export function FlightFields({ details, onChange }: FlightFieldsProps) {
 
   return (
     <div className="space-y-4">
-      {/* Header */}
-      <div className="rounded-lg border bg-muted/20 px-4 py-3">
-        <div className="flex items-center justify-between gap-3">
-          <div className="flex items-center gap-2 min-w-0">
-            <div className="h-9 w-9 rounded-md border bg-background/60 flex items-center justify-center">
-              <Plane className="h-4 w-4 text-primary" />
-            </div>
-            <div className="min-w-0">
-              <div className="text-sm font-semibold tracking-tight"></div>
-              <div className="text-xs text-muted-foreground"></div>
-            </div>
-          </div>
+     {/* Header (alinhado pela base do Select) */}
+<div className="rounded-lg border bg-muted/20 px-4 py-3">
+  <div className="grid grid-cols-1 sm:grid-cols-[1fr_auto] gap-3 items-end">
+    {/* Left */}
+    <div className="flex items-end gap-3 min-w-0">
+      <div className="h-9 w-9 rounded-md border bg-background/60 flex items-center justify-center shrink-0">
+        <Plane className="h-4 w-4 text-primary" />
+      </div>
 
-          <div className="hidden sm:flex items-center gap-2">
-            <Pill icon={<Users className="h-3 w-3" />}>{passengersTotal} pax</Pill>
-            <Pill icon={<Ticket className="h-3 w-3" />}>{data.cabinClass}</Pill>
-            <Pill icon={<Route className="h-3 w-3" />}>{data.tripType}</Pill>
-          </div>
+      <div className="min-w-0">
+        <div className="mt-1">
+          <Select
+            value={partnerId || "none"}
+            onValueChange={(value) => onPartnerChange?.(value === "none" ? null : value)}
+          >
+            <SelectTrigger className="h-9 w-[260px] sm:w-[320px]">
+              <SelectValue placeholder="Selecione o Fornecedor" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="none">Selecione o Fornecedor</SelectItem>
+              {partners.map((partner) => (
+                <SelectItem key={partner.id} value={partner.id}>
+                  {partner.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
         </div>
       </div>
+    </div>
+
+    {/* Right */}
+    <div className="hidden sm:flex items-end gap-2 flex-nowrap pb-[1px]">
+      <Pill icon={<Users className="h-3 w-3" />}>{passengersTotal} pax</Pill>
+      <Pill icon={<Ticket className="h-3 w-3" />}>{data.cabinClass}</Pill>
+      <Pill icon={<Route className="h-3 w-3" />}>{data.tripType}</Pill>
+    </div>
+  </div>
+</div>
+
 
       {/* Passengers */}
       <Card className="rounded-lg border bg-background">
@@ -561,11 +573,9 @@ export function FlightFields({ details, onChange }: FlightFieldsProps) {
             </div>
           </div>
 
+          {/* Total (sem "Calculado automaticamente") */}
           <div className="rounded-lg border bg-muted/10 p-3 flex items-center justify-between">
-            <div className="space-y-0.5">
-              <div className="text-sm font-medium">Total de passageiros</div>
-              <div className="text-xs text-muted-foreground">Calculado automaticamente</div>
-            </div>
+            <div className="text-sm font-medium">Total de passageiros</div>
             <Input value={String(passengersTotal)} readOnly disabled className="h-9 w-24 text-right font-mono" />
           </div>
 
@@ -668,7 +678,6 @@ export function FlightFields({ details, onChange }: FlightFieldsProps) {
 
             return (
               <div key={segIndex} className="rounded-lg border overflow-hidden bg-muted/10">
-                {/* Summary */}
                 <div className="px-4 py-3 border-b bg-background">
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0 flex-1 space-y-2">
@@ -720,7 +729,6 @@ export function FlightFields({ details, onChange }: FlightFieldsProps) {
                   </div>
                 </div>
 
-                {/* Fields */}
                 <div className="p-4 space-y-3">
                   <div className="grid grid-cols-1 md:grid-cols-3 gap-2">
                     <div className="rounded-lg border bg-background p-3">
@@ -840,7 +848,6 @@ export function FlightFields({ details, onChange }: FlightFieldsProps) {
                     </div>
                   </div>
 
-                  {/* Connections */}
                   {segment.connections.length > 0 && (
                     <div className="space-y-2">
                       <div className="flex items-center gap-2">
@@ -903,7 +910,9 @@ export function FlightFields({ details, onChange }: FlightFieldsProps) {
                                   <TinyLabel>Nº Voo</TinyLabel>
                                   <Input
                                     value={conn.flightNumber || ""}
-                                    onChange={(e) => updateConnection(segIndex, connIndex, "flightNumber", e.target.value)}
+                                    onChange={(e) =>
+                                      updateConnection(segIndex, connIndex, "flightNumber", e.target.value)
+                                    }
                                     placeholder="1234"
                                     className="mt-2 h-9 text-center font-mono"
                                   />
@@ -922,14 +931,24 @@ export function FlightFields({ details, onChange }: FlightFieldsProps) {
                                     <DatePickerField
                                       value={cArr.date}
                                       onChange={(date) =>
-                                        updateConnection(segIndex, connIndex, "arrivalAt", combineDateTime(date, cArr.time))
+                                        updateConnection(
+                                          segIndex,
+                                          connIndex,
+                                          "arrivalAt",
+                                          combineDateTime(date, cArr.time)
+                                        )
                                       }
                                       placeholder="Data"
                                     />
                                     <TimeInputField
                                       value={cArr.time}
                                       onChange={(time) =>
-                                        updateConnection(segIndex, connIndex, "arrivalAt", combineDateTime(cArr.date, time))
+                                        updateConnection(
+                                          segIndex,
+                                          connIndex,
+                                          "arrivalAt",
+                                          combineDateTime(cArr.date, time)
+                                        )
                                       }
                                       placeholder="HH:mm"
                                     />
@@ -1013,7 +1032,10 @@ export function FlightFields({ details, onChange }: FlightFieldsProps) {
             {baggage.carryOn && (
               <div className="flex items-center justify-between gap-3">
                 <TinyLabel>Quantidade</TinyLabel>
-                <Select value={String(baggage.carryOnQty)} onValueChange={(v) => updateBaggage("carryOnQty", parseInt(v))}>
+                <Select
+                  value={String(baggage.carryOnQty)}
+                  onValueChange={(v) => updateBaggage("carryOnQty", parseInt(v))}
+                >
                   <SelectTrigger className="h-9 w-24 rounded-md shadow-none">
                     <SelectValue />
                   </SelectTrigger>
@@ -1051,7 +1073,10 @@ export function FlightFields({ details, onChange }: FlightFieldsProps) {
               <div className="grid grid-cols-2 gap-3">
                 <div className="flex items-center justify-between gap-3">
                   <TinyLabel>Qtd</TinyLabel>
-                  <Select value={String(baggage.checkedQty)} onValueChange={(v) => updateBaggage("checkedQty", parseInt(v))}>
+                  <Select
+                    value={String(baggage.checkedQty)}
+                    onValueChange={(v) => updateBaggage("checkedQty", parseInt(v))}
+                  >
                     <SelectTrigger className="h-9 rounded-md shadow-none">
                       <SelectValue />
                     </SelectTrigger>
@@ -1067,7 +1092,10 @@ export function FlightFields({ details, onChange }: FlightFieldsProps) {
 
                 <div className="flex items-center justify-between gap-3">
                   <TinyLabel>Peso</TinyLabel>
-                  <Select value={baggage.checkedWeight || "23kg"} onValueChange={(v) => updateBaggage("checkedWeight", v)}>
+                  <Select
+                    value={baggage.checkedWeight || "23kg"}
+                    onValueChange={(v) => updateBaggage("checkedWeight", v)}
+                  >
                     <SelectTrigger className="h-9 rounded-md shadow-none">
                       <SelectValue />
                     </SelectTrigger>

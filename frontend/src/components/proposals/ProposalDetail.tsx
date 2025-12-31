@@ -11,6 +11,7 @@ import { useTags } from '@/hooks/useTags';
 import { useAuth } from '@/contexts/AuthContext';
 import { ServiceDialog } from './ServiceDialog';
 import { generateProposalPDF } from '@/utils/pdfExport';
+
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,12 +20,14 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { Input } from '@/components/ui/input';
+
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
+
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,18 +38,15 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { 
-  Mail, 
-  FileText, 
-  MessageSquare, 
-  Activity, 
-  Plane, 
-  Hotel, 
-  Car, 
-  Package, 
+
+import {
+  Activity,
+  Plane,
+  Hotel,
+  Car,
+  Package,
   Map,
   Calendar,
-  DollarSign,
   Download,
   Edit,
   Clock,
@@ -59,18 +59,17 @@ import {
   Shield,
   Bus,
   Loader2,
-  ChevronRight,
   Upload,
   Eye,
   ArrowRight,
-  RefreshCw,
-  FileUp,
+  FileText,
   StickyNote,
   FolderOpen,
-  Link,
-  Copy,
-  Check
+  FileUp,
+  Check,
+  ChevronDown,
 } from 'lucide-react';
+
 import { cn } from '@/lib/utils';
 import { format as formatDateFns, parseISO, parse } from 'date-fns';
 import { useToast } from '@/hooks/use-toast';
@@ -92,10 +91,7 @@ const formatCurrency = (value: number) => {
 const formatDate = (value?: string | null) => {
   if (!value) return '';
   try {
-    const date =
-      value.length <= 10
-        ? parse(value, 'yyyy-MM-dd', new Date())
-        : parseISO(value);
+    const date = value.length <= 10 ? parse(value, 'yyyy-MM-dd', new Date()) : parseISO(value);
     return formatDateFns(date, 'dd MMM yyyy');
   } catch {
     return value;
@@ -105,10 +101,7 @@ const formatDate = (value?: string | null) => {
 const formatDateTime = (value?: string | null) => {
   if (!value) return '';
   try {
-    const date =
-      value.length <= 10
-        ? parse(value, 'yyyy-MM-dd', new Date())
-        : parseISO(value);
+    const date = value.length <= 10 ? parse(value, 'yyyy-MM-dd', new Date()) : parseISO(value);
     return formatDateFns(date, 'dd MMM yyyy, HH:mm');
   } catch {
     return value;
@@ -151,80 +144,174 @@ const actionIcons: Record<string, typeof Activity> = {
   'Tag removida': X,
 };
 
-function ServiceCard({ 
-  service, 
-  onEdit, 
-  onDelete 
-}: { 
-  service: ProposalService; 
+function StageSwitcher({
+  stages,
+  currentStageId,
+  onChange,
+}: {
+  stages: Array<{ id: string; name: string; color?: string | null }>;
+  currentStageId: string;
+  onChange: (id: string) => void;
+}) {
+  const current = stages.find((s) => s.id === currentStageId);
+  const currentIndex = Math.max(0, stages.findIndex((s) => s.id === currentStageId));
+  const progress = stages.length <= 1 ? 100 : Math.round((currentIndex / (stages.length - 1)) * 100);
+
+  return (
+    <div className="relative w-full rounded-none border-none bg-background/60 pb-2">
+      <div className="flex justify-between gap-2 min-w-0">
+        <Badge
+          className="text-xs rounded-md h-7\8 text-primary-foreground shrink-0"
+          style={{ backgroundColor: current?.color || '#64748b' }}
+        >
+          {current?.name || 'Etapa'}
+        </Badge>
+
+<span className='flex gap-2 items-center'>
+        <DropdownMenu>
+          <DropdownMenuTrigger asChild>
+            <Button variant="outline" size="sm" className="h-8 px-2.5 text-xs shrink-0">
+              Alterar etapa
+              <ChevronDown className="w-4 h-4 ml-1.5" />
+            </Button>
+          </DropdownMenuTrigger>
+
+          <DropdownMenuContent align="start" className="w-72">
+            <div className="px-2 py-1.5 text-xs text-muted-foreground">Selecione a etapa:</div>
+            {stages.map((s) => {
+              const isCurrent = s.id === currentStageId;
+              return (
+                <DropdownMenuItem
+                  key={s.id}
+                  onClick={() => onChange(s.id)}
+                  className="flex items-center gap-2"
+                >
+                  <span
+                    className="w-2.5 h-2.5 rounded-full"
+                    style={{ backgroundColor: s.color || '#94a3b8' }}
+                  />
+                  <span className="flex-1 truncate">{s.name}</span>
+                  {isCurrent ? <Check className="w-4 h-4" /> : null}
+                </DropdownMenuItem>
+              );
+            })}
+          </DropdownMenuContent>
+        </DropdownMenu>
+
+        <span className="text-xs text-muted-foreground shrink-0">
+          {currentIndex + 1}/{stages.length}
+        </span>
+        </span>
+      </div>
+
+      {/* Barra de progresso embutida (sem “quebrar” o header em mais uma linha visual) */}
+      <div className="absolute left-0 bottom-0 h-1 w-full bg-muted overflow-hidden">
+        <div
+          className="h-full transition-all"
+          style={{ width: `${progress}%`, backgroundColor: current?.color || '#64748b' }}
+        />
+      </div>
+    </div>
+  );
+}
+
+function ServiceCard({
+  service,
+  onEdit,
+  onDelete,
+  onView,
+}: {
+  service: ProposalService;
   onEdit: () => void;
   onDelete: () => void;
+  onView: () => void;
 }) {
   const Icon = serviceIcons[service.type] || Package;
   const value = service.value || 0;
-  const serviceCommission = service.commission_type === 'percentage'
-    ? (value * (service.commission_value || 0)) / 100
-    : (service.commission_value || 0);
+  const serviceCommission =
+    service.commission_type === 'percentage'
+      ? (value * (service.commission_value || 0)) / 100
+      : service.commission_value || 0;
 
   return (
-    <Card>
+    <Card onClick={onView} className="cursor-pointer hover:shadow-md transition-shadow">
       <CardContent className="p-4">
         <div className="flex items-start gap-4">
           <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
             <Icon className="w-5 h-5 text-primary" />
           </div>
-          <div className="flex-1">
+
+          <div className="flex-1 min-w-0">
             <div className="flex items-center gap-2">
               <Badge variant="outline" className="text-xs">
                 {serviceLabels[service.type] || service.type}
               </Badge>
               {service.partners?.name && (
-                <span className="text-xs text-muted-foreground">{service.partners.name}</span>
+                <span className="text-xs text-muted-foreground truncate">{service.partners.name}</span>
               )}
             </div>
-            <p className="font-medium mt-1">{service.description || 'Sem descrição'}</p>
+
+            <p className="font-medium mt-1 truncate">{service.description || 'Sem descrição'}</p>
+
             {(service.origin || service.destination) && (
-              <p className="text-sm text-muted-foreground mt-1">
+              <p className="text-sm text-muted-foreground mt-1 truncate">
                 {service.origin} {service.origin && service.destination && '→'} {service.destination}
               </p>
             )}
+
             {(service.start_date || service.end_date) && (
               <div className="flex items-center gap-1 mt-2 text-sm text-muted-foreground">
-                <Calendar className="w-3 h-3" />
-                <span>
+                <Calendar className="w-3 h-3 shrink-0" />
+                <span className="truncate">
                   {service.start_date && formatDate(service.start_date)}
                   {service.start_time ? ` ${service.start_time}` : ''}
+                  {service.end_date && service.start_date !== service.end_date
+                    ? ` → ${formatDate(service.end_date)}${service.end_time ? ` ${service.end_time}` : ''}`
+                    : ''}
                 </span>
-                {service.end_date && service.start_date !== service.end_date && (
-                  <>
-                    <span>→</span>
-                    <span>
-                      {formatDate(service.end_date)}
-                      {service.end_time ? ` ${service.end_time}` : ''}
-                    </span>
-                  </>
-                )}
               </div>
             )}
           </div>
-          <div className="text-right">
+
+          <div className="text-right shrink-0">
             <p className="font-semibold">{formatCurrency(value)}</p>
             {serviceCommission > 0 && (
               <p className="text-xs text-primary">Comissão: {formatCurrency(serviceCommission)}</p>
             )}
           </div>
+
           <DropdownMenu>
-            <DropdownMenuTrigger asChild>
+            <DropdownMenuTrigger asChild onClick={(e) => e.stopPropagation()}>
               <Button variant="ghost" size="icon" className="h-8 w-8">
                 <MoreHorizontal className="w-4 h-4" />
               </Button>
             </DropdownMenuTrigger>
             <DropdownMenuContent align="end">
-              <DropdownMenuItem onClick={onEdit}>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onView();
+                }}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Visualizar
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onEdit();
+                }}
+              >
                 <Edit className="w-4 h-4 mr-2" />
                 Editar
               </DropdownMenuItem>
-              <DropdownMenuItem className="text-destructive" onClick={onDelete}>
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onDelete();
+                }}
+              >
                 <Trash2 className="w-4 h-4 mr-2" />
                 Excluir
               </DropdownMenuItem>
@@ -238,7 +325,7 @@ function ServiceCard({
 
 function TimelineItem({ log }: { log: any }) {
   const Icon = actionIcons[log.action] || Activity;
-  
+
   return (
     <div className="flex gap-4">
       <div className="flex flex-col items-center">
@@ -247,20 +334,25 @@ function TimelineItem({ log }: { log: any }) {
         </div>
         <div className="flex-1 w-px bg-border mt-2" />
       </div>
+
       <div className="flex-1 pb-6">
         <div className="flex items-center gap-2 mb-1">
           <span className="font-medium text-sm">{log.action}</span>
         </div>
-        {log.description && (
-          <p className="text-sm text-muted-foreground mb-1">{log.description}</p>
-        )}
-        {log.old_value && log.new_value && typeof log.old_value === 'string' && typeof log.new_value === 'string' && (
-          <p className="text-sm text-muted-foreground mb-1">
-            <span className="line-through">{log.old_value}</span>
-            {' → '}
-            <span className="font-medium">{log.new_value}</span>
-          </p>
-        )}
+
+        {log.description && <p className="text-sm text-muted-foreground mb-1">{log.description}</p>}
+
+        {log.old_value &&
+          log.new_value &&
+          typeof log.old_value === 'string' &&
+          typeof log.new_value === 'string' && (
+            <p className="text-sm text-muted-foreground mb-1">
+              <span className="line-through">{log.old_value}</span>
+              {' → '}
+              <span className="font-medium">{log.new_value}</span>
+            </p>
+          )}
+
         <div className="flex items-center gap-2 text-xs text-muted-foreground">
           <Clock className="w-3 h-3" />
           <span>{formatDateTime(log.created_at)}</span>
@@ -275,8 +367,10 @@ function TimelineItem({ log }: { log: any }) {
 export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: ProposalDetailProps) {
   const { agency, profile } = useAuth();
   const { toast } = useToast();
+
   const { updateProposalStage } = useProposals();
-  const { services, createService, updateService, deleteService, isCreating, isUpdating, isDeleting } = useProposalServices(proposal.id);
+  const { services, createService, updateService, deleteService, isCreating, isUpdating, isDeleting } =
+    useProposalServices(proposal.id);
   const { history, addHistory } = useProposalHistory(proposal.id);
   const { tags: proposalTags, addTag, removeTag } = useProposalTags(proposal.id);
   const { files, uploadFile, deleteFile, isUploading } = useProposalFiles(proposal.id);
@@ -284,54 +378,61 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
   const { stages } = usePipelineStages();
   const { partners } = usePartners();
   const { tags: availableTags } = useTags();
-  
+
   const [serviceDialogOpen, setServiceDialogOpen] = useState(false);
   const [editingService, setEditingService] = useState<ProposalService | null>(null);
+  const [pendingServiceType, setPendingServiceType] = useState<string>('flight');
+  const [serviceDialogMode, setServiceDialogMode] = useState<'create' | 'edit' | 'view'>('create');
   const [deleteServiceDialog, setDeleteServiceDialog] = useState(false);
   const [serviceToDelete, setServiceToDelete] = useState<ProposalService | null>(null);
+
   const [note, setNote] = useState('');
   const [deleteFileDialog, setDeleteFileDialog] = useState(false);
   const [fileToDelete, setFileToDelete] = useState<any>(null);
+
   const [copiedLink, setCopiedLink] = useState(false);
   const [currentStageId, setCurrentStageId] = useState(proposal.stage_id);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const client = proposal.clients;
-  const currentStage = stages.find(s => s.id === currentStageId) || proposal.pipeline_stages;
+  const currentStage = stages.find((s) => s.id === currentStageId) || proposal.pipeline_stages;
 
-  // Calculate totals from services
   const totalServices = services.reduce((sum, s) => sum + (s.value || 0), 0);
-  
-  // Calculate commission from services (sum of all service commissions)
+
   const totalCommission = services.reduce((sum, s) => {
     const serviceValue = s.value || 0;
-    const serviceComm = s.commission_type === 'percentage'
-      ? (serviceValue * (s.commission_value || 0)) / 100
-      : (s.commission_value || 0);
+    const serviceComm =
+      s.commission_type === 'percentage'
+        ? (serviceValue * (s.commission_value || 0)) / 100
+        : s.commission_value || 0;
     return sum + serviceComm;
   }, 0);
-  
-  // Calculate commission percentage based on total value
-  const commissionPercentage = totalServices > 0 ? ((totalCommission / totalServices) * 100).toFixed(1) : '0';
-  
+
+  const commissionPercentage =
+    totalServices > 0 ? ((totalCommission / totalServices) * 100).toFixed(1) : '0';
+
   const discountValue = (totalServices * (proposal.discount || 0)) / 100;
   const finalValue = totalServices - discountValue;
 
   const getInitials = (name: string) => {
-    return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
+    return name
+      .split(' ')
+      .map((n) => n[0])
+      .join('')
+      .toUpperCase()
+      .slice(0, 2);
   };
 
   const handleStageChange = (newStageId: string) => {
     if (newStageId === currentStageId) return;
-    
-    const oldStage = stages.find(s => s.id === currentStageId);
-    const newStage = stages.find(s => s.id === newStageId);
-    
-    // Update local state immediately for UI
+
+    const oldStage = stages.find((s) => s.id === currentStageId);
+    const newStage = stages.find((s) => s.id === newStageId);
+
     setCurrentStageId(newStageId);
-    
     updateProposalStage({ id: proposal.id, stage_id: newStageId });
-    
+
     addHistory({
       proposal_id: proposal.id,
       action: 'Etapa alterada',
@@ -341,13 +442,24 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
     });
   };
 
-  const handleAddService = () => {
+  const handleAddService = (type: string) => {
+    setPendingServiceType(type);
     setEditingService(null);
+    setServiceDialogMode('create');
     setServiceDialogOpen(true);
   };
 
   const handleEditService = (service: ProposalService) => {
     setEditingService(service);
+    setPendingServiceType(service.type);
+    setServiceDialogMode('edit');
+    setServiceDialogOpen(true);
+  };
+
+  const handleViewService = (service: ProposalService) => {
+    setEditingService(service);
+    setPendingServiceType(service.type);
+    setServiceDialogMode('view');
     setServiceDialogOpen(true);
   };
 
@@ -357,15 +469,26 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
   };
 
   const confirmDeleteService = () => {
-    if (serviceToDelete) {
-      deleteService(serviceToDelete.id);
-      addHistory({
-        proposal_id: proposal.id,
-        action: 'Serviço removido',
-        description: `${serviceLabels[serviceToDelete.type] || serviceToDelete.type}: ${serviceToDelete.description || 'Sem descrição'}`,
-      });
-      setDeleteServiceDialog(false);
-      setServiceToDelete(null);
+    if (!serviceToDelete) return;
+
+    deleteService(serviceToDelete.id);
+    addHistory({
+      proposal_id: proposal.id,
+      action: 'Serviço removido',
+      description: `${serviceLabels[serviceToDelete.type] || serviceToDelete.type}: ${
+        serviceToDelete.description || 'Sem descrição'
+      }`,
+    });
+
+    setDeleteServiceDialog(false);
+    setServiceToDelete(null);
+  };
+
+  const handleServiceDialogOpenChange = (open: boolean) => {
+    setServiceDialogOpen(open);
+    if (!open) {
+      setEditingService(null);
+      setServiceDialogMode('create');
     }
   };
 
@@ -389,12 +512,13 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
 
   const handleAddNote = () => {
     if (!note.trim()) return;
-    
+
     addHistory({
       proposal_id: proposal.id,
       action: 'Nota adicionada',
       description: note,
     });
+
     setNote('');
   };
 
@@ -408,9 +532,7 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
         description: file.name,
       });
     }
-    if (fileInputRef.current) {
-      fileInputRef.current.value = '';
-    }
+    if (fileInputRef.current) fileInputRef.current.value = '';
   };
 
   const handleDeleteFile = (file: any) => {
@@ -420,7 +542,6 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
 
   const handleOpenFile = async (url: string) => {
     try {
-      // Converte em blob e abre via object URL para evitar bloqueios/about:blank
       const response = await fetch(url);
       const blob = await response.blob();
       const objectUrl = URL.createObjectURL(blob);
@@ -436,26 +557,23 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
       setTimeout(() => URL.revokeObjectURL(objectUrl), 5000);
     } catch (error) {
       console.error('Erro ao abrir arquivo', error);
-      // fallback simples
       window.open(url, '_blank', 'noopener,noreferrer');
     }
   };
 
   const confirmDeleteFile = () => {
-    if (fileToDelete) {
-      deleteFile(fileToDelete.id);
-      setDeleteFileDialog(false);
-      setFileToDelete(null);
-    }
+    if (!fileToDelete) return;
+    deleteFile(fileToDelete.id);
+    setDeleteFileDialog(false);
+    setFileToDelete(null);
   };
 
   const handleExportPDF = () => {
-    // Use the logged-in user's email for contact, falling back to agency email
     const contactEmail = profile?.email || agency?.email;
-    
+
     generateProposalPDF(
-      proposal, 
-      services, 
+      proposal,
+      services,
       agency?.name,
       agency?.logo_url,
       contactEmail,
@@ -470,7 +588,10 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
       const publicUrl = `${window.location.origin}/p/${link.token}`;
       await navigator.clipboard.writeText(publicUrl);
       setCopiedLink(true);
-      toast({ title: 'Link copiado!', description: 'O link da proposta foi copiado para a área de transferência.' });
+      toast({
+        title: 'Link copiado!',
+        description: 'O link da proposta foi copiado para a área de transferência.',
+      });
       setTimeout(() => setCopiedLink(false), 3000);
     } catch (error) {
       console.error('Error generating link:', error);
@@ -486,7 +607,7 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
   };
 
   const handleAddTag = (tagId: string) => {
-    const tag = availableTags.find(t => t.id === tagId);
+    const tag = availableTags.find((t) => t.id === tagId);
     addTag(tagId);
     if (tag) {
       addHistory({
@@ -498,7 +619,7 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
   };
 
   const handleRemoveTag = (tagId: string) => {
-    const tag = proposalTags.find(pt => pt.tag_id === tagId);
+    const tag = proposalTags.find((pt) => pt.tag_id === tagId);
     removeTag(tagId);
     if (tag?.tags) {
       addHistory({
@@ -509,44 +630,33 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
     }
   };
 
-  const usedTagIds = proposalTags.map(t => t.tag_id);
-  const availableTagsToAdd = availableTags.filter(t => !usedTagIds.includes(t.id));
+  const usedTagIds = proposalTags.map((t) => t.tag_id);
+  const availableTagsToAdd = availableTags.filter((t) => !usedTagIds.includes(t.id));
 
   return (
     <div className="space-y-6">
-      {/* Header com estágios clicáveis */}
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-4">
-          <div 
-            className="w-2 h-16 rounded-full" 
-            style={{ backgroundColor: currentStage?.color || '#ccc' }} 
-          />
-          <div>
-            <div className="flex items-center gap-1 mb-2 flex-wrap">
-              {stages.map((s, index) => (
-                <div key={s.id} className="flex items-center">
-                  <Badge 
-                    variant={s.id === currentStageId ? "default" : "outline"}
-                    className={cn(
-                      "text-xs cursor-pointer transition-all hover:scale-105",
-                      s.id === currentStageId && "text-primary-foreground"
-                    )}
-                    style={s.id === currentStageId ? { backgroundColor: s.color } : {}}
-                    onClick={() => handleStageChange(s.id)}
-                  >
-                    {s.name}
-                  </Badge>
-                  {index < stages.length - 1 && (
-                    <ChevronRight className="w-4 h-4 text-muted-foreground mx-1" />
-                  )}
-                </div>
-              ))}
+      {/* HEADER (menos linhas / tipografia melhor) */}
+      <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3 min-w-0 flex-1">
+         
+
+          <div className="min-w-0 flex-1">
+            {/* Linha 1: etapa + progresso (compacto) */}
+            <div className="max-w-[680px]">
+              <StageSwitcher stages={stages} currentStageId={currentStageId} onChange={handleStageChange} />
             </div>
-            <h2 className="text-xl font-bold">{proposal.title}</h2>
-            <p className="text-muted-foreground">Proposta #{proposal.number}</p>
+
+            {/* Linha 2: título + número (mesma linha) */}
+            <div className="mt-2 flex items-baseline gap-3 min-w-0">
+              <h2 className="text-2xl font-semibold tracking-tight truncate">{proposal.title}</h2>
+              <span className="text-sm text-muted-foreground whitespace-nowrap">
+                Proposta #{proposal.number}
+              </span>
+            </div>
           </div>
         </div>
-        <div className="flex gap-2">
+
+        <div className="flex gap-2 shrink-0">
           <Button variant="outline" size="sm" onClick={handleExportPDF}>
             <Download className="w-4 h-4 mr-2" />
             Exportar PDF
@@ -559,9 +669,8 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
       </div>
 
       <div className="grid grid-cols-3 gap-6">
-        {/* Left Column - Details */}
+        {/* Left Column */}
         <div className="col-span-2 space-y-6">
-          {/* Tabs */}
           <Tabs defaultValue="services" className="w-full">
             <TabsList className="w-full justify-start">
               <TabsTrigger value="services">Serviços ({services.length})</TabsTrigger>
@@ -573,18 +682,34 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
             <TabsContent value="services" className="mt-4 space-y-3">
               <div className="flex justify-between items-center">
                 <h3 className="font-medium">Serviços</h3>
-                <Button size="sm" onClick={handleAddService}>
-                  <Plus className="w-4 h-4 mr-2" />
-                  Adicionar
-                </Button>
+
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <Button size="sm">
+                      <Plus className="w-4 h-4 mr-2" />
+                      Adicionar
+                    </Button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end" className="w-48">
+                    {Object.entries(serviceLabels).map(([type, label]) => {
+                      const Icon = serviceIcons[type] || Package;
+                      return (
+                        <DropdownMenuItem key={type} onClick={() => handleAddService(type)}>
+                          <Icon className="w-4 h-4 mr-2" />
+                          {label}
+                        </DropdownMenuItem>
+                      );
+                    })}
+                  </DropdownMenuContent>
+                </DropdownMenu>
               </div>
-              
+
               {services.length === 0 ? (
                 <Card>
                   <CardContent className="p-8 text-center">
                     <Package className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                     <p className="text-muted-foreground mb-4">Nenhum serviço adicionado</p>
-                    <Button variant="outline" onClick={handleAddService}>
+                    <Button variant="outline" onClick={() => handleAddService('flight')}>
                       <Plus className="w-4 h-4 mr-2" />
                       Adicionar Serviço
                     </Button>
@@ -592,15 +717,16 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
                 </Card>
               ) : (
                 services.map((service) => (
-                  <ServiceCard 
-                    key={service.id} 
+                  <ServiceCard
+                    key={service.id}
                     service={service}
                     onEdit={() => handleEditService(service)}
                     onDelete={() => handleDeleteService(service)}
+                    onView={() => handleViewService(service)}
                   />
                 ))
               )}
-              
+
               {services.length > 0 && (
                 <Card className="bg-muted/50">
                   <CardContent className="p-4">
@@ -622,9 +748,7 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
             <TabsContent value="timeline" className="mt-4">
               <div className="space-y-0">
                 {history.length > 0 ? (
-                  history.map((log) => (
-                    <TimelineItem key={log.id} log={log} />
-                  ))
+                  history.map((log) => <TimelineItem key={log.id} log={log} />)
                 ) : (
                   <div className="text-center py-8">
                     <Activity className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
@@ -646,16 +770,17 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
                   Adicionar Nota
                 </Button>
               </div>
-              
+
               <Separator />
-              
+
               <div className="space-y-0">
                 {history
-                  .filter(h => h.action === 'Nota adicionada')
+                  .filter((h) => h.action === 'Nota adicionada')
                   .map((log) => (
                     <TimelineItem key={log.id} log={log} />
                   ))}
-                {history.filter(h => h.action === 'Nota adicionada').length === 0 && (
+
+                {history.filter((h) => h.action === 'Nota adicionada').length === 0 && (
                   <div className="text-center py-8">
                     <StickyNote className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                     <p className="text-muted-foreground">Nenhuma nota adicionada</p>
@@ -675,11 +800,7 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
                     className="hidden"
                     accept="image/*,.pdf,.doc,.docx,.xls,.xlsx"
                   />
-                  <Button 
-                    size="sm" 
-                    onClick={() => fileInputRef.current?.click()}
-                    disabled={isUploading}
-                  >
+                  <Button size="sm" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                     {isUploading ? (
                       <Loader2 className="w-4 h-4 mr-2 animate-spin" />
                     ) : (
@@ -689,17 +810,13 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
                   </Button>
                 </div>
               </div>
-              
+
               {files.length === 0 ? (
                 <Card>
                   <CardContent className="p-8 text-center">
                     <FolderOpen className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                     <p className="text-muted-foreground mb-4">Nenhum arquivo anexado</p>
-                    <Button 
-                      variant="outline" 
-                      onClick={() => fileInputRef.current?.click()}
-                      disabled={isUploading}
-                    >
+                    <Button variant="outline" onClick={() => fileInputRef.current?.click()} disabled={isUploading}>
                       <Upload className="w-4 h-4 mr-2" />
                       Enviar Arquivo
                     </Button>
@@ -711,8 +828,8 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
                     <Card key={file.id} className="overflow-hidden">
                       <CardContent className="p-0">
                         {file.url.match(/\.(jpg|jpeg|png|gif|webp)$/i) ? (
-                          <img 
-                            src={file.url} 
+                          <img
+                            src={file.url}
                             alt={file.caption || 'Arquivo'}
                             className="w-full h-32 object-cover"
                           />
@@ -721,23 +838,23 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
                             <FileText className="w-12 h-12 text-muted-foreground" />
                           </div>
                         )}
+
                         <div className="p-3">
                           <p className="text-sm font-medium truncate">{file.caption}</p>
-                          <p className="text-xs text-muted-foreground">
-                            {formatDate(file.created_at)}
-                          </p>
+                          <p className="text-xs text-muted-foreground">{formatDate(file.created_at)}</p>
+
                           <div className="flex gap-2 mt-2">
-                            <Button 
-                              variant="outline" 
-                              size="sm" 
+                            <Button
+                              variant="outline"
+                              size="sm"
                               className="flex-1"
                               onClick={() => handleOpenFile(file.url)}
                             >
                               <Eye className="w-3 h-3 mr-1" />
                               Ver
                             </Button>
-                            <Button 
-                              variant="outline" 
+                            <Button
+                              variant="outline"
                               size="sm"
                               className="text-destructive"
                               onClick={() => handleDeleteFile(file)}
@@ -755,9 +872,8 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
           </Tabs>
         </div>
 
-        {/* Right Column - Summary */}
+        {/* Right Column - Summary (mantido) */}
         <div className="space-y-4">
-          {/* Client Info */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">Cliente</CardTitle>
@@ -771,29 +887,31 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
                         {getInitials(client.name)}
                       </AvatarFallback>
                     </Avatar>
-                    <div>
-                      <p className="font-medium">{client.name}</p>
-                      {client.email && <p className="text-sm text-muted-foreground">{client.email}</p>}
+                    <div className="min-w-0">
+                      <p className="font-medium truncate">{client.name}</p>
+                      {client.email && <p className="text-sm text-muted-foreground truncate">{client.email}</p>}
                     </div>
                   </div>
+
                   <Separator />
+
                   <div className="space-y-1 text-sm">
                     {client.phone && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-3">
                         <span className="text-muted-foreground">Telefone</span>
-                        <span>{client.phone}</span>
+                        <span className="truncate">{client.phone}</span>
                       </div>
                     )}
                     {client.cpf && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-3">
                         <span className="text-muted-foreground">CPF</span>
-                        <span>{client.cpf}</span>
+                        <span className="truncate">{client.cpf}</span>
                       </div>
                     )}
                     {client.passport && (
-                      <div className="flex justify-between">
+                      <div className="flex justify-between gap-3">
                         <span className="text-muted-foreground">Passaporte</span>
-                        <span>{client.passport}</span>
+                        <span className="truncate">{client.passport}</span>
                       </div>
                     )}
                   </div>
@@ -804,7 +922,6 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
             </CardContent>
           </Card>
 
-          {/* Financial Summary */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">Resumo Financeiro</CardTitle>
@@ -814,28 +931,30 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
                 <span className="text-muted-foreground">Total Serviços</span>
                 <span className="font-medium">{formatCurrency(totalServices)}</span>
               </div>
+
               {(proposal.discount || 0) > 0 && (
                 <div className="flex justify-between text-red-500">
                   <span>Desconto ({proposal.discount}%)</span>
                   <span>-{formatCurrency(discountValue)}</span>
                 </div>
               )}
+
               <Separator />
+
               <div className="flex justify-between font-semibold">
                 <span>Valor Final</span>
                 <span>{formatCurrency(finalValue)}</span>
               </div>
+
               <Separator />
+
               <div className="flex justify-between">
-                <span className="text-muted-foreground">
-                  Comissão ({commissionPercentage}%)
-                </span>
+                <span className="text-muted-foreground">Comissão ({commissionPercentage}%)</span>
                 <span className="text-green-600 font-medium">{formatCurrency(totalCommission)}</span>
               </div>
             </CardContent>
           </Card>
 
-          {/* Tags */}
           <Card>
             <CardHeader className="pb-3">
               <div className="flex items-center justify-between">
@@ -852,10 +971,7 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
                     ) : (
                       availableTagsToAdd.map((tag) => (
                         <DropdownMenuItem key={tag.id} onClick={() => handleAddTag(tag.id)}>
-                          <div 
-                            className="w-3 h-3 rounded-full mr-2" 
-                            style={{ backgroundColor: tag.color }} 
-                          />
+                          <div className="w-3 h-3 rounded-full mr-2" style={{ backgroundColor: tag.color }} />
                           {tag.name}
                         </DropdownMenuItem>
                       ))
@@ -870,17 +986,14 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
                   <p className="text-sm text-muted-foreground">Nenhuma tag</p>
                 ) : (
                   proposalTags.map((pt) => (
-                    <Badge 
-                      key={pt.tag_id} 
+                    <Badge
+                      key={pt.tag_id}
                       variant="secondary"
                       className="flex items-center gap-1"
                       style={{ backgroundColor: `${pt.tags?.color}20`, color: pt.tags?.color }}
                     >
                       {pt.tags?.name}
-                      <button 
-                        onClick={() => handleRemoveTag(pt.tag_id)}
-                        className="ml-1 hover:opacity-70"
-                      >
+                      <button onClick={() => handleRemoveTag(pt.tag_id)} className="ml-1 hover:opacity-70">
                         <X className="w-3 h-3" />
                       </button>
                     </Badge>
@@ -890,7 +1003,6 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
             </CardContent>
           </Card>
 
-          {/* Dates */}
           <Card>
             <CardHeader className="pb-3">
               <CardTitle className="text-sm font-medium text-muted-foreground">Datas</CardTitle>
@@ -909,18 +1021,18 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
         </div>
       </div>
 
-      {/* Service Dialog */}
       <ServiceDialog
         open={serviceDialogOpen}
-        onOpenChange={setServiceDialogOpen}
+        onOpenChange={handleServiceDialogOpenChange}
         proposalId={proposal.id}
         service={editingService}
-        partners={partners.map(p => ({ id: p.id, name: p.name }))}
+        partners={partners.map((p) => ({ id: p.id, name: p.name }))}
         onSubmit={handleServiceSubmit}
         isLoading={isCreating || isUpdating}
+        initialType={editingService?.type || pendingServiceType}
+        mode={serviceDialogMode}
       />
 
-      {/* Delete Service Confirmation */}
       <AlertDialog open={deleteServiceDialog} onOpenChange={setDeleteServiceDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -931,14 +1043,16 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteService} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction
+              onClick={confirmDeleteService}
+              className="bg-destructive text-destructive-foreground"
+            >
               {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
 
-      {/* Delete File Confirmation */}
       <AlertDialog open={deleteFileDialog} onOpenChange={setDeleteFileDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -949,7 +1063,10 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={confirmDeleteFile} className="bg-destructive text-destructive-foreground">
+            <AlertDialogAction
+              onClick={confirmDeleteFile}
+              className="bg-destructive text-destructive-foreground"
+            >
               Excluir
             </AlertDialogAction>
           </AlertDialogFooter>
