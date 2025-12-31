@@ -108,6 +108,8 @@ export function EventManager({
   const [clientSearch, setClientSearch] = useState("")
   const [dayModalEvents, setDayModalEvents] = useState<Event[] | null>(null)
 
+  const capitalizeDate = (value: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : "")
+
   // Keep internal state in sync when parent updates events
   useEffect(() => {
     setEvents(initialEvents)
@@ -300,22 +302,28 @@ export function EventManager({
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
           <h2 className="text-xl font-semibold sm:text-2xl">
             {view === "month" &&
-              currentDate.toLocaleDateString("pt-BR", {
-                month: "long",
-                year: "numeric",
-              })}
+              capitalizeDate(
+                currentDate.toLocaleDateString("pt-BR", {
+                  month: "long",
+                  year: "numeric",
+                }),
+              )}
             {view === "week" &&
-              `Semana de ${currentDate.toLocaleDateString("pt-BR", {
-                day: "numeric",
-                month: "short",
-              })}`}
+              `Semana de ${capitalizeDate(
+                currentDate.toLocaleDateString("pt-BR", {
+                  day: "numeric",
+                  month: "short",
+                }),
+              )}`}
             {view === "day" &&
-              currentDate.toLocaleDateString("pt-BR", {
-                weekday: "long",
-                month: "long",
-                day: "numeric",
-                year: "numeric",
-              })}
+              capitalizeDate(
+                currentDate.toLocaleDateString("pt-BR", {
+                  weekday: "long",
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                }),
+              )}
             {view === "list" && "Todos os eventos"}
           </h2>
           <div className="flex items-center gap-2">
@@ -447,8 +455,8 @@ export function EventManager({
               <TooltipTrigger asChild>
                 <Button
                   variant={showTasks ? "secondary" : "outline"}
-                  size="icon"
-                  className="h-9 w-9"
+                  size="sm"
+                  className="h-9 px-3 gap-2"
                   onClick={() => setShowTasks((v) => !v)}
                 >
                   {showTasks ? (
@@ -459,6 +467,7 @@ export function EventManager({
                       <Slash className="h-4 w-4 absolute inset-0 rotate-45 text-muted-foreground" />
                     </span>
                   )}
+                  <span className="text-sm">Tarefas</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">
@@ -472,8 +481,8 @@ export function EventManager({
               <TooltipTrigger asChild>
                 <Button
                   variant={showLeads ? "secondary" : "outline"}
-                  size="icon"
-                  className="h-9 w-9"
+                  size="sm"
+                  className="h-9 px-3 gap-2"
                   onClick={() => setShowLeads((v) => !v)}
                 >
                   {showLeads ? (
@@ -484,6 +493,7 @@ export function EventManager({
                       <Slash className="h-4 w-4 absolute inset-0 rotate-45 text-muted-foreground" />
                     </span>
                   )}
+                  <span className="text-sm">Leads</span>
                 </Button>
               </TooltipTrigger>
               <TooltipContent side="bottom">

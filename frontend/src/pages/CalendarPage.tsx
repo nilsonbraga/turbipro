@@ -61,7 +61,6 @@ export default function CalendarPage() {
   const [selectedTask, setSelectedTask] = useState<Task | null>(null);
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
   const [selectedProposalId, setSelectedProposalId] = useState<string | null>(null);
-
   const formatTime = (dateStr: string | null) => {
     if (!dateStr) return '';
     const d = new Date(dateStr);
@@ -69,7 +68,7 @@ export default function CalendarPage() {
     return d.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' });
   };
 
-  const buildTitle = (evt: ReturnType<typeof useCalendarEvents>['data'][number]) => {
+  function buildTitle(evt: ReturnType<typeof useCalendarEvents>['data'][number]) {
     const client = evt.client_name || 'Sem cliente';
     const label = TYPE_LABELS[evt.type] || 'Serviço';
     const timeLabel = formatTime(evt.start_date);
@@ -100,7 +99,7 @@ export default function CalendarPage() {
     }
 
     return [client, label, timeLabel].filter(Boolean).join(' - ');
-  };
+  }
 
   const priorityColor = (priority?: string | null) => {
     if (priority === 'high') return 'red';
@@ -135,6 +134,7 @@ export default function CalendarPage() {
     });
   }, [events]);
 
+
   const availableTags = useMemo(() => {
     const set = new Set<string>();
     uiEvents.forEach((e) => e.tags?.forEach((t) => set.add(t)));
@@ -151,7 +151,7 @@ export default function CalendarPage() {
 
   if (isLoading) {
     return (
-      <div className="mx-auto max-w-7xl space-y-4 px-4 pb-6 pt-2">
+      <div className="w-full space-y-4 px-4 pb-6 pt-2">
         <Skeleton className="h-[420px] w-full rounded-2xl" />
       </div>
     );
@@ -160,7 +160,7 @@ export default function CalendarPage() {
   const serviceCategories = Object.values(TYPE_LABELS).filter((c) => c !== 'Tarefa');
 
   return (
-    <div className="mx-auto max-w-7xl space-y-4 px-4 pb-6 pt-2">
+    <div className="w-full space-y-4 px-4 pb-6 pt-2">
       <EventManager
         key={uiEvents.length}
         events={uiEvents}
@@ -168,7 +168,7 @@ export default function CalendarPage() {
         availableTags={availableTags}
         clientOptions={clientOptions}
         defaultView="month"
-        className="min-h-[calc(100vh-180px)] rounded-2xl border bg-card p-4 shadow-sm"
+        className="min-h-[calc(100vh-180px)] w-full rounded-2xl border-none bg-card p-4"
         onEventClickOverride={(event) => {
           if (event.category === 'Tarefa') {
             const task = tasks.find((t) => t.id === event.id);

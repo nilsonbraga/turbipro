@@ -11,9 +11,6 @@ import {
   Filter,
   ShieldCheck,
   Compass,
-  Activity,
-  Building2,
-  User,
 } from 'lucide-react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { useDashboard, DashboardFilters } from '@/hooks/useDashboard';
