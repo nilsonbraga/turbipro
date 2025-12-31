@@ -41,13 +41,14 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Plus, Search, Eye, Edit, Trash2, Calendar as CalendarIcon, MoreHorizontal, Loader2, AlertTriangle, CheckCircle, Filter, Building2, X, DollarSign } from 'lucide-react';
+import { Plus, Search, Eye, Edit, Trash2, Calendar as CalendarIcon, MoreHorizontal, Loader2, AlertTriangle, CheckCircle, Filter, Building2, X, DollarSign, Link } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
 import { apiFetch } from '@/lib/api';
+import { useToast } from '@/hooks/use-toast';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -107,9 +108,10 @@ interface ProposalCardProps {
   onDelete: () => void;
   onClose: () => void;
   onDragStart: (e: React.DragEvent) => void;
+  onCopyLink: () => void;
 }
 
-function ProposalCard({ proposal, tags, serviceTotals, onView, onEdit, onDelete, onClose, onDragStart }: ProposalCardProps) {
+function ProposalCard({ proposal, tags, serviceTotals, onView, onEdit, onDelete, onClose, onDragStart, onCopyLink }: ProposalCardProps) {
   const client = proposal.clients;
   const totalValue = serviceTotals?.value || 0;
   const totalCommission = serviceTotals?.commission || 0;
@@ -157,6 +159,10 @@ function ProposalCard({ proposal, tags, serviceTotals, onView, onEdit, onDelete,
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onEdit(); }}>
               <Edit className="w-4 h-4 mr-2" />
               Editar
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCopyLink(); }}>
+              <Link className="w-4 h-4 mr-2" />
+              Copiar link
             </DropdownMenuItem>
             <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
               <Trash2 className="w-4 h-4 mr-2" />
@@ -326,6 +332,7 @@ function KanbanColumn({
             onDragStart={(e) => {
               e.dataTransfer.setData('proposalId', proposal.id);
             }}
+            onCopyLink={() => handleCopyProposalLink(proposal.id)}
           />
         ))}
       </div>
@@ -342,6 +349,7 @@ export default function Leads() {
   const location = useLocation();
   const navigate = useNavigate();
   const prefillLead = (location.state as { prefillLead?: PrefillLeadData })?.prefillLead;
+  const { toast } = useToast();
 
   const { agency, isSuperAdmin, isAdmin, profile } = useAuth();
   const { proposals, isLoading, createProposalAsync, updateProposal, updateProposalStage, deleteProposal, isCreating, isUpdating, isDeleting } = useProposals();
@@ -607,6 +615,33 @@ export default function Leads() {
     }
     setEditingProposal(null);
     setDefaultStageId(null);
+  };
+
+  const handleCopyProposalLink = async (proposalId: string) => {
+    try {
+      const params = new URLSearchParams({
+        where: JSON.stringify({ proposalId, isActive: true }),
+        orderBy: JSON.stringify({ createdAt: 'desc' }),
+      });
+      const { data } = await apiFetch<{ data: any[] }>(`/api/publicProposalLink?${params.toString()}`);
+      let token = data?.[0]?.token;
+      if (!token) {
+        const created = await apiFetch<any>(`/api/publicProposalLink`, {
+          method: 'POST',
+          body: JSON.stringify({ proposalId, expiresAt: null }),
+        });
+        token = created.token;
+      }
+      const publicUrl = `${window.location.origin}/p/${token}`;
+      await navigator.clipboard.writeText(publicUrl);
+      toast({ title: 'Link copiado!', description: 'Link público da proposta copiado.' });
+    } catch (error: any) {
+      toast({
+        title: 'Erro ao copiar link',
+        description: error?.message || 'Tente novamente.',
+        variant: 'destructive',
+      });
+    }
   };
 
   const handleDrop = (proposalId: string, stageId: string) => {

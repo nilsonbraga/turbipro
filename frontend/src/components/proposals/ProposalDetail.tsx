@@ -68,6 +68,7 @@ import {
   FileUp,
   Check,
   ChevronDown,
+  Link,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -582,28 +583,20 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
     );
   };
 
-  const handleGenerateLink = async () => {
-    try {
-      const link = await createLink({ expiresInDays: 30 });
-      const publicUrl = `${window.location.origin}/p/${link.token}`;
-      await navigator.clipboard.writeText(publicUrl);
-      setCopiedLink(true);
-      toast({
-        title: 'Link copiado!',
-        description: 'O link da proposta foi copiado para a área de transferência.',
-      });
-      setTimeout(() => setCopiedLink(false), 3000);
-    } catch (error) {
-      console.error('Error generating link:', error);
-    }
+  const getOrCreatePublicUrl = async () => {
+    const token = publicLinks?.[0]?.token;
+    if (token) return `${window.location.origin}/p/${token}`;
+    const link = await createLink({ expiresInDays: 30 });
+    return `${window.location.origin}/p/${link.token}`;
   };
 
-  const handleCopyLink = async (token: string) => {
-    const publicUrl = `${window.location.origin}/p/${token}`;
+  const handleCopyLink = async (token?: string) => {
+    const publicUrl = token ? `${window.location.origin}/p/${token}` : await getOrCreatePublicUrl();
     await navigator.clipboard.writeText(publicUrl);
     setCopiedLink(true);
     toast({ title: 'Link copiado!' });
     setTimeout(() => setCopiedLink(false), 3000);
+    return publicUrl;
   };
 
   const handleAddTag = (tagId: string) => {
@@ -657,6 +650,10 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
         </div>
 
         <div className="flex gap-2 shrink-0">
+          <Button variant="outline" size="sm" onClick={() => handleCopyLink()} disabled={isCreatingLink}>
+            <Link className="w-4 h-4 mr-2" />
+            Copiar link
+          </Button>
           <Button variant="outline" size="sm" onClick={handleExportPDF}>
             <Download className="w-4 h-4 mr-2" />
             Exportar PDF
