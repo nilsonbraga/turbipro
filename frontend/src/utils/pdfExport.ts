@@ -1,59 +1,59 @@
-import { Proposal } from '@/hooks/useProposals';
-import { ProposalService } from '@/hooks/useProposalServices';
+import { Proposal } from "@/hooks/useProposals";
+import { ProposalService } from "@/hooks/useProposalServices";
 
 /* -------------------- Formatação -------------------- */
 const formatCurrency = (value: number) =>
-  new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+  new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }).format(value);
 
-const pad2 = (n: number) => String(n).padStart(2, '0');
+const pad2 = (n: number) => String(n).padStart(2, "0");
 
 const formatDate = (date: string | Date) => {
-  if (!date) return '';
+  if (!date) return "";
   const d = date instanceof Date ? date : new Date(date);
   if (Number.isNaN(d.getTime())) return String(date);
   return `${pad2(d.getDate())}/${pad2(d.getMonth() + 1)}/${d.getFullYear()}`;
 };
 
 const formatDateTime = (date: string | Date) => {
-  if (!date) return '';
+  if (!date) return "";
   const d = date instanceof Date ? date : new Date(date);
   if (Number.isNaN(d.getTime())) return String(date);
   return `${formatDate(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 
 const escapeHtml = (unsafe: any) => {
-  const s = String(unsafe ?? '');
+  const s = String(unsafe ?? "");
   return s
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;')
-    .replace(/'/g, '&#039;');
+    .replace(/&/g, "&amp;")
+    .replace(/</g, "&lt;")
+    .replace(/>/g, "&gt;")
+    .replace(/"/g, "&quot;")
+    .replace(/'/g, "&#039;");
 };
 
 const isBlank = (v: any) =>
-  v === null || v === undefined || (typeof v === 'string' && v.trim() === '');
+  v === null || v === undefined || (typeof v === "string" && v.trim() === "");
 
-const safeStr = (v: any) => String(v ?? '').trim();
+const safeStr = (v: any) => String(v ?? "").trim();
 
 /** tenta converter string numérica pt/en para number */
 const coerceNumber = (v: any): number | null => {
   if (v === null || v === undefined) return null;
-  if (typeof v === 'number' && Number.isFinite(v)) return v;
+  if (typeof v === "number" && Number.isFinite(v)) return v;
 
-  if (typeof v === 'string') {
+  if (typeof v === "string") {
     const s = v.trim();
     if (!s) return null;
 
     // remove R$, espaços, etc
-    let x = s.replace(/[R$\s]/g, '');
+    let x = s.replace(/[R$\s]/g, "");
 
     // se tiver vírgula e ponto, assume pt-BR: 1.234,56
-    if (x.includes(',') && x.includes('.')) {
-      x = x.replace(/\./g, '').replace(',', '.');
-    } else if (x.includes(',') && !x.includes('.')) {
+    if (x.includes(",") && x.includes(".")) {
+      x = x.replace(/\./g, "").replace(",", ".");
+    } else if (x.includes(",") && !x.includes(".")) {
       // 1234,56
-      x = x.replace(',', '.');
+      x = x.replace(",", ".");
     }
 
     const n = Number(x);
@@ -64,30 +64,41 @@ const coerceNumber = (v: any): number | null => {
 };
 
 const isMoneyKey = (key: string) => {
-  const k = (key || '').toLowerCase();
-  return /(^|_)(amount|value|price|total|cost|fare|tax|fee|deposit|coverage|limit|premium)(_|$)/i.test(k) ||
-    /(valor|preco|preço|total|taxa|tarifa|multa|cobertura|caucao|caução|franquia|diaria|diária)/i.test(k);
+  const k = (key || "").toLowerCase();
+  return (
+    /(^|_)(amount|value|price|total|cost|fare|tax|fee|deposit|coverage|limit|premium)(_|$)/i.test(
+      k
+    ) ||
+    /(valor|preco|preço|total|taxa|tarifa|multa|cobertura|caucao|caução|franquia|diaria|diária)/i.test(
+      k
+    )
+  );
 };
 
 const isMoneyLabel = (label: string) => {
-  const l = (label || '').toLowerCase();
-  return /(valor|total|preço|preco|taxa|tarifa|cobertura|caução|caucao|franquia|diária|diaria)/i.test(l);
+  const l = (label || "").toLowerCase();
+  return /(valor|total|preço|preco|taxa|tarifa|cobertura|caução|caucao|franquia|diária|diaria)/i.test(
+    l
+  );
 };
 
 const formatMaybeDate = (v: any) => {
   const s = safeStr(v);
-  if (!s) return '';
+  if (!s) return "";
   const d = new Date(s);
-  if (!Number.isNaN(d.getTime()) && (s.includes('T') || s.includes('-') || s.includes('/'))) {
-    const hasTime = s.includes('T') || /\d{2}:\d{2}/.test(s);
+  if (
+    !Number.isNaN(d.getTime()) &&
+    (s.includes("T") || s.includes("-") || s.includes("/"))
+  ) {
+    const hasTime = s.includes("T") || /\d{2}:\d{2}/.test(s);
     return hasTime ? formatDateTime(s) : formatDate(s);
   }
   return s;
 };
 
 const generateReservationCode = (id: string, number: number) => {
-  const idPart = (id || '').replace(/-/g, '').substring(0, 4).toUpperCase() || 'XXXX';
-  const numPart = (number ?? 0).toString().padStart(4, '0');
+  const idPart = (id || "").replace(/-/g, "").substring(0, 4).toUpperCase() || "XXXX";
+  const numPart = (number ?? 0).toString().padStart(4, "0");
   const stamp = Date.now().toString(36).toUpperCase().slice(-4);
   return `RES-${idPart}${numPart}-${stamp}`;
 };
@@ -98,184 +109,184 @@ function pluralize(n: number, singular: string, plural: string) {
 
 /* -------------------- Rótulos PT -------------------- */
 const serviceLabels: Record<string, string> = {
-  flight: 'Voo',
-  hotel: 'Hotel',
-  car: 'Carro',
-  package: 'Pacote',
-  tour: 'Roteiro',
-  cruise: 'Cruzeiro',
-  insurance: 'Seguro',
-  transfer: 'Transfer',
-  other: 'Outro',
+  flight: "Voo",
+  hotel: "Hotel",
+  car: "Carro",
+  package: "Pacote",
+  tour: "Roteiro",
+  cruise: "Cruzeiro",
+  insurance: "Seguro",
+  transfer: "Transfer",
+  other: "Outro",
 };
 
 const cabinLabels: Record<string, string> = {
-  economy: 'Econômica',
-  premium_economy: 'Econômica Premium',
-  business: 'Executiva',
-  first: 'Primeira Classe',
+  economy: "Econômica",
+  premium_economy: "Econômica Premium",
+  business: "Executiva",
+  first: "Primeira Classe",
 };
 
 const boardLabels: Record<string, string> = {
-  RO: 'Sem refeições',
-  BB: 'Café da manhã',
-  HB: 'Meia pensão',
-  FB: 'Pensão completa',
-  AI: 'Tudo incluído',
+  RO: "Sem refeições",
+  BB: "Café da manhã",
+  HB: "Meia pensão",
+  FB: "Pensão completa",
+  AI: "Tudo incluído",
 };
 
 const keyLabelPt: Record<string, string> = {
   // genéricos
-  quantity: 'Quantidade',
-  unit_value: 'Valor unitário',
-  unitValue: 'Valor unitário',
-  value: 'Valor',
-  total: 'Total',
-  total_value: 'Total',
+  quantity: "Quantidade",
+  unit_value: "Valor unitário",
+  unitValue: "Valor unitário",
+  value: "Valor",
+  total: "Total",
+  total_value: "Total",
 
   // datas
-  startDate: 'Data inicial',
-  endDate: 'Data final',
-  start_date: 'Data inicial',
-  end_date: 'Data final',
-  created_at: 'Criado em',
-  updated_at: 'Atualizado em',
+  startDate: "Data inicial",
+  endDate: "Data final",
+  start_date: "Data inicial",
+  end_date: "Data final",
+  created_at: "Criado em",
+  updated_at: "Atualizado em",
 
   // voos (top)
-  passengers: 'Passageiros',
-  cabinClass: 'Classe',
-  segments: 'Trechos',
-  baggage: 'Bagagem',
-  pnr: 'Localizador',
+  passengers: "Passageiros",
+  cabinClass: "Classe",
+  segments: "Trechos",
+  baggage: "Bagagem",
+  pnr: "Localizador",
 
   // voos (segmentos)
-  fromIata: 'Origem (IATA)',
-  toIata: 'Destino (IATA)',
-  fromCity: 'Cidade de origem',
-  toCity: 'Cidade de destino',
-  fromAirport: 'Aeroporto de origem',
-  toAirport: 'Aeroporto de destino',
-  departureAt: 'Partida',
-  arrivalAt: 'Chegada',
-  airlineCode: 'Companhia',
-  airlineName: 'Companhia',
-  flightNumber: 'Número do voo',
-  operatingAirline: 'Operado por',
-  operatedBy: 'Operado por',
-  aircraft: 'Aeronave',
-  aircraftModel: 'Aeronave',
-  terminal: 'Terminal',
-  gate: 'Portão',
-  seat: 'Assento',
-  bookingClass: 'Classe de reserva',
-  fareBasis: 'Tarifa (fare basis)',
-  fareFamily: 'Família tarifária',
-  duration: 'Duração',
-  durationMinutes: 'Duração (min)',
-  connection: 'Conexão',
-  layover: 'Conexão',
-  stopover: 'Parada',
-  stops: 'Paradas',
+  fromIata: "Origem (IATA)",
+  toIata: "Destino (IATA)",
+  fromCity: "Cidade de origem",
+  toCity: "Cidade de destino",
+  fromAirport: "Aeroporto de origem",
+  toAirport: "Aeroporto de destino",
+  departureAt: "Partida",
+  arrivalAt: "Chegada",
+  airlineCode: "Companhia",
+  airlineName: "Companhia",
+  flightNumber: "Número do voo",
+  operatingAirline: "Operado por",
+  operatedBy: "Operado por",
+  aircraft: "Aeronave",
+  aircraftModel: "Aeronave",
+  terminal: "Terminal",
+  gate: "Portão",
+  seat: "Assento",
+  bookingClass: "Classe de reserva",
+  fareBasis: "Tarifa (fare basis)",
+  fareFamily: "Família tarifária",
+  duration: "Duração",
+  durationMinutes: "Duração (min)",
+  connection: "Conexão",
+  layover: "Conexão",
+  stopover: "Parada",
+  stops: "Paradas",
 
   // hotel
-  hotelName: 'Hotel',
-  city: 'Cidade',
-  country: 'País',
-  address: 'Endereço',
-  checkIn: 'Check-in',
-  checkOut: 'Check-out',
-  checkInTime: 'Horário de check-in',
-  checkOutTime: 'Horário de check-out',
-  roomType: 'Tipo de quarto',
-  board: 'Regime',
-  guests: 'Hóspedes',
-  adults: 'Adultos',
-  children: 'Crianças',
-  confirmationNumber: 'Confirmação',
-  amenities: 'Comodidades',
-  cancellationPolicy: 'Política de cancelamento',
-  refundable: 'Reembolsável',
+  hotelName: "Hotel",
+  city: "Cidade",
+  country: "País",
+  address: "Endereço",
+  checkIn: "Check-in",
+  checkOut: "Check-out",
+  checkInTime: "Horário de check-in",
+  checkOutTime: "Horário de check-out",
+  roomType: "Tipo de quarto",
+  board: "Regime",
+  guests: "Hóspedes",
+  adults: "Adultos",
+  children: "Crianças",
+  confirmationNumber: "Confirmação",
+  amenities: "Comodidades",
+  cancellationPolicy: "Política de cancelamento",
+  refundable: "Reembolsável",
 
   // carro
-  rentalCompany: 'Locadora',
-  carCategory: 'Categoria',
-  transmission: 'Câmbio',
-  pickupLocation: 'Local de retirada',
-  pickupAt: 'Retirada',
-  dropoffLocation: 'Local de devolução',
-  dropoffAt: 'Devolução',
-  mileagePolicy: 'Política de quilometragem',
-  fuelPolicy: 'Política de combustível',
-  insurance: 'Seguro',
-  deposit: 'Caução',
-  driverAge: 'Idade do condutor',
-  franchise: 'Franquia',
+  rentalCompany: "Locadora",
+  carCategory: "Categoria",
+  transmission: "Câmbio",
+  pickupLocation: "Local de retirada",
+  pickupAt: "Retirada",
+  dropoffLocation: "Local de devolução",
+  dropoffAt: "Devolução",
+  mileagePolicy: "Política de quilometragem",
+  fuelPolicy: "Política de combustível",
+  insurance: "Seguro",
+  deposit: "Caução",
+  driverAge: "Idade do condutor",
+  franchise: "Franquia",
 
   // seguro
-  insurer: 'Seguradora',
-  planName: 'Plano',
-  coverageStart: 'Início da vigência',
-  coverageEnd: 'Fim da vigência',
-  destinationRegion: 'Região',
-  medicalCoverageAmount: 'Cobertura médica',
-  baggageCoverageAmount: 'Cobertura de bagagem',
-  cancellationCoverageAmount: 'Cobertura de cancelamento',
-  policyNumber: 'Apólice',
+  insurer: "Seguradora",
+  planName: "Plano",
+  coverageStart: "Início da vigência",
+  coverageEnd: "Fim da vigência",
+  destinationRegion: "Região",
+  medicalCoverageAmount: "Cobertura médica",
+  baggageCoverageAmount: "Cobertura de bagagem",
+  cancellationCoverageAmount: "Cobertura de cancelamento",
+  policyNumber: "Apólice",
 
   // cruzeiro
-  cruiseLine: 'Companhia',
-  shipName: 'Navio',
-  embarkPort: 'Embarque',
-  disembarkPort: 'Desembarque',
-  sailingDate: 'Data de saída',
-  returnDate: 'Data de retorno',
-  cabinType: 'Tipo de cabine',
-  cabinCategory: 'Categoria',
-  itineraryPorts: 'Itinerário',
+  cruiseLine: "Companhia",
+  shipName: "Navio",
+  embarkPort: "Embarque",
+  disembarkPort: "Desembarque",
+  sailingDate: "Data de saída",
+  returnDate: "Data de retorno",
+  cabinType: "Tipo de cabine",
+  cabinCategory: "Categoria",
+  itineraryPorts: "Itinerário",
 
   // transfer
-  transferType: 'Tipo',
-  pickupPlace: 'Origem',
-  dropoffPlace: 'Destino',
-  vehicleType: 'Veículo',
-  passengersCount: 'Passageiros',
+  transferType: "Tipo",
+  pickupPlace: "Origem",
+  dropoffPlace: "Destino",
+  vehicleType: "Veículo",
+  passengersCount: "Passageiros",
 
   // roteiro/pacote
-  pace: 'Ritmo',
-  days: 'Programação',
-  itinerary: 'Programação',
-  program: 'Programação',
-  destinations: 'Destinos',
-  inclusions: 'Inclui',
-  packageName: 'Nome do pacote',
-  destinationBase: 'Base do roteiro',
+  pace: "Ritmo",
+  days: "Programação",
+  itinerary: "Programação",
+  program: "Programação",
+  destinations: "Destinos",
+  inclusions: "Inclui",
+  packageName: "Nome do pacote",
+  destinationBase: "Base do roteiro",
 };
 
 const toLabelPT = (key: string) => {
-  const k = String(key || '');
+  const k = String(key || "");
   if (keyLabelPt[k]) return keyLabelPt[k];
   return k
-    .replace(/_/g, ' ')
-    .replace(/([a-z])([A-Z])/g, '$1 $2')
+    .replace(/_/g, " ")
+    .replace(/([a-z])([A-Z])/g, "$1 $2")
     .trim()
     .replace(/^./, (c) => c.toUpperCase());
 };
 
 const translateCommonValuePT = (v: any) => {
   const s = safeStr(v);
-  if (!s) return '';
+  if (!s) return "";
   const map: Record<string, string> = {
-    'premium economy': 'Econômica Premium',
-    'all inclusive': 'Tudo incluído',
-    'economy': 'Econômica',
-    'business': 'Executiva',
-    'first': 'Primeira Classe',
-    'private': 'Privado',
-    'shared': 'Compartilhado',
-    'yes': 'Sim',
-    'no': 'Não',
-    'true': 'Sim',
-    'false': 'Não',
+    "premium economy": "Econômica Premium",
+    "all inclusive": "Tudo incluído",
+    economy: "Econômica",
+    business: "Executiva",
+    first: "Primeira Classe",
+    private: "Privado",
+    shared: "Compartilhado",
+    yes: "Sim",
+    no: "Não",
+    true: "Sim",
+    false: "Não",
   };
   const key = s.toLowerCase();
   return map[key] ?? s;
@@ -284,27 +295,28 @@ const translateCommonValuePT = (v: any) => {
 /* -------------------- UI helpers (documento) -------------------- */
 
 function formatValueByKey(keyOrLabel: string, v: any): string {
-  if (isBlank(v)) return '';
+  if (isBlank(v)) return "";
 
   // datas (string -> dd/mm/yyyy)
-  if (typeof v === 'string') {
+  if (typeof v === "string") {
     const maybeDate = formatMaybeDate(v);
     // se converteu, retorna convertido; se não, traduz valores comuns
     return translateCommonValuePT(maybeDate);
   }
 
   // boolean
-  if (typeof v === 'boolean') return v ? 'Sim' : 'Não';
+  if (typeof v === "boolean") return v ? "Sim" : "Não";
 
   // number como moeda quando fizer sentido
-  if (typeof v === 'number') {
+  if (typeof v === "number") {
     if (isMoneyKey(keyOrLabel) || isMoneyLabel(keyOrLabel)) return formatCurrency(v);
     return String(v);
   }
 
   // strings numéricas como moeda
   const n = coerceNumber(v);
-  if (n !== null && (isMoneyKey(keyOrLabel) || isMoneyLabel(keyOrLabel))) return formatCurrency(n);
+  if (n !== null && (isMoneyKey(keyOrLabel) || isMoneyLabel(keyOrLabel)))
+    return formatCurrency(n);
 
   // fallback
   return translateCommonValuePT(String(v));
@@ -315,7 +327,7 @@ function buildKeyValueList(items: Array<{ key?: string; label: string; value?: a
     .map((i) => ({ ...i, value: i.value }))
     .filter((i) => !isBlank(i.value));
 
-  if (!clean.length) return '';
+  if (!clean.length) return "";
 
   return `
     <div class="kv">
@@ -323,7 +335,7 @@ function buildKeyValueList(items: Array<{ key?: string; label: string; value?: a
         .map((i) => {
           const keyOrLabel = i.key || i.label;
           const vv = formatValueByKey(keyOrLabel, i.value);
-          if (isBlank(vv)) return '';
+          if (isBlank(vv)) return "";
           return `
             <div class="kv-row">
               <div class="kv-k">${escapeHtml(i.label)}</div>
@@ -332,41 +344,49 @@ function buildKeyValueList(items: Array<{ key?: string; label: string; value?: a
           `;
         })
         .filter(Boolean)
-        .join('')}
+        .join("")}
     </div>
   `;
 }
 
 function renderValueCompact(v: any): string {
-  if (isBlank(v)) return '';
-  if (typeof v === 'boolean') return v ? 'Sim' : 'Não';
-  if (typeof v === 'number') return String(v);
-  if (typeof v === 'string') return translateCommonValuePT(formatMaybeDate(v));
+  if (isBlank(v)) return "";
+  if (typeof v === "boolean") return v ? "Sim" : "Não";
+  if (typeof v === "number") return String(v);
+  if (typeof v === "string") return translateCommonValuePT(formatMaybeDate(v));
 
   if (Array.isArray(v)) {
-    if (!v.length) return '';
-    if (v.every((x) => ['string', 'number', 'boolean'].includes(typeof x) || x == null)) {
+    if (!v.length) return "";
+    if (v.every((x) => ["string", "number", "boolean"].includes(typeof x) || x == null)) {
       return v
-        .map((x) => (typeof x === 'string' ? translateCommonValuePT(formatMaybeDate(x)) : typeof x === 'boolean' ? (x ? 'Sim' : 'Não') : String(x)))
+        .map((x) =>
+          typeof x === "string"
+            ? translateCommonValuePT(formatMaybeDate(x))
+            : typeof x === "boolean"
+            ? x
+              ? "Sim"
+              : "Não"
+            : String(x)
+        )
         .filter((x) => !isBlank(x))
-        .join(', ');
+        .join(", ");
     }
-    return `${v.length} ${pluralize(v.length, 'item', 'itens')}`;
+    return `${v.length} ${pluralize(v.length, "item", "itens")}`;
   }
 
-  if (typeof v === 'object') {
+  if (typeof v === "object") {
     const keys = Object.keys(v);
-    if (!keys.length) return '';
+    if (!keys.length) return "";
     const previewKeys = keys.slice(0, 3);
     const preview = previewKeys
       .map((k) => {
         const vv = (v as any)[k];
         const vvStr = renderValueCompact(vv);
-        return vvStr ? `${toLabelPT(k)}: ${vvStr}` : '';
+        return vvStr ? `${toLabelPT(k)}: ${vvStr}` : "";
       })
       .filter(Boolean)
-      .join(' • ');
-    return preview || 'Detalhes';
+      .join(" • ");
+    return preview || "Detalhes";
   }
 
   return String(v);
@@ -374,14 +394,14 @@ function renderValueCompact(v: any): string {
 
 function hasAnyNonBlankDeep(obj: any): boolean {
   if (isBlank(obj)) return false;
-  if (typeof obj !== 'object') return !isBlank(obj);
+  if (typeof obj !== "object") return !isBlank(obj);
   if (Array.isArray(obj)) return obj.some((x) => hasAnyNonBlankDeep(x));
   return Object.values(obj).some((x) => hasAnyNonBlankDeep(x));
 }
 
 function renderTableFromObjectArray(label: string, arr: any[]) {
-  const rows = arr.filter((x) => x && typeof x === 'object' && !Array.isArray(x));
-  if (!rows.length) return '';
+  const rows = arr.filter((x) => x && typeof x === "object" && !Array.isArray(x));
+  if (!rows.length) return "";
 
   // escolhe colunas mais relevantes (até 7)
   const colSet = new Set<string>();
@@ -391,20 +411,20 @@ function renderTableFromObjectArray(label: string, arr: any[]) {
     });
   }
   const cols = Array.from(colSet).slice(0, 7);
-  if (!cols.length) return '';
+  if (!cols.length) return "";
 
-  const head = cols.map((c) => `<th>${escapeHtml(toLabelPT(c))}</th>`).join('');
+  const head = cols.map((c) => `<th>${escapeHtml(toLabelPT(c))}</th>`).join("");
   const body = rows
     .map((r) => {
       const tds = cols
         .map((c) => {
           const vv = formatValueByKey(c, r[c]);
-          return `<td>${escapeHtml(vv || '')}</td>`;
+          return `<td>${escapeHtml(vv || "")}</td>`;
         })
-        .join('');
+        .join("");
       return `<tr>${tds}</tr>`;
     })
-    .join('');
+    .join("");
 
   return `
     <div class="kv-block">
@@ -426,18 +446,24 @@ function renderTableFromObjectArray(label: string, arr: any[]) {
  * - objetos viram KV “achatado” quando possível
  * - <pre> só quando for realmente necessário
  */
-function renderAllRemainingDetails(details: any, usedKeys: Set<string>, title = 'Detalhes adicionais') {
-  if (!details || typeof details !== 'object') return '';
+function renderAllRemainingDetails(
+  details: any,
+  usedKeys: Set<string>,
+  title = "Detalhes adicionais"
+) {
+  if (!details || typeof details !== "object") return "";
 
-  const entries = Object.entries(details).filter(([k, v]) => !usedKeys.has(k) && hasAnyNonBlankDeep(v));
-  if (!entries.length) return '';
+  const entries = Object.entries(details).filter(
+    ([k, v]) => !usedKeys.has(k) && hasAnyNonBlankDeep(v)
+  );
+  if (!entries.length) return "";
 
   const simple: Array<{ key: string; label: string; value: string }> = [];
   const tables: Array<{ label: string; raw: any[] }> = [];
   const complexObjects: Array<{ label: string; raw: any }> = [];
 
   for (const [k, v] of entries) {
-    if (typeof v !== 'object' || v === null) {
+    if (typeof v !== "object" || v === null) {
       const vv = formatValueByKey(k, v);
       if (!isBlank(vv)) simple.push({ key: k, label: toLabelPT(k), value: vv });
       continue;
@@ -446,10 +472,18 @@ function renderAllRemainingDetails(details: any, usedKeys: Set<string>, title = 
     if (Array.isArray(v)) {
       if (!v.length) continue;
 
-      if (v.every((x) => typeof x === 'string' || typeof x === 'number' || typeof x === 'boolean' || x == null)) {
+      if (
+        v.every(
+          (x) =>
+            typeof x === "string" ||
+            typeof x === "number" ||
+            typeof x === "boolean" ||
+            x == null
+        )
+      ) {
         const vv = renderValueCompact(v);
         if (!isBlank(vv)) simple.push({ key: k, label: toLabelPT(k), value: vv });
-      } else if (v.every((x) => x && typeof x === 'object' && !Array.isArray(x))) {
+      } else if (v.every((x) => x && typeof x === "object" && !Array.isArray(x))) {
         tables.push({ label: toLabelPT(k), raw: v });
       } else {
         // misto: cai em objeto complexo (último caso)
@@ -466,7 +500,7 @@ function renderAllRemainingDetails(details: any, usedKeys: Set<string>, title = 
       const vv = v[kk];
       if (!hasAnyNonBlankDeep(vv)) continue;
 
-      if (typeof vv !== 'object' || vv === null) {
+      if (typeof vv !== "object" || vv === null) {
         flatPairs.push({ key: kk, label: toLabelPT(kk), value: vv });
       } else {
         nested[kk] = vv;
@@ -475,8 +509,13 @@ function renderAllRemainingDetails(details: any, usedKeys: Set<string>, title = 
 
     if (flatPairs.length) {
       // render flatPairs como sub-bloco
-      const block = buildKeyValueList(flatPairs.map((p) => ({ key: p.key, label: p.label, value: p.value })));
-      complexObjects.push({ label: toLabelPT(k), raw: block + (Object.keys(nested).length ? '' : '') });
+      const block = buildKeyValueList(
+        flatPairs.map((p) => ({ key: p.key, label: p.label, value: p.value }))
+      );
+      complexObjects.push({
+        label: toLabelPT(k),
+        raw: block + (Object.keys(nested).length ? "" : ""),
+      });
       if (Object.keys(nested).length) {
         complexObjects.push({ label: `${toLabelPT(k)} (detalhes)`, raw: nested });
       }
@@ -486,15 +525,19 @@ function renderAllRemainingDetails(details: any, usedKeys: Set<string>, title = 
   }
 
   const simpleHtml = simple.length
-    ? buildKeyValueList(simple.map((x) => ({ key: x.key, label: x.label, value: x.value })))
-    : '';
+    ? buildKeyValueList(
+        simple.map((x) => ({ key: x.key, label: x.label, value: x.value }))
+      )
+    : "";
 
-  const tablesHtml = tables.map((t) => renderTableFromObjectArray(t.label, t.raw)).join('');
+  const tablesHtml = tables
+    .map((t) => renderTableFromObjectArray(t.label, t.raw))
+    .join("");
 
   const complexHtml = complexObjects
     .map((r) => {
       // se já veio HTML (string com KV), usa direto
-      if (typeof r.raw === 'string' && r.raw.includes('<div')) {
+      if (typeof r.raw === "string" && r.raw.includes("<div")) {
         return `
           <div class="kv-block">
             <div class="kv-k">${escapeHtml(r.label)}</div>
@@ -512,9 +555,9 @@ function renderAllRemainingDetails(details: any, usedKeys: Set<string>, title = 
         </div>
       `;
     })
-    .join('');
+    .join("");
 
-  if (!simpleHtml && !tablesHtml && !complexHtml) return '';
+  if (!simpleHtml && !tablesHtml && !complexHtml) return "";
 
   return `
     <div class="subsection">
@@ -531,8 +574,11 @@ function getServicePricing(service: ProposalService) {
   const total = Number(service.value || 0);
 
   const quantity = Number(details?.quantity || 0);
-  const unitValue =
-    !isBlank(details?.unit_value) ? Number(details.unit_value) : quantity > 0 ? total / quantity : total;
+  const unitValue = !isBlank(details?.unit_value)
+    ? Number(details.unit_value)
+    : quantity > 0
+    ? total / quantity
+    : total;
 
   const normalizedQty = quantity > 0 ? quantity : undefined;
   return { total, quantity: normalizedQty, unitValue };
@@ -541,43 +587,60 @@ function getServicePricing(service: ProposalService) {
 /* -------------------- Render por tipo (sem “cards dentro de cards”) -------------------- */
 
 function renderFlightDetails(details: any): string {
-  if (!details) return '';
+  if (!details) return "";
   const used = new Set<string>();
 
   const passengers = Array.isArray(details.passengers) ? details.passengers : [];
-  used.add('passengers');
+  used.add("passengers");
 
   const paxInfo = passengers
     .map((p: any) => {
-      const labels: Record<string, string> = { ADT: 'Adulto', CHD: 'Criança', INF: 'Bebê' };
+      const labels: Record<string, string> = {
+        ADT: "Adulto",
+        CHD: "Criança",
+        INF: "Bebê",
+      };
       const count = Number(p?.count || 0);
       if (!count) return null;
-      const type = labels[p?.type] || p?.type || 'Passageiro';
-      return `${count} ${type}${count > 1 ? 's' : ''}`;
+      const type = labels[p?.type] || p?.type || "Passageiro";
+      return `${count} ${type}${count > 1 ? "s" : ""}`;
     })
     .filter(Boolean)
-    .join(', ');
+    .join(", ");
 
-  used.add('cabinClass');
+  used.add("cabinClass");
 
   const baggage = details.baggage || null;
-  if (baggage) used.add('baggage');
+  if (baggage) used.add("baggage");
 
   const baggageItems: string[] = [];
   if (baggage?.carryOn) baggageItems.push(`${baggage.carryOnQty || 1}x Mão`);
-  if (baggage?.checked) baggageItems.push(`${baggage.checkedQty || 1}x Despachada (${baggage.checkedWeight || '23kg'})`);
+  if (baggage?.checked)
+    baggageItems.push(
+      `${baggage.checkedQty || 1}x Despachada (${baggage.checkedWeight || "23kg"})`
+    );
 
-  used.add('pnr');
+  used.add("pnr");
 
   const top = buildKeyValueList([
-    { key: 'passengers', label: 'Passageiros', value: paxInfo },
-    { key: 'cabinClass', label: 'Classe', value: details.cabinClass ? cabinLabels[details.cabinClass] || details.cabinClass : '' },
-    { key: 'baggage', label: 'Bagagem', value: baggageItems.length ? baggageItems.join(' + ') : '' },
-    { key: 'pnr', label: 'Localizador', value: details.pnr || '' },
+    { key: "passengers", label: "Passageiros", value: paxInfo },
+    {
+      key: "cabinClass",
+      label: "Classe",
+      value: details.cabinClass
+        ? cabinLabels[details.cabinClass] || details.cabinClass
+        : "",
+    },
+    {
+      key: "baggage",
+      label: "Bagagem",
+      value: baggageItems.length ? baggageItems.join(" + ") : "",
+    },
+    { key: "pnr", label: "Localizador", value: details.pnr || "" },
   ]);
 
   const segments = Array.isArray(details.segments) ? details.segments : [];
-  used.add('segments');
+  used.add("segments");
 
   const parseMs = (iso: any) => {
     const d = new Date(iso);
@@ -590,7 +653,7 @@ function renderFlightDetails(details: any): string {
     const m = min % 60;
     if (!h) return `${m}min`;
     if (!m) return `${h}h`;
-    return `${h}h${String(m).padStart(2, '0')}`;
+    return `${h}h${String(m).padStart(2, "0")}`;
   };
 
   const stopsCount = Math.max(0, segments.length - 1);
@@ -598,67 +661,92 @@ function renderFlightDetails(details: any): string {
   const segRows = segments
     .filter((s: any) => s?.fromIata || s?.toIata || s?.departureAt || s?.arrivalAt)
     .map((seg: any, idx: number) => {
-      const route = `${escapeHtml(seg.fromIata || '---')} → ${escapeHtml(seg.toIata || '---')}`;
+      const route = `${escapeHtml(seg.fromIata || "---")} → ${escapeHtml(
+        seg.toIata || "---"
+      )}`;
 
       const flightNo =
-        seg.airlineCode && seg.flightNumber ? `${escapeHtml(seg.airlineCode)}${escapeHtml(seg.flightNumber)}` : '';
+        seg.airlineCode && seg.flightNumber
+          ? `${escapeHtml(seg.airlineCode)}${escapeHtml(seg.flightNumber)}`
+          : "";
 
-      const dep = seg.departureAt ? formatDateTime(seg.departureAt) : '';
-      const arr = seg.arrivalAt ? formatDateTime(seg.arrivalAt) : '';
+      const dep = seg.departureAt ? formatDateTime(seg.departureAt) : "";
+      const arr = seg.arrivalAt ? formatDateTime(seg.arrivalAt) : "";
 
       const segDuration =
         seg.duration || seg.durationMinutes
           ? seg.duration
             ? String(seg.duration)
             : `${Math.round(Number(seg.durationMinutes))}min`
-          : '';
+          : "";
 
       const extraParts = [
-        segDuration ? `Duração: ${escapeHtml(segDuration)}` : '',
-        seg.cabinClass ? `Classe: ${escapeHtml(cabinLabels[seg.cabinClass] || seg.cabinClass)}` : '',
-        seg.aircraft || seg.aircraftModel ? `Aeronave: ${escapeHtml(seg.aircraft || seg.aircraftModel)}` : '',
-        seg.operatedBy || seg.operatingAirline ? `Operado por: ${escapeHtml(seg.operatedBy || seg.operatingAirline)}` : '',
-        seg.terminal ? `Terminal: ${escapeHtml(seg.terminal)}` : '',
-        seg.gate ? `Portão: ${escapeHtml(seg.gate)}` : '',
-        seg.bookingClass ? `Classe de reserva: ${escapeHtml(seg.bookingClass)}` : '',
-        seg.fareFamily ? `Família tarifária: ${escapeHtml(seg.fareFamily)}` : '',
+        segDuration ? `Duração: ${escapeHtml(segDuration)}` : "",
+        seg.cabinClass
+          ? `Classe: ${escapeHtml(cabinLabels[seg.cabinClass] || seg.cabinClass)}`
+          : "",
+        seg.aircraft || seg.aircraftModel
+          ? `Aeronave: ${escapeHtml(seg.aircraft || seg.aircraftModel)}`
+          : "",
+        seg.operatedBy || seg.operatingAirline
+          ? `Operado por: ${escapeHtml(seg.operatedBy || seg.operatingAirline)}`
+          : "",
+        seg.terminal ? `Terminal: ${escapeHtml(seg.terminal)}` : "",
+        seg.gate ? `Portão: ${escapeHtml(seg.gate)}` : "",
+        seg.bookingClass ? `Classe de reserva: ${escapeHtml(seg.bookingClass)}` : "",
+        seg.fareFamily ? `Família tarifária: ${escapeHtml(seg.fareFamily)}` : "",
       ].filter(Boolean);
 
-      let connHtml = '';
+      let connHtml = "";
       if (idx < segments.length - 1) {
         const a = parseMs(seg.arrivalAt);
         const b = parseMs(segments[idx + 1]?.departureAt);
         if (a != null && b != null && b > a) {
-          connHtml = `<div class="conn">Conexão em <strong>${escapeHtml(seg.toIata || '')}</strong>: ${escapeHtml(
-            diffHuman(b - a)
-          )}</div>`;
+          connHtml = `<div class="conn">Conexão em <strong>${escapeHtml(
+            seg.toIata || ""
+          )}</strong>: ${escapeHtml(diffHuman(b - a))}</div>`;
         } else {
-          const conn = seg.connection || seg.layover || '';
-          if (conn) connHtml = `<div class="conn">Conexão: ${escapeHtml(renderValueCompact(conn))}</div>`;
+          const conn = seg.connection || seg.layover || "";
+          if (conn)
+            connHtml = `<div class="conn">Conexão: ${escapeHtml(
+              renderValueCompact(conn)
+            )}</div>`;
         }
       }
 
-      const timeLine = [dep ? `Partida: ${dep}` : '', arr ? `Chegada: ${arr}` : ''].filter(Boolean).join(' • ');
+      const timeLine = [dep ? `Partida: ${dep}` : "", arr ? `Chegada: ${arr}` : ""]
+        .filter(Boolean)
+        .join(" • ");
 
       return `
         <div class="seg-row">
           <div>
             <div class="seg-route">${route}</div>
-            ${extraParts.length ? `<div class="seg-extra">${extraParts.join(' • ')}</div>` : ''}
+            ${
+              extraParts.length
+                ? `<div class="seg-extra">${extraParts.join(" • ")}</div>`
+                : ""
+            }
             ${connHtml}
           </div>
           <div class="seg-time">${escapeHtml(timeLine)}</div>
-          <div class="seg-right">${flightNo ? `<span class="seg-chip">${flightNo}</span>` : ''}</div>
+          <div class="seg-right">${
+            flightNo ? `<span class="seg-chip">${flightNo}</span>` : ""
+          }</div>
         </div>
       `;
     })
-    .join('');
+    .join("");
 
   const segHtml = segRows
     ? `
       <div class="subsection">
         <div class="subsection-title">
-          Trechos${stopsCount ? ` • ${stopsCount} ${pluralize(stopsCount, 'conexão', 'conexões')}` : ''}
+          Trechos${
+            stopsCount
+              ? ` • ${stopsCount} ${pluralize(stopsCount, "conexão", "conexões")}`
+              : ""
+          }
         </div>
         <div class="segments">
           <div class="seg-head">
@@ -670,217 +758,319 @@ function renderFlightDetails(details: any): string {
         </div>
       </div>
     `
-    : '';
+    : "";
 
-  const remaining = renderAllRemainingDetails(details, used, 'Detalhes adicionais do voo');
+  const remaining = renderAllRemainingDetails(
+    details,
+    used,
+    "Detalhes adicionais do voo"
+  );
   return `${top}${segHtml}${remaining}`;
 }
 
 function renderHotelDetails(details: any): string {
-  if (!details) return '';
+  if (!details) return "";
   const used = new Set<string>();
 
-  used.add('hotelName');
-  used.add('city');
-  used.add('country');
-  used.add('checkIn');
-  used.add('checkOut');
-  used.add('checkInTime');
-  used.add('checkOutTime');
-  used.add('roomType');
-  used.add('board');
-  used.add('guests');
-  used.add('confirmationNumber');
+  used.add("hotelName");
+  used.add("city");
+  used.add("country");
+  used.add("checkIn");
+  used.add("checkOut");
+  used.add("checkInTime");
+  used.add("checkOutTime");
+  used.add("roomType");
+  used.add("board");
+  used.add("guests");
+  used.add("confirmationNumber");
 
   const guestsParts: string[] = [];
-  if (details?.guests?.adults) guestsParts.push(`${details.guests.adults} adulto${details.guests.adults > 1 ? 's' : ''}`);
-  if (details?.guests?.children) guestsParts.push(`${details.guests.children} criança${details.guests.children > 1 ? 's' : ''}`);
+  if (details?.guests?.adults)
+    guestsParts.push(
+      `${details.guests.adults} adulto${details.guests.adults > 1 ? "s" : ""}`
+    );
+  if (details?.guests?.children)
+    guestsParts.push(
+      `${details.guests.children} criança${details.guests.children > 1 ? "s" : ""}`
+    );
 
-  const checkInTime = details.checkInTime ? ` ${details.checkInTime}` : '';
-  const checkOutTime = details.checkOutTime ? ` ${details.checkOutTime}` : '';
+  const checkInTime = details.checkInTime ? ` ${details.checkInTime}` : "";
+  const checkOutTime = details.checkOutTime ? ` ${details.checkOutTime}` : "";
 
-  const title = !isBlank(details.hotelName) ? `${details.hotelName}` : '';
+  const title = !isBlank(details.hotelName) ? `${details.hotelName}` : "";
 
   const base = `
-    ${title ? `<div class="service-main">${escapeHtml(title)}</div>` : ''}
+    ${title ? `<div class="service-main">${escapeHtml(title)}</div>` : ""}
     ${buildKeyValueList([
-      { key: 'local', label: 'Local', value: [details.city, details.country].filter(Boolean).join(', ') },
       {
-        key: 'periodo',
-        label: 'Período',
-        value:
-          (details.checkIn ? `${formatDate(details.checkIn)}${checkInTime}` : '') +
-          (details.checkIn && details.checkOut ? ' → ' : '') +
-          (details.checkOut ? `${formatDate(details.checkOut)}${checkOutTime}` : ''),
+        key: "local",
+        label: "Local",
+        value: [details.city, details.country].filter(Boolean).join(", "),
       },
-      { key: 'roomType', label: 'Quarto', value: details.roomType || '' },
-      { key: 'board', label: 'Regime', value: details.board ? boardLabels[details.board] || details.board : '' },
-      { key: 'guests', label: 'Hóspedes', value: guestsParts.join(', ') },
-      { key: 'confirmationNumber', label: 'Confirmação', value: details.confirmationNumber || '' },
+      {
+        key: "periodo",
+        label: "Período",
+        value:
+          (details.checkIn ? `${formatDate(details.checkIn)}${checkInTime}` : "") +
+          (details.checkIn && details.checkOut ? " → " : "") +
+          (details.checkOut ? `${formatDate(details.checkOut)}${checkOutTime}` : ""),
+      },
+      { key: "roomType", label: "Quarto", value: details.roomType || "" },
+      {
+        key: "board",
+        label: "Regime",
+        value: details.board ? boardLabels[details.board] || details.board : "",
+      },
+      { key: "guests", label: "Hóspedes", value: guestsParts.join(", ") },
+      {
+        key: "confirmationNumber",
+        label: "Confirmação",
+        value: details.confirmationNumber || "",
+      },
     ])}
   `;
 
-  const remaining = renderAllRemainingDetails(details, used, 'Detalhes adicionais do hotel');
+  const remaining = renderAllRemainingDetails(
+    details,
+    used,
+    "Detalhes adicionais do hotel"
+  );
   return `${base}${remaining}`;
 }
 
 function renderCarDetails(details: any): string {
-  if (!details) return '';
+  if (!details) return "";
   const used = new Set<string>();
 
-  used.add('rentalCompany');
-  used.add('carCategory');
-  used.add('transmission');
-  used.add('pickupLocation');
-  used.add('pickupAt');
-  used.add('dropoffLocation');
-  used.add('dropoffAt');
-  used.add('mileagePolicy');
-  used.add('fuelPolicy');
-  used.add('insurance');
-  used.add('deposit');
-  used.add('driverAge');
-  used.add('franchise');
+  used.add("rentalCompany");
+  used.add("carCategory");
+  used.add("transmission");
+  used.add("pickupLocation");
+  used.add("pickupAt");
+  used.add("dropoffLocation");
+  used.add("dropoffAt");
+  used.add("mileagePolicy");
+  used.add("fuelPolicy");
+  used.add("insurance");
+  used.add("deposit");
+  used.add("driverAge");
+  used.add("franchise");
 
   const trans =
-    details.transmission === 'auto'
-      ? 'Automático'
-      : details.transmission === 'manual'
-      ? 'Manual'
-      : translateCommonValuePT(details.transmission || '');
+    details.transmission === "auto"
+      ? "Automático"
+      : details.transmission === "manual"
+      ? "Manual"
+      : translateCommonValuePT(details.transmission || "");
 
-  const title = !isBlank(details.rentalCompany) ? `${details.rentalCompany}` : '';
+  const title = !isBlank(details.rentalCompany) ? `${details.rentalCompany}` : "";
 
   const base = `
-    ${title ? `<div class="service-main">${escapeHtml(title)}</div>` : ''}
+    ${title ? `<div class="service-main">${escapeHtml(title)}</div>` : ""}
     ${buildKeyValueList([
-      { key: 'carCategory', label: 'Categoria', value: details.carCategory ? `${details.carCategory}${trans ? ` (${trans})` : ''}` : '' },
-      { key: 'pickup', label: 'Retirada', value: details.pickupLocation && details.pickupAt ? `${details.pickupLocation} • ${formatDateTime(details.pickupAt)}` : '' },
-      { key: 'dropoff', label: 'Devolução', value: details.dropoffLocation && details.dropoffAt ? `${details.dropoffLocation} • ${formatDateTime(details.dropoffAt)}` : '' },
-      { key: 'mileagePolicy', label: 'Política de quilometragem', value: details.mileagePolicy || '' },
-      { key: 'fuelPolicy', label: 'Política de combustível', value: details.fuelPolicy || '' },
-      { key: 'deposit', label: 'Caução', value: details.deposit ?? '' },
-      { key: 'franchise', label: 'Franquia', value: details.franchise ?? '' },
-      { key: 'insurance', label: 'Seguro', value: details.insurance || '' },
+      {
+        key: "carCategory",
+        label: "Categoria",
+        value: details.carCategory
+          ? `${details.carCategory}${trans ? ` (${trans})` : ""}`
+          : "",
+      },
+      {
+        key: "pickup",
+        label: "Retirada",
+        value:
+          details.pickupLocation && details.pickupAt
+            ? `${details.pickupLocation} • ${formatDateTime(details.pickupAt)}`
+            : "",
+      },
+      {
+        key: "dropoff",
+        label: "Devolução",
+        value:
+          details.dropoffLocation && details.dropoffAt
+            ? `${details.dropoffLocation} • ${formatDateTime(details.dropoffAt)}`
+            : "",
+      },
+      {
+        key: "mileagePolicy",
+        label: "Política de quilometragem",
+        value: details.mileagePolicy || "",
+      },
+      {
+        key: "fuelPolicy",
+        label: "Política de combustível",
+        value: details.fuelPolicy || "",
+      },
+      { key: "deposit", label: "Caução", value: details.deposit ?? "" },
+      { key: "franchise", label: "Franquia", value: details.franchise ?? "" },
+      { key: "insurance", label: "Seguro", value: details.insurance || "" },
     ])}
   `;
 
-  const remaining = renderAllRemainingDetails(details, used, 'Detalhes adicionais do carro');
+  const remaining = renderAllRemainingDetails(
+    details,
+    used,
+    "Detalhes adicionais do carro"
+  );
   return `${base}${remaining}`;
 }
 
 function renderCruiseDetails(details: any): string {
-  if (!details) return '';
+  if (!details) return "";
   const used = new Set<string>();
 
-  used.add('cruiseLine');
-  used.add('shipName');
-  used.add('embarkPort');
-  used.add('disembarkPort');
-  used.add('sailingDate');
-  used.add('returnDate');
-  used.add('cabinType');
-  used.add('cabinCategory');
-  used.add('itineraryPorts');
+  used.add("cruiseLine");
+  used.add("shipName");
+  used.add("embarkPort");
+  used.add("disembarkPort");
+  used.add("sailingDate");
+  used.add("returnDate");
+  used.add("cabinType");
+  used.add("cabinCategory");
+  used.add("itineraryPorts");
 
-  const title = [details.cruiseLine, details.shipName].filter(Boolean).join(' ');
-  const main = title ? `${title}` : '';
+  const title = [details.cruiseLine, details.shipName].filter(Boolean).join(" ");
+  const main = title ? `${title}` : "";
 
   const base = `
-    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ''}
+    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ""}
     ${buildKeyValueList([
-      { key: 'ports', label: 'Portos', value: [details.embarkPort, details.disembarkPort].filter(Boolean).join(' → ') },
       {
-        key: 'period',
-        label: 'Período',
-        value:
-          (details.sailingDate ? formatDate(details.sailingDate) : '') +
-          (details.sailingDate && details.returnDate ? ' → ' : '') +
-          (details.returnDate ? formatDate(details.returnDate) : ''),
+        key: "ports",
+        label: "Portos",
+        value: [details.embarkPort, details.disembarkPort].filter(Boolean).join(" → "),
       },
-      { key: 'cabin', label: 'Cabine', value: [details.cabinType, details.cabinCategory].filter(Boolean).join(' - ') },
-      { key: 'itineraryPorts', label: 'Itinerário', value: details.itineraryPorts || '' },
+      {
+        key: "period",
+        label: "Período",
+        value:
+          (details.sailingDate ? formatDate(details.sailingDate) : "") +
+          (details.sailingDate && details.returnDate ? " → " : "") +
+          (details.returnDate ? formatDate(details.returnDate) : ""),
+      },
+      {
+        key: "cabin",
+        label: "Cabine",
+        value: [details.cabinType, details.cabinCategory].filter(Boolean).join(" - "),
+      },
+      { key: "itineraryPorts", label: "Itinerário", value: details.itineraryPorts || "" },
     ])}
   `;
 
-  const remaining = renderAllRemainingDetails(details, used, 'Detalhes adicionais do cruzeiro');
+  const remaining = renderAllRemainingDetails(
+    details,
+    used,
+    "Detalhes adicionais do cruzeiro"
+  );
   return `${base}${remaining}`;
 }
 
 function renderInsuranceDetails(details: any): string {
-  if (!details) return '';
+  if (!details) return "";
   const used = new Set<string>();
 
-  used.add('insurer');
-  used.add('planName');
-  used.add('coverageStart');
-  used.add('coverageEnd');
-  used.add('destinationRegion');
-  used.add('medicalCoverageAmount');
-  used.add('baggageCoverageAmount');
-  used.add('cancellationCoverageAmount');
-  used.add('policyNumber');
+  used.add("insurer");
+  used.add("planName");
+  used.add("coverageStart");
+  used.add("coverageEnd");
+  used.add("destinationRegion");
+  used.add("medicalCoverageAmount");
+  used.add("baggageCoverageAmount");
+  used.add("cancellationCoverageAmount");
+  used.add("policyNumber");
 
-  const title = [details.insurer, details.planName].filter(Boolean).join(' - ');
-  const main = title ? `${title}` : '';
+  const title = [details.insurer, details.planName].filter(Boolean).join(" - ");
+  const main = title ? `${title}` : "";
 
   const base = `
-    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ''}
+    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ""}
     ${buildKeyValueList([
       {
-        key: 'coveragePeriod',
-        label: 'Vigência',
+        key: "coveragePeriod",
+        label: "Vigência",
         value:
-          (details.coverageStart ? formatDate(details.coverageStart) : '') +
-          (details.coverageStart && details.coverageEnd ? ' → ' : '') +
-          (details.coverageEnd ? formatDate(details.coverageEnd) : ''),
+          (details.coverageStart ? formatDate(details.coverageStart) : "") +
+          (details.coverageStart && details.coverageEnd ? " → " : "") +
+          (details.coverageEnd ? formatDate(details.coverageEnd) : ""),
       },
-      { key: 'destinationRegion', label: 'Região', value: details.destinationRegion || '' },
-      { key: 'medicalCoverageAmount', label: 'Cobertura médica', value: details.medicalCoverageAmount ?? '' },
-      { key: 'baggageCoverageAmount', label: 'Cobertura de bagagem', value: details.baggageCoverageAmount ?? '' },
-      { key: 'cancellationCoverageAmount', label: 'Cobertura de cancelamento', value: details.cancellationCoverageAmount ?? '' },
-      { key: 'policyNumber', label: 'Apólice', value: details.policyNumber || '' },
+      {
+        key: "destinationRegion",
+        label: "Região",
+        value: details.destinationRegion || "",
+      },
+      {
+        key: "medicalCoverageAmount",
+        label: "Cobertura médica",
+        value: details.medicalCoverageAmount ?? "",
+      },
+      {
+        key: "baggageCoverageAmount",
+        label: "Cobertura de bagagem",
+        value: details.baggageCoverageAmount ?? "",
+      },
+      {
+        key: "cancellationCoverageAmount",
+        label: "Cobertura de cancelamento",
+        value: details.cancellationCoverageAmount ?? "",
+      },
+      { key: "policyNumber", label: "Apólice", value: details.policyNumber || "" },
     ])}
   `;
 
-  const remaining = renderAllRemainingDetails(details, used, 'Detalhes adicionais do seguro');
+  const remaining = renderAllRemainingDetails(
+    details,
+    used,
+    "Detalhes adicionais do seguro"
+  );
   return `${base}${remaining}`;
 }
 
 function renderTransferDetails(details: any): string {
-  if (!details) return '';
+  if (!details) return "";
   const used = new Set<string>();
 
-  used.add('transferType');
-  used.add('pickupPlace');
-  used.add('dropoffPlace');
-  used.add('pickupAt');
-  used.add('vehicleType');
-  used.add('passengersCount');
+  used.add("transferType");
+  used.add("pickupPlace");
+  used.add("dropoffPlace");
+  used.add("pickupAt");
+  used.add("vehicleType");
+  used.add("passengersCount");
 
   const type =
-    details.transferType === 'privado'
-      ? 'Privado'
-      : details.transferType === 'compartilhado'
-      ? 'Compartilhado'
-      : translateCommonValuePT(details.transferType || '');
+    details.transferType === "privado"
+      ? "Privado"
+      : details.transferType === "compartilhado"
+      ? "Compartilhado"
+      : translateCommonValuePT(details.transferType || "");
 
   const base = `
     <div class="service-main">${escapeHtml(`Transfer ${type}`)}</div>
     ${buildKeyValueList([
-      { key: 'pickupPlace', label: 'Origem', value: details.pickupPlace || '' },
-      { key: 'dropoffPlace', label: 'Destino', value: details.dropoffPlace || '' },
-      { key: 'pickupAt', label: 'Horário', value: details.pickupAt ? formatDateTime(details.pickupAt) : '' },
-      { key: 'vehicleType', label: 'Veículo', value: details.vehicleType || '' },
+      { key: "pickupPlace", label: "Origem", value: details.pickupPlace || "" },
+      { key: "dropoffPlace", label: "Destino", value: details.dropoffPlace || "" },
       {
-        key: 'passengersCount',
-        label: 'Passageiros',
-        value: details.passengersCount ? `${details.passengersCount} passageiro${details.passengersCount > 1 ? 's' : ''}` : '',
+        key: "pickupAt",
+        label: "Horário",
+        value: details.pickupAt ? formatDateTime(details.pickupAt) : "",
+      },
+      { key: "vehicleType", label: "Veículo", value: details.vehicleType || "" },
+      {
+        key: "passengersCount",
+        label: "Passageiros",
+        value: details.passengersCount
+          ? `${details.passengersCount} passageiro${
+              details.passengersCount > 1 ? "s" : ""
+            }`
+          : "",
       },
     ])}
   `;
 
-  const remaining = renderAllRemainingDetails(details, used, 'Detalhes adicionais do transfer');
+  const remaining = renderAllRemainingDetails(
+    details,
+    used,
+    "Detalhes adicionais do transfer"
+  );
   return `${base}${remaining}`;
 }
 
@@ -891,7 +1081,7 @@ function normalizeActivities(items: any[]): string[] {
   for (const x of items || []) {
     if (isBlank(x)) continue;
 
-    if (typeof x === 'string') {
+    if (typeof x === "string") {
       const s = x.trim();
       if (!s) continue;
       if (/^\s*\{.*\}\s*$/.test(s) || /^\s*\[.*\]\s*$/.test(s)) continue;
@@ -899,7 +1089,7 @@ function normalizeActivities(items: any[]): string[] {
       continue;
     }
 
-    if (typeof x === 'object') {
+    if (typeof x === "object") {
       const text =
         safeStr(x.title) ||
         safeStr(x.name) ||
@@ -909,7 +1099,7 @@ function normalizeActivities(items: any[]): string[] {
         safeStr(x.place);
 
       const time = safeStr(x.time) || safeStr(x.hour) || safeStr(x.at);
-      const line = [time, text].filter(Boolean).join(' • ');
+      const line = [time, text].filter(Boolean).join(" • ");
 
       // se não tem conteúdo humano, não imprime
       if (line && !/^\s*[\{\[]/.test(line)) out.push(translateCommonValuePT(line));
@@ -921,11 +1111,11 @@ function normalizeActivities(items: any[]): string[] {
 }
 
 function renderProgramacao(days: any[], titulo: string) {
-  if (!Array.isArray(days) || !days.length) return '';
+  if (!Array.isArray(days) || !days.length) return "";
 
   const rows = days
     .map((d: any, i: number) => {
-      if (!d) return '';
+      if (!d) return "";
 
       const title = safeStr(d.title) || safeStr(d.name) || safeStr(d.dayTitle);
       const date = safeStr(d.date) || safeStr(d.dayDate);
@@ -941,30 +1131,34 @@ function renderProgramacao(days: any[], titulo: string) {
 
       const items = normalizeActivities(itemsRaw);
 
-      if (!title && !date && !summary && items.length === 0) return '';
+      if (!title && !date && !summary && items.length === 0) return "";
 
       return `
         <div class="t-row">
           <div class="t-left">
             <div class="t-day">Dia ${i + 1}</div>
-            ${date ? `<div class="t-date">${escapeHtml(formatMaybeDate(date))}</div>` : ''}
+            ${
+              date ? `<div class="t-date">${escapeHtml(formatMaybeDate(date))}</div>` : ""
+            }
           </div>
           <div class="t-right">
-            ${title ? `<div class="t-title">${escapeHtml(title)}</div>` : ''}
-            ${summary ? `<div class="t-text">${escapeHtml(summary)}</div>` : ''}
+            ${title ? `<div class="t-title">${escapeHtml(title)}</div>` : ""}
+            ${summary ? `<div class="t-text">${escapeHtml(summary)}</div>` : ""}
             ${
               items.length
-                ? `<ul class="t-list">${items.map((it) => `<li>${escapeHtml(it)}</li>`).join('')}</ul>`
-                : ''
+                ? `<ul class="t-list">${items
+                    .map((it) => `<li>${escapeHtml(it)}</li>`)
+                    .join("")}</ul>`
+                : ""
             }
           </div>
         </div>
       `;
     })
     .filter(Boolean)
-    .join('');
+    .join("");
 
-  if (!rows) return '';
+  if (!rows) return "";
 
   return `
     <div class="subsection">
@@ -977,127 +1171,149 @@ function renderProgramacao(days: any[], titulo: string) {
 }
 
 function renderPackageDetails(details: any): string {
-  if (!details) return '';
+  if (!details) return "";
   const used = new Set<string>();
 
-  used.add('packageName');
-  used.add('destinations');
-  used.add('startDate');
-  used.add('endDate');
-  used.add('nights');
-  used.add('inclusions');
-  used.add('days');
-  used.add('itinerary');
-  used.add('program');
+  used.add("packageName");
+  used.add("destinations");
+  used.add("startDate");
+  used.add("endDate");
+  used.add("nights");
+  used.add("inclusions");
+  used.add("days");
+  used.add("itinerary");
+  used.add("program");
 
-  const nights = details.nights ? ` (${details.nights} noites)` : '';
-  const main = details.packageName ? `📦 ${details.packageName}` : '';
+  const nights = details.nights ? ` (${details.nights} noites)` : "";
+  const main = details.packageName ? `📦 ${details.packageName}` : "";
 
-  const days =
-    Array.isArray(details.days)
-      ? details.days
-      : Array.isArray(details.itinerary)
-      ? details.itinerary
-      : Array.isArray(details.program)
-      ? details.program
-      : [];
+  const days = Array.isArray(details.days)
+    ? details.days
+    : Array.isArray(details.itinerary)
+    ? details.itinerary
+    : Array.isArray(details.program)
+    ? details.program
+    : [];
 
-  const programHtml = renderProgramacao(days, 'Programação do pacote');
+  const programHtml = renderProgramacao(days, "Programação do pacote");
 
   const base = `
-    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ''}
+    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ""}
     ${buildKeyValueList([
-      { key: 'destinations', label: 'Destinos', value: details.destinations || '' },
+      { key: "destinations", label: "Destinos", value: details.destinations || "" },
       {
-        key: 'period',
-        label: 'Período',
+        key: "period",
+        label: "Período",
         value:
-          (details.startDate ? formatDate(details.startDate) : '') +
-          (details.startDate && details.endDate ? ' → ' : '') +
-          (details.endDate ? formatDate(details.endDate) : '') +
+          (details.startDate ? formatDate(details.startDate) : "") +
+          (details.startDate && details.endDate ? " → " : "") +
+          (details.endDate ? formatDate(details.endDate) : "") +
           nights,
       },
-      { key: 'inclusions', label: 'Inclui', value: details.inclusions || '' },
+      { key: "inclusions", label: "Inclui", value: details.inclusions || "" },
     ])}
     ${programHtml}
   `;
 
-  const remaining = renderAllRemainingDetails(details, used, 'Detalhes adicionais do pacote');
+  const remaining = renderAllRemainingDetails(
+    details,
+    used,
+    "Detalhes adicionais do pacote"
+  );
   return `${base}${remaining}`;
 }
 
 function renderTourDetails(details: any): string {
-  if (!details) return '';
+  if (!details) return "";
   const used = new Set<string>();
 
-  used.add('destinationBase');
-  used.add('startDate');
-  used.add('endDate');
-  used.add('pace');
-  used.add('days');
-  used.add('program');
-  used.add('itinerary');
+  used.add("destinationBase");
+  used.add("startDate");
+  used.add("endDate");
+  used.add("pace");
+  used.add("days");
+  used.add("program");
+  used.add("itinerary");
 
-  const paceLabels: Record<string, string> = { leve: 'Leve', moderado: 'Moderado', intenso: 'Intenso' };
-  const main = details.destinationBase ? `Roteiro: ${details.destinationBase}` : '';
+  const paceLabels: Record<string, string> = {
+    leve: "Leve",
+    moderado: "Moderado",
+    intenso: "Intenso",
+  };
+  const main = details.destinationBase ? `Roteiro: ${details.destinationBase}` : "";
 
-  const days =
-    Array.isArray(details.days)
-      ? details.days
-      : Array.isArray(details.program)
-      ? details.program
-      : Array.isArray(details.itinerary)
-      ? details.itinerary
-      : [];
+  const days = Array.isArray(details.days)
+    ? details.days
+    : Array.isArray(details.program)
+    ? details.program
+    : Array.isArray(details.itinerary)
+    ? details.itinerary
+    : [];
 
-  const programHtml = renderProgramacao(days, 'Programação do roteiro');
+  const programHtml = renderProgramacao(days, "Programação do roteiro");
 
   const base = `
-    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ''}
+    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ""}
     ${buildKeyValueList([
       {
-        key: 'period',
-        label: 'Período',
+        key: "period",
+        label: "Período",
         value:
-          (details.startDate ? formatDate(details.startDate) : '') +
-          (details.startDate && details.endDate ? ' → ' : '') +
-          (details.endDate ? formatDate(details.endDate) : ''),
+          (details.startDate ? formatDate(details.startDate) : "") +
+          (details.startDate && details.endDate ? " → " : "") +
+          (details.endDate ? formatDate(details.endDate) : ""),
       },
-      { key: 'pace', label: 'Ritmo', value: details.pace ? paceLabels[details.pace] || translateCommonValuePT(details.pace) : '' },
-      { key: 'days', label: 'Dias', value: days?.length ? `${days.length} ${pluralize(days.length, 'dia', 'dias')}` : '' },
+      {
+        key: "pace",
+        label: "Ritmo",
+        value: details.pace
+          ? paceLabels[details.pace] || translateCommonValuePT(details.pace)
+          : "",
+      },
+      {
+        key: "days",
+        label: "Dias",
+        value: days?.length
+          ? `${days.length} ${pluralize(days.length, "dia", "dias")}`
+          : "",
+      },
     ])}
     ${programHtml}
   `;
 
-  const remaining = renderAllRemainingDetails(details, used, 'Detalhes adicionais do roteiro');
+  const remaining = renderAllRemainingDetails(
+    details,
+    used,
+    "Detalhes adicionais do roteiro"
+  );
   return `${base}${remaining}`;
 }
 
 function renderServiceDetails(service: ProposalService): string {
   const details: any = service.details || {};
   switch (service.type) {
-    case 'flight':
+    case "flight":
       return renderFlightDetails(details);
-    case 'hotel':
+    case "hotel":
       return renderHotelDetails(details);
-    case 'car':
+    case "car":
       return renderCarDetails(details);
-    case 'cruise':
+    case "cruise":
       return renderCruiseDetails(details);
-    case 'insurance':
+    case "insurance":
       return renderInsuranceDetails(details);
-    case 'transfer':
+    case "transfer":
       return renderTransferDetails(details);
-    case 'package':
+    case "package":
       return renderPackageDetails(details);
-    case 'tour':
+    case "tour":
       return renderTourDetails(details);
     default: {
       const used = new Set<string>();
       const main = !isBlank(details?.title || details?.name)
         ? `<div class="service-main">${escapeHtml(details.title || details.name)}</div>`
-        : '';
-      return `${main}${renderAllRemainingDetails(details, used, 'Detalhes do serviço')}`;
+        : "";
+      return `${main}${renderAllRemainingDetails(details, used, "Detalhes do serviço")}`;
     }
   }
 }
@@ -1140,7 +1356,7 @@ function inferTripPeriod(services: ProposalService[]) {
 export function generateProposalPDF(
   proposal: Proposal,
   services: ProposalService[],
-  agencyName: string = 'Sua Agência de Viagens',
+  agencyName: string = "Sua Agência de Viagens",
   agencyLogo?: string | null,
   agencyEmail?: string | null,
   agencyPhone?: string | null,
@@ -1151,25 +1367,38 @@ export function generateProposalPDF(
   const discountValue = (totalServices * discountPct) / 100;
   const finalValue = totalServices - discountValue;
 
-  const proposalCode = generateReservationCode(proposal.id, proposal.number);
-  const createdAt = (proposal as any).created_at ? formatDate(String((proposal as any).created_at)) : '';
+  const proposalCode = proposal.number ? String(proposal.number) : "";
+  const createdAt = (proposal as any).created_at
+    ? formatDate(String((proposal as any).created_at))
+    : "";
   const client = (proposal as any).clients || null;
 
   const tripPeriod = inferTripPeriod(services);
-  const tripPeriodText = tripPeriod ? `${formatDate(tripPeriod.start)} → ${formatDate(tripPeriod.end)}` : '';
+  const tripPeriodText = tripPeriod
+    ? `${formatDate(tripPeriod.start)} → ${formatDate(tripPeriod.end)}`
+    : "";
 
   const logoSection = agencyLogo
-    ? `<img src="${escapeHtml(agencyLogo)}" alt="${escapeHtml(agencyName)}" class="agency-logo" />`
+    ? `<img src="${escapeHtml(agencyLogo)}" alt="${escapeHtml(
+        agencyName
+      )}" class="agency-logo" />`
     : `<div class="agency-name">${escapeHtml(agencyName)}</div>`;
 
-  const contactInfo = [agencyPhone ? `Telefone: ${agencyPhone}` : '', agencyEmail || '', agencyAddress || ''].filter(Boolean);
+  const contactInfo = [
+    agencyPhone ? `Telefone: ${agencyPhone}` : "",
+    agencyEmail || "",
+    agencyAddress || "",
+  ].filter(Boolean);
 
   const notesValue =
-    (proposal as any).notes || (proposal as any).observations || (proposal as any).observation || '';
+    (proposal as any).notes ||
+    (proposal as any).observations ||
+    (proposal as any).observation ||
+    "";
 
   const servicesCountText = services.length
-    ? `${services.length} ${pluralize(services.length, 'item', 'itens')}`
-    : '';
+    ? `${services.length} ${pluralize(services.length, "item", "itens")}`
+    : "";
 
   const html = `
   <!DOCTYPE html>
@@ -1177,7 +1406,9 @@ export function generateProposalPDF(
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Proposta #${escapeHtml(proposal.number)} - ${escapeHtml(proposal.title)}</title>
+    <title>Proposta #${escapeHtml(proposal.number)} - ${escapeHtml(
+    proposal.title
+  )}</title>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
       :root{
@@ -1209,7 +1440,7 @@ export function generateProposalPDF(
       }
       .agency-logo{ max-width:180px; max-height:56px; object-fit:contain; display:block; }
       .agency-name{ font-size:22px; font-weight:700; letter-spacing:-0.02em; }
-      .agency-contact{ margin-top:10px; font-size:12px; color:var(--muted2); line-height:1.6; }
+      .agency-contact{ margin-top:0px; font-size:12px; color:var(--muted2); line-height:1.6; }
 
       .docmeta{ text-align:right; }
       .badge{
@@ -1588,23 +1819,34 @@ export function generateProposalPDF(
       <div class="topbar">
         <div>
           ${logoSection}
-          ${contactInfo.length ? `<div class="agency-contact">${contactInfo.map(escapeHtml).join('<br>')}</div>` : ''}
         </div>
 
         <div class="docmeta">
-          <div class="badge">Proposta comercial</div>
-          <div class="code">${escapeHtml(proposalCode)}</div>
-          ${createdAt ? `<div class="muted">Gerado em ${escapeHtml(createdAt)}</div>` : ''}
+                  <div>Proposta comercial - ${agencyName}</div>
+
+        
+                    ${
+                      contactInfo.length
+                        ? `<div class="agency-contact">${contactInfo
+                            .map(escapeHtml)
+                            .join("<br>")}</div>`
+                        : ""
+                    }
+
         </div>
+
+       
       </div>
 
       <div class="hero">
         <div>
-          <h1>${escapeHtml(proposal.title || 'Proposta')}</h1>
+          <h1>${escapeHtml(proposal.title || "Proposta")}</h1>
           <div class="sub">
             ${
               client?.name
-                ? `Proposta para <span style="font-weight:600">${escapeHtml(client.name)}</span>`
+                ? `<span style="font-weight:600">${escapeHtml(
+                    client.name
+                  )}</span>`
                 : `Proposta personalizada`
             }
           </div>
@@ -1621,7 +1863,7 @@ export function generateProposalPDF(
                    <div class="meta-k">Período</div>
                    <div class="meta-v">${escapeHtml(tripPeriodText)}</div>
                  </div>`
-              : ''
+              : ""
           }
         </div>
       </div>
@@ -1641,7 +1883,7 @@ export function generateProposalPDF(
                   <div class="v">- ${escapeHtml(formatCurrency(discountValue))}</div>
                 </div>
               `
-              : ''
+              : ""
           }
           <div class="final">
             <div class="k">Valor total</div>
@@ -1664,27 +1906,41 @@ export function generateProposalPDF(
             ? `<div class="muted">Nenhum serviço adicionado.</div>`
             : services
                 .map((service) => {
-                  const label = serviceLabels[service.type] || translateCommonValuePT(service.type);
+                  const label =
+                    serviceLabels[service.type] || translateCommonValuePT(service.type);
                   const details: any = service.details || {};
                   const { total, quantity, unitValue } = getServicePricing(service);
 
                   const desc = safeStr(service.description);
 
                   const metaPieces: string[] = [];
-                  if ((service as any).partners?.name) metaPieces.push(String((service as any).partners.name));
-                  const metaLine = metaPieces.filter(Boolean).join(' • ');
+                  if ((service as any).partners?.name)
+                    metaPieces.push(String((service as any).partners.name));
+                  const metaLine = metaPieces.filter(Boolean).join(" • ");
 
                   const priceHtml =
                     quantity && quantity > 1
                       ? `
                         <div class="price">${escapeHtml(formatCurrency(total))}</div>
-                        <div class="price-sub">${escapeHtml(String(quantity))}x • ${escapeHtml(formatCurrency(unitValue))} por unidade</div>
+                        <div class="price-sub">${escapeHtml(
+                          String(quantity)
+                        )}x  ${escapeHtml(formatCurrency(unitValue))} por unidade</div>
                       `
                       : `
                         <div class="price">${escapeHtml(formatCurrency(total))}</div>
                         ${
                           details?.unit_value || details?.quantity
-                            ? `<div class="price-sub">${details?.quantity ? `${escapeHtml(String(details.quantity))}x` : ''}${details?.quantity && details?.unit_value ? ' • ' : ''}${details?.unit_value ? `${escapeHtml(formatCurrency(Number(details.unit_value)))} por unidade` : ''}</div>`
+                            ? `<div class="price-sub">${
+                                details?.quantity
+                                  ? `${escapeHtml(String(details.quantity))}x`
+                                  : ""
+                              }${details?.quantity && details?.unit_value ? "  " : ""}${
+                                details?.unit_value
+                                  ? `${escapeHtml(
+                                      formatCurrency(Number(details.unit_value))
+                                    )} por unidade`
+                                  : ""
+                              }</div>`
                             : `<div class="price-sub">&nbsp;</div>`
                         }
                       `;
@@ -1694,8 +1950,16 @@ export function generateProposalPDF(
                       <div class="service-top">
                         <div>
                           <div class="type-chip">${escapeHtml(label)}</div>
-                          ${desc ? `<div class="service-desc">${escapeHtml(desc)}</div>` : ''}
-                          ${metaLine ? `<div class="service-meta">${escapeHtml(metaLine)}</div>` : ''}
+                          ${
+                            desc
+                              ? `<div class="service-desc">${escapeHtml(desc)}</div>`
+                              : ""
+                          }
+                          ${
+                            metaLine
+                              ? `<div class="service-meta">${escapeHtml(metaLine)}</div>`
+                              : ""
+                          }
                         </div>
                         <div>
                           ${priceHtml}
@@ -1708,7 +1972,7 @@ export function generateProposalPDF(
                     </div>
                   `;
                 })
-                .join('')
+                .join("")
         }
       </div>
 
@@ -1718,17 +1982,21 @@ export function generateProposalPDF(
             <div class="notes">
               <div class="notes-title">Observações</div>
               <div class="notes-body">
-                ${escapeHtml(notesValue).replace(/\n/g, '<br>')}
+                ${escapeHtml(notesValue).replace(/\n/g, "<br>")}
               </div>
             </div>
           `
-          : ''
+          : ""
       }
 
       <div class="footer">
-        <div>Gerado por <strong>${escapeHtml(agencyName)}</strong>.</div>
+        <div><strong>${escapeHtml(agencyName)}</strong></div>
         <div style="margin-top:6px;">
-          ${contactInfo.length ? `Contato: ${escapeHtml(contactInfo.join(' • '))}` : 'Entre em contato para confirmar disponibilidade e condições.'}
+          ${
+            contactInfo.length
+              ? `Contato: ${escapeHtml(contactInfo.join(" | "))}`
+              : "Entre em contato para confirmar disponibilidade e condições."
+          }
         </div>
       </div>
 
@@ -1737,7 +2005,7 @@ export function generateProposalPDF(
   </html>
   `;
 
-  const printWindow = window.open('', '_blank');
+  const printWindow = window.open("", "_blank");
   if (printWindow) {
     printWindow.document.open();
     printWindow.document.write(html);
