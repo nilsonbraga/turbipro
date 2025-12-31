@@ -296,7 +296,7 @@ const renderExtraDetails = (details: any, exclude: string[] = []) => {
       <div className="space-y-1">
         {entries.map(([k, v]) => {
           const value = Array.isArray(v)
-            ? v.map((item) => (typeof item === 'object' ? '' : String(item))).filter(Boolean).join(' • ')
+            ? v.map((item) => (typeof item === 'object' ? '' : String(item))).filter(Boolean).join('  ')
             : typeof v === 'boolean'
             ? boolLabel(v)
             : String(v);
@@ -397,7 +397,7 @@ function FlightDetail({ service }: { service: any }) {
                           : '';
                       const times = [conn?.departureAt && `Saída ${formatTime(conn.departureAt)}`, conn?.arrivalAt && `Chegada ${formatTime(conn.arrivalAt)}`]
                         .filter(Boolean)
-                        .join(' • ');
+                        .join('  ');
                       return (
                         <div key={cIdx} className="flex items-center justify-between gap-2">
                           <div className="font-medium">{(conn?.iata || '---').toUpperCase()}</div>
@@ -486,8 +486,8 @@ function CarDetail({ service }: { service: any }) {
       </div>
 
       <div className="grid sm:grid-cols-2 gap-2 text-[12px] text-muted-foreground">
-        <div>Retirada: {details?.pickupLocation} {details?.pickupAt ? `• ${formatDateTime(details.pickupAt)}` : ''}</div>
-        <div>Devolução: {details?.dropoffLocation} {details?.dropoffAt ? `• ${formatDateTime(details.dropoffAt)}` : ''}</div>
+        <div>Retirada: {details?.pickupLocation} {details?.pickupAt ? `${formatDateTime(details.pickupAt)}` : ''}</div>
+        <div>Devolução: {details?.dropoffLocation} {details?.dropoffAt ? `${formatDateTime(details.dropoffAt)}` : ''}</div>
       </div>
 
       {renderExtraDetails(details, ['pickupAt', 'dropoffAt', 'pickupLocation', 'dropoffLocation', 'rentalCompany', 'carCategory', 'transmission', 'insurance', 'deposit'])}
@@ -603,44 +603,56 @@ function TourDetail({ service }: { service: any }) {
       </div>
 
       {days.length > 0 && (
-        <div className="space-y-2">
+        <div className="space-y-3">
           <div className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
             Itinerário
           </div>
-          <div className="overflow-x-auto">
-            <table className="w-full text-[13px] border border-muted/60 rounded-lg overflow-hidden">
-              <thead className="bg-muted/40 text-[11px] uppercase tracking-wider text-muted-foreground">
-                <tr>
-                  <th className="py-2 px-3 text-left font-semibold w-[80px]">Dia</th>
-                  <th className="py-2 px-3 text-left font-semibold">Atividade</th>
-                  <th className="py-2 px-3 text-left font-semibold w-[180px]">Local</th>
-                  <th className="py-2 px-3 text-left font-semibold w-[120px]">Horário</th>
-                </tr>
-              </thead>
-              <tbody className="divide-y">
-                {days.map((day: any, idx: number) => {
-                  const acts = Array.isArray(day?.activities) && day.activities.length ? day.activities : [{ name: 'Sem atividades' }];
-                  return acts.map((act: any, aIdx: number) => (
-                    <tr key={`${idx}-${aIdx}`} className="align-top">
-                      <td className="py-2.5 px-3 font-semibold text-foreground">
-                        Dia {day?.dayNumber || idx + 1}
-                        {day?.title && <div className="text-[11px] text-muted-foreground">{day.title}</div>}
-                      </td>
-                      <td className="py-2.5 px-3">
-                        <div className="font-medium text-foreground">{act?.name || 'Atividade'}</div>
-                        {act?.summary && <div className="text-[12px] text-muted-foreground">{act.summary}</div>}
-                      </td>
-                      <td className="py-2.5 px-3 text-[12px] text-foreground">
-                        {act?.location || '—'}
-                      </td>
-                      <td className="py-2.5 px-3 text-[12px] text-foreground">
-                        {act?.time || '—'}
-                      </td>
-                    </tr>
-                  ));
-                })}
-              </tbody>
-            </table>
+          <div className="space-y-3">
+            {days.map((day: any, idx: number) => {
+              const acts =
+                Array.isArray(day?.activities) && day.activities.length
+                  ? day.activities
+                  : [{ name: 'Sem atividades', summary: '', time: '' }];
+
+              return (
+                <div key={idx} className="rounded-lg border border-muted/60 bg-muted/10 p-3 space-y-2">
+                  <div className="flex items-center gap-2 text-sm font-semibold">
+                    Dia {day?.dayNumber || idx + 1}
+                  </div>
+                  {day?.title && (
+                    <div className="text-[12px] text-muted-foreground">
+                      {day.title}
+                    </div>
+                  )}
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-[13px]">
+                      <thead className="text-[11px] uppercase tracking-wider text-muted-foreground">
+                        <tr>
+                          <th className="py-2 px-3 text-left font-semibold w-[220px]">Atividade</th>
+                          <th className="py-2 px-3 text-left font-semibold w-[120px]">Hora</th>
+                          <th className="py-2 px-3 text-left font-semibold">Descrição da atividade</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y">
+                        {acts.map((act: any, aIdx: number) => (
+                          <tr key={`${idx}-${aIdx}`} className="align-top">
+                            <td className="py-2.5 px-3">
+                              <div className="font-medium text-foreground">{act?.name || 'Atividade'}</div>
+                            </td>
+                            <td className="py-2.5 px-3 text-[12px] text-foreground">
+                              {act?.time || '—'}
+                            </td>
+                            <td className="py-2.5 px-3 text-[12px] text-muted-foreground">
+                              {act?.summary || '—'}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         </div>
       )}
@@ -904,7 +916,7 @@ export default function PublicProposal() {
                       <span className="text-foreground">#{proposal?.number}</span>
                       {proposal?.created_at && (
                         <span className="text-[12px] text-muted-foreground font-normal">
-                          • Emitida em {formatDate(proposal.created_at)}
+                          Emitida em {formatDate(proposal.created_at)}
                         </span>
                       )}
                     </div>
@@ -914,14 +926,14 @@ export default function PublicProposal() {
                 <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-3">
                   <div className="min-w-0">
                     <div className="text-[11px] uppercase tracking-wider text-muted-foreground">
-                      Título
+                      
                     </div>
                     <div className="text-xl sm:text-2xl font-bold leading-tight break-words">
                       {proposal?.title || 'Proposta'}
                     </div>
                   </div>
 
-                  <Badge variant="secondary" className="text-[11px]">
+                  <Badge variant="default" className="text-[11px]">
                     {pluralize(services?.length || 0, 'serviço', 'serviços')}
                   </Badge>
                 </div>
@@ -1170,7 +1182,7 @@ export default function PublicProposal() {
                 <div className="mt-6 text-center text-[12px] text-muted-foreground">
                   {(agency?.email || agency?.phone) && (
                     <div>
-                      {agency?.email ? `Contato: ${agency.email}` : ''}
+                      {agency?.email ? `${agency.email}` : ''}
                       {agency?.email && agency?.phone ? ' | ' : ''}
                       {agency?.phone ? agency.phone : ''}
                     </div>
@@ -1181,28 +1193,34 @@ export default function PublicProposal() {
           </div>
 
           <div className="h-10 print:hidden" />
-          <footer className="print:hidden text-center text-[12px] text-muted-foreground py-4">
-            <div className="flex items-center justify-center gap-4">
-              <a
-                href="https://voyu.com.br"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 hover:text-foreground"
-              >
-                <Globe className="h-4 w-4" />
-                voyu.com.br
-              </a>
-              <a
-                href="https://instagram.com/voyu.go"
-                target="_blank"
-                rel="noreferrer"
-                className="inline-flex items-center gap-1 hover:text-foreground"
-              >
-                <Instagram className="h-4 w-4" />
-                @voyu.go
-              </a>
-            </div>
-          </footer>
+          {(agency?.website_url || agency?.instagram_handle) && (
+            <footer className="print:hidden text-center text-[12px] text-muted-foreground py-4">
+              <div className="flex items-center justify-center gap-4">
+                {agency?.website_url && (
+                  <a
+                    href={agency.website_url}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    <Globe className="h-4 w-4" />
+                    {agency.website_url.replace(/^https?:\/\//, '')}
+                  </a>
+                )}
+                {agency?.instagram_handle && (
+                  <a
+                    href={`https://instagram.com/${agency.instagram_handle.replace(/^@/, '')}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1 hover:text-foreground"
+                  >
+                    <Instagram className="h-4 w-4" />
+                    {agency.instagram_handle.startsWith('@') ? agency.instagram_handle : `@${agency.instagram_handle}`}
+                  </a>
+                )}
+              </div>
+            </footer>
+          )}
         </div>
       </main>
     </div>

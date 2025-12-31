@@ -106,7 +106,17 @@ export function usePublicProposal(token: string | null) {
           proposal: {
             include: {
               ...proposalInclude,
-              agency: { select: { id: true, name: true, email: true, phone: true, logoUrl: true } },
+              agency: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  phone: true,
+                  logoUrl: true,
+                  websiteUrl: true,
+                  instagramHandle: true,
+                },
+              },
             },
           },
         }),
@@ -153,16 +163,18 @@ export function usePublicProposal(token: string | null) {
       }));
 
       return {
-        proposal: mappedProposal,
-        services,
-        agency: proposal.agency
-          ? {
-              name: proposal.agency.name,
-              logo_url: proposal.agency.logoUrl,
-              email: proposal.agency.email,
-              phone: proposal.agency.phone,
-            }
-          : null,
+          proposal: mappedProposal,
+          services,
+          agency: proposal.agency
+            ? {
+                name: proposal.agency.name,
+                logo_url: proposal.agency.logoUrl,
+                email: proposal.agency.email,
+                phone: proposal.agency.phone,
+                website_url: (proposal.agency as any).websiteUrl ?? null,
+                instagram_handle: (proposal.agency as any).instagramHandle ?? null,
+              }
+            : null,
       };
     },
     enabled: !!token,

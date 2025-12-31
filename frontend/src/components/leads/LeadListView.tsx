@@ -33,6 +33,7 @@ import {
   ChevronRight,
   User,
   Calendar,
+  ExternalLink,
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -62,6 +63,7 @@ interface LeadListViewProps {
   onProposalEdit: (proposal: Proposal) => void;
   onProposalDelete: (proposal: Proposal) => void;
   onProposalClose: (proposal: Proposal) => void;
+  onProposalCopyLink: (proposal: Proposal) => void;
 }
 
 interface StageSectionProps {
@@ -73,6 +75,7 @@ interface StageSectionProps {
   onProposalEdit: (proposal: Proposal) => void;
   onProposalDelete: (proposal: Proposal) => void;
   onProposalClose: (proposal: Proposal) => void;
+  onProposalCopyLink: (proposal: Proposal) => void;
 }
 
 function StageSection({
@@ -84,6 +87,7 @@ function StageSection({
   onProposalEdit,
   onProposalDelete,
   onProposalClose,
+  onProposalCopyLink,
 }: StageSectionProps) {
   const [isOpen, setIsOpen] = useState(true);
   const totalValue = proposals.reduce((sum, p) => sum + (serviceTotals[p.id]?.value || 0), 0);
@@ -215,30 +219,39 @@ function StageSection({
                             <MoreHorizontal className="h-4 w-4" />
                           </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onProposalView(proposal);
-                            }}
-                          >
-                            <Eye className="w-4 h-4 mr-2" />
-                            Visualizar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onProposalEdit(proposal);
-                            }}
-                          >
-                            <Edit className="w-4 h-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive"
-                            onClick={(e) => {
-                              e.stopPropagation();
-                              onProposalDelete(proposal);
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onProposalView(proposal);
+                }}
+              >
+                <Eye className="w-4 h-4 mr-2" />
+                Visualizar
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onProposalEdit(proposal);
+                }}
+              >
+                <Edit className="w-4 h-4 mr-2" />
+                Editar
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onProposalCopyLink(proposal);
+                }}
+              >
+                <ExternalLink className="w-4 h-4 mr-2" />
+                Ver link
+              </DropdownMenuItem>
+              <DropdownMenuItem
+                className="text-destructive"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onProposalDelete(proposal);
                             }}
                           >
                             <Trash2 className="w-4 h-4 mr-2" />

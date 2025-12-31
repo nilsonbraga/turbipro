@@ -41,7 +41,7 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Plus, Search, Eye, Edit, Trash2, Calendar as CalendarIcon, MoreHorizontal, Loader2, AlertTriangle, CheckCircle, Filter, Building2, X, DollarSign, Link } from 'lucide-react';
+import { Plus, Search, Eye, Edit, Trash2, Calendar as CalendarIcon, MoreHorizontal, Loader2, AlertTriangle, CheckCircle, Filter, Building2, X, DollarSign, ExternalLink } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuery } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -161,8 +161,8 @@ function ProposalCard({ proposal, tags, serviceTotals, onView, onEdit, onDelete,
               Editar
             </DropdownMenuItem>
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCopyLink(); }}>
-              <Link className="w-4 h-4 mr-2" />
-              Copiar link
+              <ExternalLink className="w-4 h-4 mr-2" />
+              Ver link
             </DropdownMenuItem>
             <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
               <Trash2 className="w-4 h-4 mr-2" />
@@ -247,6 +247,7 @@ interface KanbanColumnProps {
   onProposalClose: (proposal: Proposal) => void;
   onDrop: (proposalId: string, stageId: string) => void;
   onAddProposal: (stageId: string) => void;
+  onProposalCopyLink: (proposal: Proposal) => void;
 }
 
 function KanbanColumn({ 
@@ -259,7 +260,8 @@ function KanbanColumn({
   onProposalDelete,
   onProposalClose,
   onDrop,
-  onAddProposal
+  onAddProposal,
+  onProposalCopyLink,
 }: KanbanColumnProps) {
   const totalValue = proposals.reduce((sum, p) => sum + (serviceTotals[p.id]?.value || 0), 0);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -332,7 +334,7 @@ function KanbanColumn({
             onDragStart={(e) => {
               e.dataTransfer.setData('proposalId', proposal.id);
             }}
-            onCopyLink={() => handleCopyProposalLink(proposal.id)}
+            onCopyLink={() => onProposalCopyLink(proposal)}
           />
         ))}
       </div>
@@ -633,11 +635,10 @@ export default function Leads() {
         token = created.token;
       }
       const publicUrl = `${window.location.origin}/p/${token}`;
-      await navigator.clipboard.writeText(publicUrl);
-      toast({ title: 'Link copiado!', description: 'Link público da proposta copiado.' });
+      window.open(publicUrl, '_blank');
     } catch (error: any) {
       toast({
-        title: 'Erro ao copiar link',
+        title: 'Erro ao abrir link',
         description: error?.message || 'Tente novamente.',
         variant: 'destructive',
       });
@@ -1051,6 +1052,7 @@ export default function Leads() {
                   onProposalClose={handleCloseProposal}
                   onDrop={handleDrop}
                   onAddProposal={handleAddProposal}
+                  onProposalCopyLink={(proposal) => handleCopyProposalLink(proposal.id)}
                 />
               ))}
             </div>

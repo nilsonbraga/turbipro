@@ -16,6 +16,8 @@ import {
   Upload,
   Image,
   X,
+  Globe,
+  Instagram,
 } from 'lucide-react';
 import { apiFetch } from '@/lib/api';
 
@@ -29,6 +31,8 @@ export default function AgencySettings() {
   const [agencyPhone, setAgencyPhone] = useState(agency?.phone || '');
   const [agencyAddress, setAgencyAddress] = useState(agency?.address || '');
   const [agencyLogo, setAgencyLogo] = useState(agency?.logo_url || '');
+  const [agencyWebsite, setAgencyWebsite] = useState(agency?.website_url || '');
+  const [agencyInstagram, setAgencyInstagram] = useState(agency?.instagram_handle || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
 
@@ -39,6 +43,8 @@ export default function AgencySettings() {
       setAgencyPhone(agency.phone || '');
       setAgencyAddress(agency.address || '');
       setAgencyLogo(agency.logo_url || '');
+      setAgencyWebsite(agency.website_url || '');
+      setAgencyInstagram(agency.instagram_handle || '');
     }
   }, [agency]);
 
@@ -172,6 +178,8 @@ export default function AgencySettings() {
           phone: agencyPhone,
           address: agencyAddress,
           logoUrl: agencyLogo || null,
+          websiteUrl: agencyWebsite || null,
+          instagramHandle: agencyInstagram || null,
           updatedAt: new Date().toISOString(),
         }),
       });
@@ -247,6 +255,33 @@ export default function AgencySettings() {
                 value={agencyPhone}
                 onChange={(e) => setAgencyPhone(e.target.value)}
                 placeholder="(00) 00000-0000"
+              />
+            </div>
+          </div>
+
+          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+            <div className="space-y-2">
+              <Label htmlFor="website">
+                <Globe className="w-4 h-4 inline mr-2" />
+                Site
+              </Label>
+              <Input
+                id="website"
+                value={agencyWebsite}
+                onChange={(e) => setAgencyWebsite(e.target.value)}
+                placeholder="https://suaagencia.com.br"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="instagram">
+                <Instagram className="w-4 h-4 inline mr-2" />
+                Instagram
+              </Label>
+              <Input
+                id="instagram"
+                value={agencyInstagram}
+                onChange={(e) => setAgencyInstagram(e.target.value)}
+                placeholder="@suaagencia"
               />
             </div>
           </div>
