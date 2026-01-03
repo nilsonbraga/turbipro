@@ -18,8 +18,11 @@ All colors MUST be HSL.
     --popover: 0 0% 100%;
     --popover-foreground: 220 20% 10%;
 
-    --primary: 150 76% 40%;
+    --primary: 24 90% 52%;
     --primary-foreground: 0 0% 100%;
+    --primary-start: 6 89% 51%;
+    --primary-start-soft: 6 89% 58%;
+    --primary-end: 41 92% 53%;
 
     --secondary: 210 20% 96%;
     --secondary-foreground: 220 20% 10%;
@@ -44,24 +47,24 @@ All colors MUST be HSL.
 
     --border: 220 13% 91%;
     --input: 220 13% 91%;
-    --ring: 150 76% 40%;
+    --ring: 24 90% 52%;
 
     --radius: 0.5rem;
 
     --sidebar-background: 220 20% 10%;
     --sidebar-foreground: 210 20% 98%;
-    --sidebar-primary: 217 91% 60%;
+    --sidebar-primary: 24 90% 52%;
     --sidebar-primary-foreground: 0 0% 100%;
     --sidebar-accent: 220 15% 20%;
     --sidebar-accent-foreground: 210 20% 98%;
     --sidebar-border: 220 15% 20%;
-    --sidebar-ring: 217 91% 60%;
+    --sidebar-ring: 24 90% 52%;
 
-    --chart-1: 217 91% 60%;
-    --chart-2: 142 76% 36%;
-    --chart-3: 38 92% 50%;
-    --chart-4: 280 65% 60%;
-    --chart-5: 199 89% 48%;
+    --chart-1: 6 89% 51%;
+    --chart-2: 24 90% 52%;
+    --chart-3: 41 92% 53%;
+    --chart-4: 30 84% 48%;
+    --chart-5: 15 85% 52%;
 
     --sidebar: 220 20% 10%;
 
@@ -93,8 +96,11 @@ All colors MUST be HSL.
     --popover: 150 14% 12%;
     --popover-foreground: 150 30% 92%;
 
-    --primary: 150 76% 45%;
+    --primary: 24 90% 52%;
     --primary-foreground: 0 0% 100%;
+    --primary-start: 6 89% 51%;
+    --primary-start-soft: 6 89% 58%;
+    --primary-end: 41 92% 53%;
 
     --secondary: 150 14% 16%;
     --secondary-foreground: 150 30% 92%;
@@ -119,7 +125,7 @@ All colors MUST be HSL.
 
     --border: 150 14% 22%;
     --input: 150 14% 22%;
-    --ring: 150 76% 45%;
+    --ring: 24 90% 52%;
   }
 }
 
@@ -140,5 +146,94 @@ All colors MUST be HSL.
   .dark body {
     background: linear-gradient(180deg, #0b1410 0%, #0c1613 50%, #0b1410 100%);
     color: hsl(var(--foreground));
+  }
+}
+
+@keyframes fadeSlideIn {
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0px);
+  }
+}
+
+@keyframes slideRightIn {
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateX(0px);
+  }
+}
+
+@keyframes testimonialIn {
+  to {
+    opacity: 1;
+    filter: blur(0px);
+    transform: translateY(0px) scale(1);
+  }
+}
+
+@layer utilities {
+  .animate-element {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(12px);
+    animation: fadeSlideIn 0.8s ease forwards;
+  }
+
+  .animate-slide-right {
+    opacity: 0;
+    filter: blur(8px);
+    transform: translateX(18px);
+    animation: slideRightIn 1s ease forwards;
+  }
+
+  .animate-testimonial {
+    opacity: 0;
+    filter: blur(6px);
+    transform: translateY(10px) scale(0.98);
+    animation: testimonialIn 0.9s ease forwards;
+  }
+
+  .animate-delay-100 {
+    animation-delay: 0.1s;
+  }
+  .animate-delay-200 {
+    animation-delay: 0.2s;
+  }
+  .animate-delay-300 {
+    animation-delay: 0.3s;
+  }
+  .animate-delay-400 {
+    animation-delay: 0.4s;
+  }
+  .animate-delay-500 {
+    animation-delay: 0.5s;
+  }
+  .animate-delay-600 {
+    animation-delay: 0.6s;
+  }
+  .animate-delay-700 {
+    animation-delay: 0.7s;
+  }
+  .animate-delay-800 {
+    animation-delay: 0.8s;
+  }
+  .animate-delay-900 {
+    animation-delay: 0.9s;
+  }
+  .animate-delay-1000 {
+    animation-delay: 1s;
+  }
+  .animate-delay-1200 {
+    animation-delay: 1.2s;
+  }
+  .animate-delay-1400 {
+    animation-delay: 1.4s;
+  }
+
+  .custom-checkbox {
+    accent-color: hsl(var(--primary));
+    @apply h-4 w-4 rounded border border-border bg-background;
   }
 }

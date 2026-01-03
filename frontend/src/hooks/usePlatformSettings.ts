@@ -60,7 +60,7 @@ export function usePlatformSettings() {
 
   return {
     settings: settingsMap ?? { 
-      platform_name: 'TravelCRM', 
+      platform_name: 'Tourbine', 
       platform_icon: 'plane',
       platform_icon_url: '',
       stripe_secret_key: '',

@@ -1,14 +1,10 @@
 import { useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
-import { Button } from '@/components/ui/button';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Card, CardContent, CardDescription, CardHeader, CardTitle, CardFooter } from '@/components/ui/card';
+import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { usePlatformSettings } from '@/hooks/usePlatformSettings';
-import { Plane, Loader2 } from 'lucide-react';
 import { z } from 'zod';
 import { useAuth } from '@/contexts/AuthContext';
+import { SignInPage, Testimonial } from '@/components/ui/sign-in';
 
 const loginSchema = z.object({
   email: z.string().email('Email inválido'),
@@ -17,18 +13,20 @@ const loginSchema = z.object({
 
 export default function Auth() {
   const [isLoading, setIsLoading] = useState(false);
-  const [email, setEmail] = useState('');
-  const [password, setPassword] = useState('');
   const { toast } = useToast();
   const { settings } = usePlatformSettings();
   const { login } = useAuth();
   const navigate = useNavigate();
   
-  const platformName = settings.platform_name || 'TravelCRM';
+  const platformName = settings.platform_name || 'Tourbine';
 
-  const handleLogin = async (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
-    
+    if (isLoading) return;
+
+    const formData = new FormData(e.currentTarget);
+    const email = String(formData.get('email') || '').trim();
+    const password = String(formData.get('password') || '');
     const validation = loginSchema.safeParse({ email, password });
     if (!validation.success) {
       toast({
@@ -62,76 +60,65 @@ export default function Auth() {
   const trialEnabled = settings.trial_enabled === 'true';
   const trialDays = parseInt(settings.trial_days || '7', 10);
 
+  const testimonials: Testimonial[] = [
+    {
+      avatarSrc: 'https://images.unsplash.com/photo-1500648767791-00dcc994a43e?w=200&h=200&fit=facearea&facepad=2&q=80',
+      name: 'Marina Costa',
+      handle: '@marinaviagens',
+      text: 'Centralizamos vendas, propostas e financeiro sem perder o ritmo.',
+    },
+    {
+      avatarSrc: 'https://images.unsplash.com/photo-1506794778202-cad84cf45f1d?w=200&h=200&fit=facearea&facepad=2&q=80',
+      name: 'Lucas Oliveira',
+      handle: '@lucastrips',
+      text: 'Menos planilhas e mais controle da operação completa.',
+    },
+    {
+      avatarSrc: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&h=200&fit=facearea&facepad=2&q=80',
+      name: 'Fernanda Lima',
+      handle: '@fernandatours',
+      text: 'Tudo conectado: vendas, comissões e operação em um só lugar.',
+    },
+  ];
+
   return (
-    <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-primary/10 via-background to-secondary/10 p-4">
-      <Card className="w-full max-w-md">
-        <CardHeader className="text-center">
-          <div className="flex justify-center mb-4">
-            <div className="bg-primary rounded-xl p-3">
-              <Plane className="h-8 w-8 text-primary-foreground" />
-            </div>
-          </div>
-          <CardTitle className="text-2xl font-bold">{platformName}</CardTitle>
-          <CardDescription>
-            Sistema de gestão para agências de turismo
-          </CardDescription>
-        </CardHeader>
-        <CardContent>
-          <form onSubmit={handleLogin} className="space-y-4">
-            <div className="space-y-2">
-              <Label htmlFor="email">Email</Label>
-              <Input
-                id="email"
-                type="email"
-                placeholder="seu@email.com"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                disabled={isLoading}
-                required
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="password">Senha</Label>
-              <Input
-                id="password"
-                type="password"
-                placeholder="••••••"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                disabled={isLoading}
-                required
-              />
-            </div>
-            <Button type="submit" className="w-full" disabled={isLoading}>
-              {isLoading ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                  Entrando...
-                </>
-              ) : (
-                'Entrar'
-              )}
-            </Button>
-          </form>
-        </CardContent>
-        <CardFooter className="flex flex-col gap-3">
-          {trialEnabled && (
-            <Button variant="default" className="w-full" asChild>
-              <Link to="/registrar">
-                Teste grátis por {trialDays} dias
-              </Link>
-            </Button>
-          )}
-          <div className="w-full border-t pt-3">
-            <p className="text-sm text-muted-foreground text-center mb-2">
-              Já conhece nossos planos?
-            </p>
-            <Button variant="outline" className="w-full" asChild>
-              <Link to="/planos">Ver planos e assinar</Link>
-            </Button>
-          </div>
-        </CardFooter>
-      </Card>
+    <div className="min-h-screen bg-gradient-to-br from-primary/10 via-background to-secondary/10">
+      <SignInPage
+        title={
+          <span className="inline-flex items-center gap-3">
+            <img src="/name-logo.png" alt={platformName} className="h-10 w-auto" />
+            <span className="sr-only">{platformName}</span>
+          </span>
+        }
+        description="Centralize operações e impulsiona a sua agência"
+        heroImageSrc="https://images.unsplash.com/photo-1500530855697-b586d89ba3ee?w=2160&q=80"
+        testimonials={testimonials}
+        onSignIn={handleLogin}
+        onGoogleSignIn={() =>
+          toast({
+            title: 'Em breve',
+            description: 'Login com Google será liberado em breve.',
+          })
+        }
+        onResetPassword={() =>
+          toast({
+            title: 'Recuperação de senha',
+            description: 'Fale com o suporte para redefinir sua senha.',
+          })
+        }
+        onCreateAccount={() => {
+          if (trialEnabled) {
+            navigate('/registrar');
+            return;
+          }
+          navigate('/planos');
+        }}
+      />
+      {trialEnabled && (
+        <p className="text-center text-sm text-muted-foreground pb-6">
+          Teste grátis por {trialDays} dias disponível para novas agências.
+        </p>
+      )}
     </div>
   );
 }

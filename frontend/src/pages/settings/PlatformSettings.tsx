@@ -44,11 +44,11 @@ const availableIcons = [
 export default function PlatformSettings() {
   const { settings: platformSettings, updateSetting, isUpdating } = usePlatformSettings();
   
-  const [platformName, setPlatformName] = useState(platformSettings.platform_name || 'TravelCRM');
+  const [platformName, setPlatformName] = useState(platformSettings.platform_name || 'Tourbine');
   const [platformIcon, setPlatformIcon] = useState(platformSettings.platform_icon || 'plane');
 
   useEffect(() => {
-    setPlatformName(platformSettings.platform_name || 'TravelCRM');
+    setPlatformName(platformSettings.platform_name || 'Tourbine');
     setPlatformIcon(platformSettings.platform_icon || 'plane');
   }, [platformSettings]);
 
@@ -77,7 +77,7 @@ export default function PlatformSettings() {
                 id="platformName"
                 value={platformName}
                 onChange={(e) => setPlatformName(e.target.value)}
-                placeholder="TravelCRM"
+                placeholder="Tourbine"
               />
               <p className="text-sm text-muted-foreground">
                 Este nome será exibido na barra lateral de todas as agências
@@ -126,7 +126,7 @@ export default function PlatformSettings() {
               </div>
             )}
             <div>
-              <h3 className="font-bold">{platformName || 'TravelCRM'}</h3>
+              <h3 className="font-bold">{platformName || 'Tourbine'}</h3>
               <p className="text-sm text-muted-foreground">Prévia da barra lateral</p>
             </div>
           </div>
@@ -135,7 +135,7 @@ export default function PlatformSettings() {
             <Button 
               variant="outline"
               onClick={() => {
-                setPlatformName(platformSettings.platform_name || 'TravelCRM');
+                setPlatformName(platformSettings.platform_name || 'Tourbine');
                 setPlatformIcon(platformSettings.platform_icon || 'plane');
               }}
             >

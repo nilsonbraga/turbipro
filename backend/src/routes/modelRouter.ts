@@ -241,7 +241,23 @@ const normalizeTimeOnlyFields = (data: Record<string, unknown>, fields: string[]
       if (value === null || value === '') {
         data[field] = null;
       } else {
-        data[field] = new Date(`1970-01-01T${value}`).toISOString();
+        if (value instanceof Date) {
+          data[field] = value.toISOString();
+          return;
+        }
+        if (typeof value === 'string') {
+          const str = value.trim();
+          // Already an ISO date-time string
+          if (/^\d{4}-\d{2}-\d{2}T/.test(str)) {
+            const parsed = new Date(str);
+            data[field] = Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+            return;
+          }
+          const parsed = new Date(`1970-01-01T${str}`);
+          data[field] = Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+          return;
+        }
+        data[field] = null;
       }
     }
   });

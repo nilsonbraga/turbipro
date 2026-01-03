@@ -112,9 +112,9 @@ export function AppSidebar() {
   const [collapsed, setCollapsed] = useState(false);
 
   const isAdmin = role === 'admin' || isSuperAdmin;
-  const platformName = settings.platform_name || 'TravelCRM';
+  const platformName = settings.platform_name || 'Tourbine';
   const platformIconKey = (settings.platform_icon || 'plane').toLowerCase();
-  const platformIconUrl = settings.platform_icon_url || agency?.logo_url || null;
+  const platformIconUrl = settings.platform_icon_url || '/t-logo.png';
   const PlatformIcon = iconMap[platformIconKey] || Plane;
 
   const getInitials = (name: string) =>
@@ -135,13 +135,14 @@ export function AppSidebar() {
         to={item.url}
         end={item.url === '/'}
         className={cn(
-          'group flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors duration-300',
-          'text-white/80 hover:text-white hover:bg-emerald-500/10',
+          'group flex items-center gap-3 px-3 py-2 rounded-lg text-[14px] font-medium transition-colors duration-200',
+          'text-slate-500 hover:text-slate-900 hover:bg-slate-50',
+          'dark:text-white/80 dark:hover:text-white dark:hover:bg-[hsl(var(--primary-start)/0.12)]',
           collapsed && 'justify-center px-2'
         )}
-        activeClassName={cn('bg-emerald-500/20 text-white', 'shadow-sm')}
+        activeClassName={cn('bg-slate-100 text-slate-900 shadow-sm', 'dark:bg-[hsl(var(--primary-start)/0.2)] dark:text-white')}
       >
-        <item.icon className="w-5 h-5 flex-shrink-0 transition-colors duration-300 text-emerald-300" />
+        <item.icon className="w-4 h-4 flex-shrink-0 transition-colors duration-200 text-[hsl(var(--primary-start))]" />
         {!collapsed && <span>{item.title}</span>}
       </NavLink>
     ));
@@ -151,8 +152,10 @@ export function AppSidebar() {
     if (!filtered.length) return null;
     return (
       <>
-        <Separator className="my-3 bg-white/10" />
-        <p className={cn('px-3 text-xs font-semibold uppercase tracking-wider mb-2 text-white/60', collapsed && 'hidden')}>{label}</p>
+        <Separator className="my-3 bg-slate-200/50 dark:bg-white/10" />
+        <p className={cn('px-3 text-[10px] font-medium uppercase tracking-[0.18em] mb-2 text-slate-400 dark:text-white/60', collapsed && 'hidden')}>
+          {label}
+        </p>
         {renderNavItems(items)}
       </>
     );
@@ -169,9 +172,9 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        'flex flex-col transition-all duration-500 shadow-[4px_0_18px_rgba(0,0,0,0.12)]',
+        "flex flex-col font-['Poppins'] transition-all duration-500 shadow-[4px_0_18px_rgba(0,0,0,0.12)]",
         collapsed ? 'w-16' : 'w-64',
-        'bg-gradient-to-b from-[#0b1210] via-[#0c1512] to-[#0b1210] text-white'
+        'bg-white text-slate-900 border-r border-slate-200 dark:border-transparent dark:bg-gradient-to-b dark:from-[#0b1210] dark:via-[#0c1512] dark:to-[#0b1210] dark:text-white'
       )}
     >
       {/* Logo */}
@@ -179,14 +182,23 @@ export function AppSidebar() {
         {platformIconUrl ? (
           <img src={platformIconUrl} alt={platformName} className="w-10 h-10 object-contain" />
         ) : (
-          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-emerald-500/20 text-emerald-200">
+          <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-[hsl(var(--primary-start)/0.2)] text-[hsl(var(--primary-start))]">
             <PlatformIcon className="w-6 h-6" />
           </div>
         )}
         {!collapsed && (
           <div className="flex-1 min-w-0">
-            <h1 className="text-lg font-bold truncate text-white">{platformName}</h1>
-            {agency && <p className="text-xs truncate text-emerald-100/70">{agency.name}</p>}
+            <img
+              src="/name-logo-white.png"
+              alt={platformName}
+              className="h-6 w-auto max-w-[160px] object-contain pb-1 hidden dark:block"
+            />
+            <img
+              src="/name-logo.png"
+              alt={platformName}
+              className="h-6 w-auto max-w-[160px] object-contain pb-1 block dark:hidden"
+            />
+            {agency && <p className="text-xs truncate text-slate-500 dark:text-[hsl(var(--primary-end)/0.7)]">{agency.name}</p>}
           </div>
         )}
       </div>
@@ -201,13 +213,13 @@ export function AppSidebar() {
         {renderSection('Configurações', buildSettingsItems())}
       </nav>
 
-      <div className="p-3 border-t border-emerald-500/20">
+      <div className="p-3 border-t border-slate-200 dark:border-[hsl(var(--primary-start)/0.2)]">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            'w-full justify-center transition-colors duration-300 text-emerald-100/70 hover:text-white hover:bg-emerald-500/10',
+            'w-full justify-center transition-colors duration-300 text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-[hsl(var(--primary-end)/0.7)] dark:hover:text-white dark:hover:bg-[hsl(var(--primary-start)/0.12)]',
             !collapsed && 'justify-start'
           )}
         >
@@ -216,24 +228,24 @@ export function AppSidebar() {
         </Button>
       </div>
 
-      <div className={cn('p-3 border-t border-emerald-500/20', collapsed && 'flex flex-col items-center')}>
+      <div className={cn('p-3 border-t border-slate-200 dark:border-[hsl(var(--primary-start)/0.2)]', collapsed && 'flex flex-col items-center')}>
         <div className={cn('flex items-center gap-3', collapsed && 'flex-col')}>
           <Avatar className="w-9 h-9">
-            <AvatarFallback className="text-sm bg-emerald-500/20 text-emerald-200">
+            <AvatarFallback className="text-sm bg-[hsl(var(--primary-start)/0.2)] text-[hsl(var(--primary-start))]">
               {profile?.name ? getInitials(profile.name) : 'U'}
             </AvatarFallback>
           </Avatar>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-white">{profile?.name || 'Usuário'}</p>
-              <p className="text-xs truncate text-emerald-100/70">{user?.email}</p>
+              <p className="text-sm font-medium truncate text-slate-900 dark:text-white">{profile?.name || 'Usuário'}</p>
+              <p className="text-xs truncate text-slate-500 dark:text-[hsl(var(--primary-end)/0.7)]">{user?.email}</p>
             </div>
           )}
           <Button
             variant="ghost"
             size="icon"
             onClick={logout}
-            className="transition-colors duration-300 text-emerald-100/70 hover:text-white hover:bg-emerald-500/10"
+            className="transition-colors duration-300 text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-[hsl(var(--primary-end)/0.7)] dark:hover:text-white dark:hover:bg-[hsl(var(--primary-start)/0.12)]"
           >
             <LogOut className="w-4 h-4" />
           </Button>

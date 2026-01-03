@@ -52,7 +52,7 @@ const months = [
   { value: 12, label: 'Dezembro' },
 ];
 
-const GREEN_PALETTE = ['#6EE7B7', '#34D399', '#10B981', '#065F46', '#111827', '#1F2937'];
+const ORANGE_PALETTE = ['#f9c24d', '#f7b23b', '#f5af19', '#f48a17', '#f45d17', '#f12711'];
 
 function FullPageSkeleton() {
   return (
@@ -99,7 +99,7 @@ function RefreshOverlay({ show, isDark }: { show: boolean; isDark: boolean }) {
           isDark ? 'bg-white/10 text-white border-white/10' : 'bg-white/80 text-slate-900 border-slate-200'
         }`}
       >
-        <span className="h-2 w-2 rounded-full bg-emerald-400 animate-pulse" />
+        <span className="h-2 w-2 rounded-full bg-[hsl(var(--primary-end))] animate-pulse" />
         Atualizando dados...
       </div>
     </div>
@@ -157,11 +157,11 @@ export default function Dashboard() {
   };
 
   const isDark = theme === 'dark';
-  const surfaceCard = isDark ? 'bg-white/5 border-emerald-500/20' : 'bg-white border-slate-200';
-  const subtleCard = isDark ? 'bg-black/20 border-emerald-500/10' : 'bg-emerald-50 border-emerald-100';
-  const textMuted = isDark ? 'text-emerald-100/70' : 'text-slate-500';
+  const surfaceCard = isDark ? 'bg-white/5 border-[hsl(var(--primary-start)/0.25)]' : 'bg-white border-slate-200';
+  const subtleCard = isDark ? 'bg-black/20 border-[hsl(var(--primary-start)/0.2)]' : 'bg-[hsl(var(--primary-start)/0.08)] border-[hsl(var(--primary-start)/0.2)]';
+  const textMuted = isDark ? 'text-[hsl(var(--primary-end)/0.75)]' : 'text-slate-500';
   const textStrong = isDark ? 'text-white' : 'text-slate-900';
-  const softShadow = isDark ? 'shadow-xl shadow-emerald-900/20' : 'shadow-none';
+  const softShadow = isDark ? 'shadow-xl shadow-[hsl(var(--primary-start)/0.25)]' : 'shadow-none';
 
   const myPerformance = useMemo(() => {
     const meEmail = profile?.email ?? null;
@@ -206,7 +206,7 @@ export default function Dashboard() {
 
   // Refresh overlay quando já tem tela e está refetching
   const showRefreshing = isFetching && !showFullSkeleton;
-  const LIGHT_PIPELINE_COLORS = ['#16a34a', '#22c55e', '#0ea5e9', '#f59e0b', '#10b981', '#047857'];
+  const LIGHT_PIPELINE_COLORS = ['#f5af19', '#f7b23b', '#f9c24d', '#f48a17', '#f45d17', '#f12711'];
   const revenueData = displayMetrics?.revenueByMonth || [];
   const closedCount = metrics?.closedProposalsCount ?? 0;
   const ticketMedio = closedCount > 0 ? (metrics?.totalRevenue || 0) / closedCount : 0;
@@ -214,7 +214,7 @@ export default function Dashboard() {
   const pipelineValor = displayMetrics.openValue ?? 0;
   const currentMonth = revenueData[revenueData.length - 1];
   const colorForStage = (stage: string, index: number) => {
-    if (isDark) return STAGE_COLORS[stage] || GREEN_PALETTE[index % GREEN_PALETTE.length];
+    if (isDark) return STAGE_COLORS[stage] || ORANGE_PALETTE[index % ORANGE_PALETTE.length];
     return LIGHT_PIPELINE_COLORS[index % LIGHT_PIPELINE_COLORS.length];
   };
   const pipelineData = useMemo(() => {
@@ -297,8 +297,8 @@ export default function Dashboard() {
     <div
       className={`min-h-screen overflow-x-hidden transition-colors duration-500 ${
         isDark
-          ? 'bg-gradient-to-b from-[#0b1410] via-[#0c1613] to-[#0b1410] text-slate-50'
-          : 'bg-gradient-to-b from-emerald-50 via-white to-emerald-50 text-slate-900'
+          ? 'bg-gradient-to-b from-[#140a08] via-[#130c09] to-[#140a08] text-slate-50'
+          : 'bg-gradient-to-b from-[#fff3ea] via-white to-[#fff7e6] text-slate-900'
       }`}
     >
       <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 transition-all duration-500 relative">
@@ -313,24 +313,24 @@ export default function Dashboard() {
               <div
                 className={`relative overflow-hidden rounded-2xl border p-6 transition-colors duration-500 w-full ${softShadow} ${
                   isDark
-                    ? 'border-emerald-500/20 bg-gradient-to-r from-emerald-500 via-emerald-600 to-emerald-700'
-                    : 'border-emerald-100 bg-gradient-to-r from-emerald-100 via-emerald-200 to-emerald-300 text-slate-900'
+                    ? 'border-[hsl(var(--primary-start)/0.35)] bg-gradient-to-r from-[#f12711] via-[#f48a17] to-[#f5af19]'
+                    : 'border-[hsl(var(--primary-start)/0.2)] bg-gradient-to-r from-[#ffe1d5] via-[#ffd8b7] to-[#ffe6bf] text-slate-900'
                 }`}
               >
                 <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.12),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.1),transparent_30%)]" />
                 <div className="relative flex flex-col gap-4">
                   <div className="space-y-2">
-                    <p className={`text-sm font-medium ${isDark ? 'text-white/80' : 'text-emerald-900/80'}`}>Painel Inteligente</p>
-                    <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-emerald-950'}`}>Performance em tempo real</h1>
-                    <p className={`${isDark ? 'text-white/80' : 'text-emerald-900/80'} max-w-3xl`}>
+                    <p className={`text-sm font-medium ${isDark ? 'text-white/80' : 'text-slate-900/80'}`}>Painel Inteligente</p>
+                    <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Performance em tempo real</h1>
+                    <p className={`${isDark ? 'text-white/80' : 'text-slate-800/80'} max-w-3xl`}>
                       Acompanhe faturamento, margens e conversões de todas as agências em um só lugar.
                     </p>
                     <div className="flex flex-wrap gap-3">
-                      <div className={`rounded-full px-3 py-1 text-sm font-medium flex items-center gap-2 ${isDark ? 'bg-white/20 text-white' : 'bg-white/70 text-emerald-900'}`}>
+                      <div className={`rounded-full px-3 py-1 text-sm font-medium flex items-center gap-2 ${isDark ? 'bg-white/20 text-white' : 'bg-white/80 text-slate-900'}`}>
                         <ShieldCheck size={16} />
                         Operações ativas
                       </div>
-                      <div className={`rounded-full px-3 py-1 text-sm font-medium flex items-center gap-2 ${isDark ? 'bg-black/30 text-white' : 'bg-emerald-200 text-emerald-900'}`}>
+                      <div className={`rounded-full px-3 py-1 text-sm font-medium flex items-center gap-2 ${isDark ? 'bg-black/30 text-white' : 'bg-[#ffd8b7] text-slate-900'}`}>
                         <Compass size={16} />
                         Visão multiagência
                       </div>
@@ -359,17 +359,17 @@ export default function Dashboard() {
             {/* Filters */}
             <div className={`rounded-2xl p-4 backdrop-blur-md shadow-lg border ${surfaceCard}`}>
               <div className="flex flex-wrap items-center gap-3">
-                <div className={`flex items-center gap-2 rounded-full px-3 py-2 ${isDark ? 'bg-black/30 text-emerald-100' : 'bg-emerald-50 text-emerald-800'}`}>
+                <div className={`flex items-center gap-2 rounded-full px-3 py-2 ${isDark ? 'bg-black/30 text-[hsl(var(--primary-end))]' : 'bg-[#fff1e2] text-slate-900'}`}>
                   <Filter className="w-4 h-4" />
                   <span className="text-sm font-medium">Filtros</span>
                 </div>
 
                 {isSuperAdmin && (
                   <Select value={filters.agencyId || 'all'} onValueChange={(v) => updateFilter('agencyId', v === 'all' ? undefined : v)}>
-                    <SelectTrigger className={`w-[200px] border-emerald-500/20 ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
+                    <SelectTrigger className={`w-[200px] border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
                       <SelectValue placeholder="Todas agências" />
                     </SelectTrigger>
-                    <SelectContent className={`border-emerald-500/20 ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
+                    <SelectContent className={`border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
                       <SelectItem value="all">Todas agências</SelectItem>
                       {agencies.map((agency) => (
                         <SelectItem key={agency.id} value={agency.id}>
@@ -381,10 +381,10 @@ export default function Dashboard() {
                 )}
 
                 <Select value={filters.clientId || 'all'} onValueChange={(v) => updateFilter('clientId', v === 'all' ? undefined : v)}>
-                  <SelectTrigger className={`w-[200px] border-emerald-500/20 ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
+                  <SelectTrigger className={`w-[200px] border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
                     <SelectValue placeholder="Todos clientes" />
                   </SelectTrigger>
-                  <SelectContent className={`border-emerald-500/20 ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
+                  <SelectContent className={`border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
                     <SelectItem value="all">Todos clientes</SelectItem>
                     {clients.map((client) => (
                       <SelectItem key={client.id} value={client.id}>
@@ -395,10 +395,10 @@ export default function Dashboard() {
                 </Select>
 
                 <Select value={filters.year?.toString() || 'all'} onValueChange={(v) => updateFilter('year', v === 'all' ? undefined : parseInt(v, 10))}>
-                  <SelectTrigger className={`w-[140px] border-emerald-500/20 ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
+                  <SelectTrigger className={`w-[140px] border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
                     <SelectValue placeholder="Ano" />
                   </SelectTrigger>
-                  <SelectContent className={`border-emerald-500/20 ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
+                  <SelectContent className={`border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
                     <SelectItem value="all">Todos anos</SelectItem>
                     {years.map((y) => (
                       <SelectItem key={y} value={y.toString()}>
@@ -409,10 +409,10 @@ export default function Dashboard() {
                 </Select>
 
                 <Select value={filters.month?.toString() || 'all'} onValueChange={(v) => updateFilter('month', v === 'all' ? undefined : parseInt(v, 10))}>
-                  <SelectTrigger className={`w-[160px] border-emerald-500/20 ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
+                  <SelectTrigger className={`w-[160px] border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
                     <SelectValue placeholder="Mês" />
                   </SelectTrigger>
-                  <SelectContent className={`border-emerald-500/20 ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
+                  <SelectContent className={`border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
                     <SelectItem value="all">Todos meses</SelectItem>
                     {months.map((m) => (
                       <SelectItem key={m.value} value={m.value.toString()}>
@@ -443,7 +443,7 @@ export default function Dashboard() {
                       </div>
                       <p className="text-xs text-muted-foreground mt-1">{card.hint}</p>
                     </div>
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-300' : 'bg-emerald-100 text-emerald-700'}`}>
+                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-[hsl(var(--primary-start)/0.2)] text-[hsl(var(--primary-end))]' : 'bg-[#ffe1d5] text-[#c2410c]'}`}>
                       <card.icon className="w-6 h-6" />
                     </div>
                   </CardContent>
@@ -462,8 +462,8 @@ export default function Dashboard() {
                     <ChartContainer
                       config={
                         {
-                          revenue: { label: 'Faturamento', color: isDark ? '#10b981' : '#16a34a' },
-                          profit: { label: 'Lucro', color: isDark ? '#34d399' : '#86efac' },
+                          revenue: { label: 'Faturamento', color: isDark ? '#f5af19' : '#f48a17' },
+                          profit: { label: 'Lucro', color: isDark ? '#f12711' : '#f5af19' },
                         } satisfies ChartConfig
                       }
                       className="h-[320px] w-full"
@@ -500,7 +500,7 @@ export default function Dashboard() {
                     <ChartContainer
                       config={
                         {
-                          count: { label: 'Propostas', color: isDark ? '#34d399' : '#16a34a' },
+                          count: { label: 'Propostas', color: isDark ? '#f5af19' : '#f48a17' },
                           label: { color: 'var(--background)' },
                         } satisfies ChartConfig
                       }
@@ -546,7 +546,7 @@ export default function Dashboard() {
               <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
                 <CardHeader>
                   <CardTitle className={`text-lg flex items-center gap-2 ${textStrong}`}>
-                    <Users className={`${isDark ? 'text-emerald-300' : 'text-emerald-700'} w-5 h-5`} />
+                    <Users className={`${isDark ? 'text-[hsl(var(--primary-end))]' : 'text-[#c2410c]'} w-5 h-5`} />
                     Top Clientes
                   </CardTitle>
                 </CardHeader>
@@ -556,10 +556,10 @@ export default function Dashboard() {
                       metrics.topClients.map((client, index) => (
                         <div
                           key={client.name}
-                          className={`flex items-center justify-between rounded-xl px-4 py-3 border ${isDark ? 'border-emerald-500/10 bg-black/20' : 'border-emerald-100 bg-white'}`}
+                          className={`flex items-center justify-between rounded-xl px-4 py-3 border ${isDark ? 'border-[hsl(var(--primary-start)/0.15)] bg-black/20' : 'border-[hsl(var(--primary-start)/0.2)] bg-white'}`}
                         >
                           <div className="flex items-center gap-3">
-                            <span className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-200' : 'bg-emerald-100 text-emerald-800'}`}>
+                            <span className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${isDark ? 'bg-[hsl(var(--primary-start)/0.2)] text-[hsl(var(--primary-end))]' : 'bg-[#ffe1d5] text-[#9a3412]'}`}>
                               {index + 1}
                             </span>
                             <div>
@@ -580,7 +580,7 @@ export default function Dashboard() {
               <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
                 <CardHeader>
                   <CardTitle className={`text-lg flex items-center gap-2 ${textStrong}`}>
-                    <Target className={`${isDark ? 'text-emerald-300' : 'text-emerald-700'} w-5 h-5`} />
+                    <Target className={`${isDark ? 'text-[hsl(var(--primary-end))]' : 'text-[#c2410c]'} w-5 h-5`} />
                     Top Fornecedores
                   </CardTitle>
                 </CardHeader>
@@ -590,10 +590,10 @@ export default function Dashboard() {
                       metrics.topPartners.map((partner, index) => (
                         <div
                           key={partner.name}
-                          className={`flex items-center justify-between rounded-xl px-4 py-3 border ${isDark ? 'border-emerald-500/10 bg-black/20' : 'border-emerald-100 bg-white'}`}
+                          className={`flex items-center justify-between rounded-xl px-4 py-3 border ${isDark ? 'border-[hsl(var(--primary-start)/0.15)] bg-black/20' : 'border-[hsl(var(--primary-start)/0.2)] bg-white'}`}
                         >
                           <div className="flex items-center gap-3">
-                            <span className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${isDark ? 'bg-emerald-500/20 text-emerald-200' : 'bg-emerald-100 text-emerald-800'}`}>
+                            <span className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${isDark ? 'bg-[hsl(var(--primary-start)/0.2)] text-[hsl(var(--primary-end))]' : 'bg-[#ffe1d5] text-[#9a3412]'}`}>
                               {index + 1}
                             </span>
                             <div>

@@ -198,8 +198,8 @@ const mapItem = (i: any): ItineraryItem => ({
   type: i.type,
   title: i.title,
   description: i.description,
-  start_time: i.startTime,
-  end_time: i.endTime,
+  start_time: toTimeString(i.startTime),
+  end_time: toTimeString(i.endTime),
   location: i.location,
   address: i.address,
   details: i.details || {},
@@ -213,6 +213,34 @@ const mapItem = (i: any): ItineraryItem => ({
   updated_at: i.updatedAt,
   feedbacks: i.feedbacks,
 });
+
+const toTimeIso = (value?: string | null) => {
+  if (!value) return null;
+  const trimmed = value.trim();
+  if (!trimmed) return null;
+  // If already ISO with date, parse directly
+  if (/^\d{4}-\d{2}-\d{2}T/.test(trimmed)) {
+    const d = new Date(trimmed);
+    return Number.isNaN(d.getTime()) ? null : d.toISOString();
+  }
+  // If only HH:mm or HH:mm:ss
+  const hasSeconds = trimmed.length === 8;
+  const padded = hasSeconds ? trimmed : `${trimmed.length === 5 ? trimmed : `${trimmed}:00`}`;
+  const d = new Date(`1970-01-01T${padded}`);
+  return Number.isNaN(d.getTime()) ? null : d.toISOString();
+};
+
+const toTimeString = (value: any): string => {
+  if (!value) return '';
+  if (typeof value === 'string' && /^\d{2}:\d{2}/.test(value.trim())) {
+    return value.trim().slice(0, 5);
+  }
+  const d = new Date(value);
+  if (Number.isNaN(d.getTime())) return '';
+  const hh = String(d.getHours()).padStart(2, '0');
+  const mm = String(d.getMinutes()).padStart(2, '0');
+  return `${hh}:${mm}`;
+};
 
 const mapItemFeedback = (f: any): ItineraryItemFeedback => ({
   id: f.id,
@@ -266,8 +294,8 @@ const mapItemInput = (input: ItineraryItemInput) => ({
   type: input.type,
   title: input.title,
   description: input.description ?? null,
-  startTime: input.start_time ? new Date(`1970-01-01T${input.start_time}`).toISOString() : null,
-  endTime: input.end_time ? new Date(`1970-01-01T${input.end_time}`).toISOString() : null,
+  startTime: toTimeIso(input.start_time),
+  endTime: toTimeIso(input.end_time),
   // ensure we don't send unused date fields
   startDate: undefined,
   endDate: undefined,
@@ -436,9 +464,19 @@ export function useItineraryDetails(itineraryId: string | null) {
 
   const updateDayMutation = useMutation({
     mutationFn: async ({ id, ...input }: Partial<ItineraryDayInput> & { id: string }) => {
+      const payload: any = { updatedAt: new Date().toISOString() };
+      if (input.day_number !== undefined) payload.dayNumber = input.day_number;
+      if (input.title !== undefined) payload.title = input.title ?? null;
+      if (input.date !== undefined) payload.date = input.date ? new Date(input.date).toISOString() : null;
+      if (input.location !== undefined) payload.location = input.location ?? null;
+      if (input.description !== undefined) payload.description = input.description ?? null;
+      if (input.cover_image_url !== undefined) payload.coverImageUrl = input.cover_image_url ?? null;
+      if (input.images !== undefined) payload.images = input.images ?? [];
+      if (input.sort_order !== undefined) payload.sortOrder = input.sort_order ?? 0;
+
       const updated = await apiFetch<any>(`/api/itineraryDay/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ ...mapDayInput(input as ItineraryDayInput), updatedAt: new Date().toISOString() }),
+        body: JSON.stringify(payload),
       });
       return mapDay(updated);
     },
@@ -482,9 +520,29 @@ export function useItineraryDetails(itineraryId: string | null) {
 
   const updateItemMutation = useMutation({
     mutationFn: async ({ id, ...input }: Partial<ItineraryItemInput> & { id: string }) => {
+      const payload: any = { updatedAt: new Date().toISOString() };
+      if (input.type !== undefined) payload.type = input.type;
+      if (input.title !== undefined) payload.title = input.title;
+      if (input.description !== undefined) payload.description = input.description ?? null;
+      if (input.start_time !== undefined) {
+        payload.startTime = input.start_time ? new Date(`1970-01-01T${input.start_time}`).toISOString() : null;
+      }
+      if (input.end_time !== undefined) {
+        payload.endTime = input.end_time ? new Date(`1970-01-01T${input.end_time}`).toISOString() : null;
+      }
+      if (input.location !== undefined) payload.location = input.location ?? null;
+      if (input.address !== undefined) payload.address = input.address ?? null;
+      if (input.details !== undefined) payload.details = input.details ?? {};
+      if (input.images !== undefined) payload.images = input.images ?? [];
+      if (input.price !== undefined) payload.price = input.price ?? null;
+      if (input.currency !== undefined) payload.currency = input.currency ?? 'BRL';
+      if (input.booking_reference !== undefined) payload.bookingReference = input.booking_reference ?? null;
+      if (input.confirmation_number !== undefined) payload.confirmationNumber = input.confirmation_number ?? null;
+      if (input.sort_order !== undefined) payload.sortOrder = input.sort_order ?? 0;
+
       const updated = await apiFetch<any>(`/api/itineraryItem/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ ...mapItemInput(input as ItineraryItemInput), updatedAt: new Date().toISOString() }),
+        body: JSON.stringify(payload),
       });
       return mapItem(updated);
     },

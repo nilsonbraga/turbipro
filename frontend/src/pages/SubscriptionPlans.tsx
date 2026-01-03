@@ -11,7 +11,7 @@ export default function SubscriptionPlans() {
   const { settings } = usePlatformSettings();
   const navigate = useNavigate();
   
-  const platformName = settings.platform_name || 'TravelCRM';
+  const platformName = settings.platform_name || 'Tourbine';
   const activePlans = plans?.filter(p => p.is_active) || [];
 
   const formatCurrency = (value: number) => {

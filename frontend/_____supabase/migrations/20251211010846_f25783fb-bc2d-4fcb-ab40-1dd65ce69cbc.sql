@@ -24,7 +24,7 @@ USING (true);
 
 -- Insert default values
 INSERT INTO public.platform_settings (setting_key, setting_value) VALUES
-  ('platform_name', 'TravelCRM'),
+  ('platform_name', 'Tourbine'),
   ('platform_icon', 'plane');
 
 -- Create default pipeline stages for agency function

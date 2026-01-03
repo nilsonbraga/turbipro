@@ -73,6 +73,60 @@ import { ImageUploader } from '@/components/itineraries/ImageUploader';
 import { MultiImageUploader } from '@/components/itineraries/MultiImageUploader';
 import { apiFetch } from '@/lib/api';
 
+// Campo de hora com máscara HH:mm
+const TimeInputField = ({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (time: string) => void;
+  placeholder?: string;
+}) => {
+  const [display, setDisplay] = useState(value || '');
+
+  useEffect(() => {
+    setDisplay(value || '');
+  }, [value]);
+
+  const formatPartial = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 4);
+    if (digits.length <= 2) return digits;
+    return `${digits.slice(0, 2)}:${digits.slice(2)}`;
+  };
+
+  const clampFinal = (raw: string) => {
+    const digits = raw.replace(/\D/g, '').slice(0, 4);
+    if (digits.length === 0) return '';
+    const hh = digits.slice(0, 2);
+    const mm = digits.slice(2, 4);
+    const h = Math.min(23, Math.max(0, parseInt(hh || '0', 10)));
+    const m = Math.min(59, Math.max(0, parseInt(mm || '0', 10)));
+    const hh2 = String(isNaN(h) ? 0 : h).padStart(2, '0');
+    const mm2 = String(isNaN(m) ? 0 : m).padStart(2, '0');
+    return `${hh2}:${mm2}`;
+  };
+
+  return (
+    <Input
+      value={display}
+      onChange={(e) => {
+        const next = formatPartial(e.target.value);
+        setDisplay(next);
+        if (/^\d{2}:\d{2}$/.test(next)) onChange(next);
+        if (next === '') onChange('');
+      }}
+      onBlur={() => {
+        const final = clampFinal(display);
+        setDisplay(final);
+        onChange(final);
+      }}
+      inputMode="numeric"
+      placeholder={placeholder || 'HH:mm'}
+    />
+  );
+};
+
 const ITEM_TYPES = [
   { value: 'activity', label: 'Atividade', icon: Camera, color: 'bg-violet-500' },
   { value: 'hotel', label: 'Hotel', icon: Hotel, color: 'bg-amber-500' },
@@ -1100,18 +1154,16 @@ export default function ItineraryEditor() {
               <div className="grid grid-cols-2 gap-4">
                 <div>
                   <Label>Horário Início</Label>
-                  <Input
-                    type="time"
+                  <TimeInputField
                     value={itemForm.start_time}
-                    onChange={(e) => setItemForm({ ...itemForm, start_time: e.target.value })}
+                    onChange={(time) => setItemForm({ ...itemForm, start_time: time })}
                   />
                 </div>
                 <div>
                   <Label>Horário Fim</Label>
-                  <Input
-                    type="time"
+                  <TimeInputField
                     value={itemForm.end_time}
-                    onChange={(e) => setItemForm({ ...itemForm, end_time: e.target.value })}
+                    onChange={(time) => setItemForm({ ...itemForm, end_time: time })}
                   />
                 </div>
               </div>

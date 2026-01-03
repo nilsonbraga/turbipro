@@ -27,7 +27,7 @@ export default function Register() {
   const { settings } = usePlatformSettings();
   const navigate = useNavigate();
   
-  const platformName = settings.platform_name || 'TravelCRM';
+  const platformName = settings.platform_name || 'Tourbine';
   const trialDays = parseInt(settings.trial_days || '7', 10);
 
   const handleRegister = async (e: React.FormEvent) => {
