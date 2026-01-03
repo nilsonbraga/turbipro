@@ -1,6 +1,7 @@
 /* eslint-disable no-console */
 const { PrismaClient } = require('@prisma/client');
 const bcrypt = require('bcryptjs');
+const { seedDashboardLeads } = require('./seed-dashboard-leads');
 
 const prisma = new PrismaClient();
 
@@ -99,12 +100,25 @@ async function ensureDefaultPipelineStages(agencyId) {
   });
 
   console.log('Seed: estágios de pipeline padrão recriados');
+
+  const firstStage = await prisma.pipelineStage.findFirst({
+    where: { agencyId },
+    orderBy: { order: 'asc' },
+  });
+
+  if (firstStage) {
+    await prisma.proposal.updateMany({
+      where: { agencyId, stageId: null },
+      data: { stageId: firstStage.id },
+    });
+  }
 }
 
 async function main() {
   const user = await upsertSuperAdmin();
   const agency = await ensureVoyuAgency(user.id);
   await ensureDefaultPipelineStages(agency.id);
+  await seedDashboardLeads({ prisma });
 }
 
 main()

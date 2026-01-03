@@ -142,17 +142,6 @@ export function useDashboard(filters: DashboardFilters = {}) {
       // cliente
       if (filters.clientId) where.clientId = filters.clientId;
 
-      // ano/mês
-      if (filters.year && filters.month) {
-        const startDate = new Date(filters.year, filters.month - 1, 1);
-        const endDate = new Date(filters.year, filters.month, 0);
-        where.createdAt = { gte: startDate.toISOString(), lte: endDate.toISOString() };
-      } else if (filters.year) {
-        const startDate = new Date(filters.year, 0, 1);
-        const endDate = new Date(filters.year, 11, 31);
-        where.createdAt = { gte: startDate.toISOString(), lte: endDate.toISOString() };
-      }
-
       const query = toQueryString({
         where,
         include: {
@@ -200,15 +189,6 @@ export function useDashboard(filters: DashboardFilters = {}) {
       const where: Record<string, unknown> = { type: 'income', status: { in: ['paid', 'pending', 'scheduled'] } };
       if (!isSuperAdmin && userAgencyId) where.agencyId = userAgencyId;
       else if (filters.agencyId) where.agencyId = filters.agencyId;
-      if (filters.year && filters.month) {
-        const startDate = new Date(filters.year, filters.month - 1, 1);
-        const endDate = new Date(filters.year, filters.month, 0);
-        where.launchDate = { gte: startDate.toISOString(), lte: endDate.toISOString() };
-      } else if (filters.year) {
-        const startDate = new Date(filters.year, 0, 1);
-        const endDate = new Date(filters.year, 11, 31);
-        where.launchDate = { gte: startDate.toISOString(), lte: endDate.toISOString() };
-      }
       const query = toQueryString({
         where,
         select: { id: true, totalValue: true, profitValue: true, status: true, type: true, launchDate: true, agencyId: true },
@@ -226,10 +206,29 @@ export function useDashboard(filters: DashboardFilters = {}) {
 
   // métricas calculadas SEM criar hooks condicionais
   const metrics = useMemo(() => {
+    const matchesFilterDate = (dateValue: string | null | undefined) => {
+      if (!filters.year && !filters.month) return true;
+      const date = new Date(dateValue || '');
+      if (!Number.isFinite(date.getTime())) return false;
+      if (filters.year && filters.month) {
+        return date.getFullYear() === filters.year && date.getMonth() === filters.month - 1;
+      }
+      if (filters.year) {
+        return date.getFullYear() === filters.year;
+      }
+      return true;
+    };
+
+    const proposalsCreatedScope = proposals.filter((p) => matchesFilterDate(p.createdAt));
+    const proposalScopeIds = new Set(proposalsCreatedScope.map((p) => p.id));
+    const servicesScope = services.filter((s) => proposalScopeIds.has(s.proposalId));
+    const financialScope = financial.filter((f) => matchesFilterDate(f.launchDate));
+
     // Receita e lucro preferencialmente vindos do financeiro (apenas pagos para evitar superestimar)
     const statusNormalized = (s: string | null | undefined) => (s || '').toLowerCase();
-    const paidFinancial = financial.filter((f) => statusNormalized(f.status) === 'paid');
-    const forecastFinancial = financial.filter((f) => ['paid', 'scheduled', 'pending'].includes(statusNormalized(f.status)));
+    const paidFinancial = financialScope.filter((f) => statusNormalized(f.status) === 'paid');
+    const forecastFinancial = financialScope.filter((f) => ['paid', 'scheduled', 'pending'].includes(statusNormalized(f.status)));
+    const paidFinancialAll = financial.filter((f) => statusNormalized(f.status) === 'paid');
 
     const financialRevenuePaid = paidFinancial.reduce((sum, f) => sum + toNumber(f.totalValue), 0);
     const financialProfitPaid = paidFinancial.reduce((sum, f) => sum + toNumber(f.profitValue), 0);
@@ -237,16 +236,20 @@ export function useDashboard(filters: DashboardFilters = {}) {
     const financialProfitForecast = forecastFinancial.reduce((sum, f) => sum + toNumber(f.profitValue), 0);
 
     // closed proposals
-    const closedProposals = proposals.filter((p) => p.stage?.isClosed === true);
+    const closedProposals = proposals.filter((p) => p.stage?.isClosed === true && matchesFilterDate(p.updatedAt));
     const closedProposalIds = new Set(closedProposals.map((p) => p.id));
-    const lostProposals = proposals.filter((p) => p.stage?.isLost === true);
+    const lostProposals = proposals.filter((p) => p.stage?.isLost === true && matchesFilterDate(p.updatedAt));
     const lostProposalIds = new Set(lostProposals.map((p) => p.id));
-    const openProposals = proposals.filter((p) => !p.stage?.isClosed && !p.stage?.isLost);
+    const openProposals = proposalsCreatedScope.filter((p) => !p.stage?.isClosed && !p.stage?.isLost);
     const openProposalIds = new Set(openProposals.map((p) => p.id));
 
     const closedServices = services.filter((s) => closedProposalIds.has(s.proposalId));
-    const openServices = services.filter((s) => openProposalIds.has(s.proposalId));
+    const openServices = servicesScope.filter((s) => openProposalIds.has(s.proposalId));
     const lostServices = services.filter((s) => lostProposalIds.has(s.proposalId));
+
+    const allClosedProposals = proposals.filter((p) => p.stage?.isClosed === true);
+    const allClosedProposalIds = new Set(allClosedProposals.map((p) => p.id));
+    const closedServicesAll = services.filter((s) => allClosedProposalIds.has(s.proposalId));
 
     // Usar apenas serviços fechados como base dos KPIs (mantendo alinhado com propostas)
     const servicesRevenue = closedServices.reduce((sum, s) => sum + toNumber(s.value), 0);
@@ -258,20 +261,26 @@ export function useDashboard(filters: DashboardFilters = {}) {
     const totalRevenue = financialRevenuePaid || servicesRevenue;
     const totalCommission = financialProfitPaid || servicesCommission;
 
-    const totalProposals = proposals.length;
+    const totalProposals = proposalsCreatedScope.length;
     const closedCount = closedProposals.length;
-    const lostCount = proposals.filter((p) => p.stage?.isLost === true).length;
-    const conversionRate = totalProposals > 0 ? Math.round((closedCount / totalProposals) * 100) : 0;
+    const lostCount = lostProposals.length;
+    const closedCreatedInScope = proposalsCreatedScope.filter(
+      (p) => p.stage?.isClosed === true && matchesFilterDate(p.updatedAt)
+    ).length;
+    const conversionRate = totalProposals > 0 ? Math.round((closedCreatedInScope / totalProposals) * 100) : 0;
     const openValue = openServices.reduce((sum, s) => sum + (s.value || 0), 0);
     const lostValue = lostServices.reduce((sum, s) => sum + (s.value || 0), 0);
-    const servicesTotalValue = services.reduce((sum, s) => sum + (s.value || 0), 0);
-    const servicesTotalCount = services.length;
+    const servicesTotalValue = servicesScope.reduce((sum, s) => sum + (s.value || 0), 0);
+    const servicesTotalCount = servicesScope.length;
 
     // Propostas por estágio (count e value = volume de serviços)
+    const useScopedPipeline = proposalsCreatedScope.length > 0;
+    const pipelineProposals = useScopedPipeline ? proposalsCreatedScope : proposals;
+    const pipelineServices = useScopedPipeline ? servicesScope : services;
     const byStage: Record<string, { count: number; value: number }> = {};
-    for (const p of proposals) {
+    for (const p of pipelineProposals) {
       const stageName = p.stage?.name || 'Sem etapa';
-      const sumValue = services
+      const sumValue = pipelineServices
         .filter((s) => s.proposalId === p.id)
         .reduce((acc, s) => acc + toNumber(s.value), 0);
       if (!byStage[stageName]) {
@@ -316,46 +325,54 @@ export function useDashboard(filters: DashboardFilters = {}) {
 
     // Receita por mês (últimos 6 meses) - financeiro se existir, senão serviços fechados
     const revenueByMonth: Array<{ month: string; revenue: number; profit: number }> = [];
+    const proposalsByMonth: Array<{ month: string; proposals: number }> = [];
+    const conversionByMonth: Array<{ month: string; conversion: number }> = [];
     const now = new Date();
 
     for (let i = 5; i >= 0; i--) {
       const date = new Date(now.getFullYear(), now.getMonth() - i, 1);
       const monthName = date.toLocaleDateString('pt-BR', { month: 'short' });
 
-      const monthFinancial = paidFinancial.filter((f) => {
+      const monthFinancial = paidFinancialAll.filter((f) => {
         const d = new Date(f.launchDate || '');
         return d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear();
       });
+      const closedInMonth = allClosedProposals.filter((p) => {
+        const d = new Date(p.updatedAt || '');
+        return d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear();
+      });
+      const closedMonthIds = new Set(closedInMonth.map((p) => p.id));
+      const closedServicesMonth = closedServicesAll.filter((s) => closedMonthIds.has(s.proposalId));
 
       const revenue =
         monthFinancial.length > 0
           ? monthFinancial.reduce((sum, f) => sum + toNumber(f.totalValue), 0)
-          : closedServices
-              .filter((s) => {
-                const p = proposals.find((pr) => pr.id === s.proposalId);
-                if (!p) return false;
-                const d = new Date(p.createdAt || '');
-                return d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear();
-              })
-              .reduce((sum, s) => sum + toNumber(s.value), 0);
+          : closedServicesMonth.reduce((sum, s) => sum + toNumber(s.value), 0);
 
       const profit =
         monthFinancial.length > 0
           ? monthFinancial.reduce((sum, f) => sum + toNumber(f.profitValue), 0)
-          : closedServices
-              .filter((s) => {
-                const p = proposals.find((pr) => pr.id === s.proposalId);
-                if (!p) return false;
-                const d = new Date(p.createdAt || '');
-                return d.getMonth() === date.getMonth() && d.getFullYear() === date.getFullYear();
-              })
-              .reduce((sum, s) => sum + calcCommission(toNumber(s.value), s.commissionType, s.commissionValue), 0);
+          : closedServicesMonth.reduce((sum, s) => sum + calcCommission(toNumber(s.value), s.commissionType, s.commissionValue), 0);
 
       revenueByMonth.push({ month: monthName, revenue, profit });
+
+      const proposalsInMonth = proposals.filter((p) => {
+        const created = new Date(p.createdAt || '');
+        return created.getMonth() === date.getMonth() && created.getFullYear() === date.getFullYear();
+      });
+      const closedCreatedInMonth = proposalsInMonth.filter((p) => {
+        if (!p.stage?.isClosed) return false;
+        const updated = new Date(p.updatedAt || '');
+        return updated.getMonth() === date.getMonth() && updated.getFullYear() === date.getFullYear();
+      });
+      const monthTotal = proposalsInMonth.length;
+      const monthConversion = monthTotal > 0 ? Math.round((closedCreatedInMonth.length / monthTotal) * 100) : 0;
+      proposalsByMonth.push({ month: monthName, proposals: monthTotal });
+      conversionByMonth.push({ month: monthName, conversion: monthConversion });
     }
 
     const nowMonthCheck = new Date();
-    const createdThisMonth = proposals.filter((p) => {
+    const createdThisMonth = proposalsCreatedScope.filter((p) => {
       const d = new Date(p.createdAt || '');
       return d.getMonth() === nowMonthCheck.getMonth() && d.getFullYear() === nowMonthCheck.getFullYear();
     }).length;
@@ -390,7 +407,7 @@ export function useDashboard(filters: DashboardFilters = {}) {
       return sellersMap.get(key)!;
     };
 
-    for (const p of proposals) {
+    for (const p of proposalsCreatedScope) {
       const fallbackId = profile?.id ?? (profile as any)?.user_id ?? null;
       const fallbackName = profile?.name || (profile as any)?.full_name || profile?.email || 'Você';
       const fallbackEmail = profile?.email || null;
@@ -436,9 +453,11 @@ export function useDashboard(filters: DashboardFilters = {}) {
       topClients,
       topPartners,
       revenueByMonth,
+      proposalsByMonth,
+      conversionByMonth,
       sellerSummary,
     };
-  }, [proposals, services, financial]);
+  }, [proposals, services, financial, filters.year, filters.month]);
 
   // estados
   const isInitialLoading =

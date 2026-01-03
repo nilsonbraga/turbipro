@@ -1,7 +1,7 @@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { CollaboratorPerformance } from '@/hooks/useTeamPerformance';
 import { Trophy, TrendingUp, DollarSign, Users } from 'lucide-react';
 
@@ -10,14 +10,16 @@ interface PerformanceCardProps {
   rank?: number;
   formatCurrency: (value: number) => string;
   onCardClick?: () => void;
+  className?: string;
 }
 
-export function PerformanceCard({ performance, rank, formatCurrency, onCardClick }: PerformanceCardProps) {
+export function PerformanceCard({ performance, rank, formatCurrency, onCardClick, className }: PerformanceCardProps) {
   const { collaborator, totalSales, totalProfit, totalCommissions, dealsCount, goal, goalProgress, leadsCount } = performance as any;
 
   const getInitials = (name: string) => {
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
   };
+  const avatarUrl = collaborator.avatar_url ?? null;
 
   const getRankBadge = (rank: number) => {
     if (rank === 1) return <Badge className="bg-yellow-500 text-yellow-950">🥇 1º</Badge>;
@@ -27,11 +29,12 @@ export function PerformanceCard({ performance, rank, formatCurrency, onCardClick
   };
 
   return (
-    <Card className={onCardClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""} onClick={onCardClick}>
+    <Card className={`${onCardClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""} ${className || ""}`} onClick={onCardClick}>
       <CardHeader className="pb-3">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-3">
             <Avatar className="h-10 w-10">
+              {avatarUrl && <AvatarImage src={avatarUrl} alt={collaborator.name || 'Avatar'} />}
               <AvatarFallback>{getInitials(collaborator.name)}</AvatarFallback>
             </Avatar>
             <div>
@@ -78,24 +81,33 @@ export function PerformanceCard({ performance, rank, formatCurrency, onCardClick
             <p className="text-sm font-medium">Progresso das Metas</p>
             
             <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span>Vendas</span>
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5">
+                  <DollarSign className="h-3 w-3 text-slate-500" />
+                  Vendas
+                </span>
                 <span>{formatCurrency(totalSales)} / {formatCurrency(goal.target_sales_value)}</span>
               </div>
               <Progress value={Math.min(goalProgress.salesProgress, 100)} className="h-2" />
             </div>
 
             <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span>Lucro</span>
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5">
+                  <TrendingUp className="h-3 w-3 text-slate-500" />
+                  Lucro
+                </span>
                 <span>{formatCurrency(totalProfit)} / {formatCurrency(goal.target_profit)}</span>
               </div>
               <Progress value={Math.min(goalProgress.profitProgress, 100)} className="h-2" />
             </div>
 
             <div className="space-y-2">
-              <div className="flex justify-between text-xs">
-                <span>Negócios</span>
+              <div className="flex items-center justify-between text-xs">
+                <span className="flex items-center gap-1.5">
+                  <Trophy className="h-3 w-3 text-slate-500" />
+                  Número de Vendas Fechadas
+                </span>
                 <span>{dealsCount} / {goal.target_deals_count}</span>
               </div>
               <Progress value={Math.min(goalProgress.dealsProgress, 100)} className="h-2" />

@@ -153,7 +153,7 @@ function AppRoutes() {
         path="/"
         element={
           <ProtectedRoute>
-            <AppLayout>
+            <AppLayout frame={false}>
               <Dashboard />
             </AppLayout>
           </ProtectedRoute>

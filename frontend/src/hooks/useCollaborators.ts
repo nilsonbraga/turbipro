@@ -23,6 +23,7 @@ export interface Collaborator {
   level: CollaboratorLevel | null;
   commission_percentage: number;
   commission_base: CommissionBase;
+  avatar_url?: string | null;
   created_at: string;
   updated_at: string;
   team?: Team;
@@ -63,6 +64,7 @@ export function useCollaborators(filters?: { teamId?: string; status?: string },
     level: c.level,
     commission_percentage: c.commissionPercentage,
     commission_base: c.commissionBase,
+    avatar_url: c.avatarUrl ?? c.avatar_url ?? null,
     created_at: c.createdAt,
     updated_at: c.updatedAt,
     team: c.team

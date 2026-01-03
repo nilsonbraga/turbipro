@@ -1,18 +1,14 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   TrendingUp,
   DollarSign,
   FileText,
   Target,
   Users,
-  Filter,
-  ShieldCheck,
-  Compass,
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, LabelList } from 'recharts';
 import { useDashboard, DashboardFilters } from '@/hooks/useDashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -24,6 +20,8 @@ import { PerformanceCard } from '@/components/team/PerformanceCard';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
+const formatNumber = (value: number) => new Intl.NumberFormat('pt-BR').format(value);
+const formatPercent = (value: number) => `${Math.round(value)}%`;
 
 const STAGE_COLORS: Record<string, string> = {
   Novo: 'hsl(var(--chart-1))',
@@ -33,24 +31,6 @@ const STAGE_COLORS: Record<string, string> = {
   Fechado: 'hsl(var(--chart-5))',
   Perdido: 'hsl(var(--muted))',
 };
-
-const currentYear = new Date().getFullYear();
-const years = Array.from({ length: 5 }, (_, i) => currentYear - i);
-
-const months = [
-  { value: 1, label: 'Janeiro' },
-  { value: 2, label: 'Fevereiro' },
-  { value: 3, label: 'Março' },
-  { value: 4, label: 'Abril' },
-  { value: 5, label: 'Maio' },
-  { value: 6, label: 'Junho' },
-  { value: 7, label: 'Julho' },
-  { value: 8, label: 'Agosto' },
-  { value: 9, label: 'Setembro' },
-  { value: 10, label: 'Outubro' },
-  { value: 11, label: 'Novembro' },
-  { value: 12, label: 'Dezembro' },
-];
 
 const ORANGE_PALETTE = ['#f9c24d', '#f7b23b', '#f5af19', '#f48a17', '#f45d17', '#f12711'];
 
@@ -66,7 +46,7 @@ function FullPageSkeleton() {
 
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
         {[...Array(4)].map((_, i) => (
-          <Card key={i}>
+          <Card key={i} className="border-0 shadow-none">
             <CardContent className="p-6">
               <Skeleton className="h-20 w-full" />
             </CardContent>
@@ -75,12 +55,12 @@ function FullPageSkeleton() {
       </div>
 
       <div className="grid grid-cols-1 xl:grid-cols-[2fr,1fr] gap-6">
-        <Card>
+        <Card className="border-0 shadow-none">
           <CardContent className="p-6">
             <Skeleton className="h-[320px] w-full" />
           </CardContent>
         </Card>
-        <Card>
+        <Card className="border-0 shadow-none">
           <CardContent className="p-6">
             <Skeleton className="h-[320px] w-full" />
           </CardContent>
@@ -107,13 +87,16 @@ function RefreshOverlay({ show, isDark }: { show: boolean; isDark: boolean }) {
 }
 
 export default function Dashboard() {
-  const { isSuperAdmin, profile, role, user } = useAuth() as any;
-  const [filters, setFilters] = useState<DashboardFilters>({});
+  const { isSuperAdmin, profile, user } = useAuth() as any;
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
-
-  const { agencies, clients, metrics, isLoading, isFetching } = useDashboard(filters);
-  const { stages: pipelineStages } = usePipelineStages();
   const now = useMemo(() => new Date(), []);
+  const filters = useMemo<DashboardFilters>(
+    () => ({ year: now.getFullYear(), month: now.getMonth() + 1 }),
+    [now]
+  );
+
+  const { metrics, isLoading, isFetching } = useDashboard(filters);
+  const { stages: pipelineStages } = usePipelineStages();
   const effectiveMonth = filters.month ?? now.getMonth() + 1;
   const effectiveYear = filters.year ?? now.getFullYear();
   const myUserId = user?.id ?? profile?.id ?? (profile as any)?.user_id ?? null;
@@ -154,14 +137,13 @@ export default function Dashboard() {
     conversionRate: 0,
     topClients: [],
     topPartners: [],
+    proposalsByMonth: [],
+    conversionByMonth: [],
   };
 
   const isDark = theme === 'dark';
-  const surfaceCard = isDark ? 'bg-white/5 border-[hsl(var(--primary-start)/0.25)]' : 'bg-white border-slate-200';
-  const subtleCard = isDark ? 'bg-black/20 border-[hsl(var(--primary-start)/0.2)]' : 'bg-[hsl(var(--primary-start)/0.08)] border-[hsl(var(--primary-start)/0.2)]';
   const textMuted = isDark ? 'text-[hsl(var(--primary-end)/0.75)]' : 'text-slate-500';
   const textStrong = isDark ? 'text-white' : 'text-slate-900';
-  const softShadow = isDark ? 'shadow-xl shadow-[hsl(var(--primary-start)/0.25)]' : 'shadow-none';
 
   const myPerformance = useMemo(() => {
     const meEmail = profile?.email ?? null;
@@ -175,31 +157,16 @@ export default function Dashboard() {
     return { ...perf, leadsCount } as any;
   }, [collaboratorPerformance, myProposals, myUserId, profile?.email]);
 
-  const updateFilter = (key: keyof DashboardFilters, value: string | number | undefined) => {
-    setFilters((prev) => ({ ...prev, [key]: value }));
-  };
+  const currentMonthLabel = useMemo(() => {
+    const label = new Date(effectiveYear, effectiveMonth - 1, 1).toLocaleDateString('pt-BR', { month: 'long' });
+    return label.charAt(0).toUpperCase() + label.slice(1);
+  }, [effectiveMonth, effectiveYear]);
 
   // Aplica tema vindo do perfil quando houver
   useEffect(() => {
     const preferred = (profile?.theme_preference as 'dark' | 'light' | undefined) ?? 'dark';
     setTheme(preferred);
   }, [profile?.theme_preference]);
-
-  const persistTheme = async (nextTheme: 'dark' | 'light') => {
-    setTheme(nextTheme);
-    if (!profile?.id) return;
-    try {
-      await apiFetch(`/api/profile/${profile.id}`, {
-        method: 'PUT',
-        body: JSON.stringify({
-          themePreference: nextTheme,
-          updatedAt: new Date().toISOString(),
-        }),
-      });
-    } catch (err) {
-      console.error('Erro ao atualizar tema do perfil', err);
-    }
-  };
 
   // Full skeleton só quando realmente não tem dado útil ainda
   const showFullSkeleton = isLoading || !metrics;
@@ -208,9 +175,12 @@ export default function Dashboard() {
   const showRefreshing = isFetching && !showFullSkeleton;
   const LIGHT_PIPELINE_COLORS = ['#f5af19', '#f7b23b', '#f9c24d', '#f48a17', '#f45d17', '#f12711'];
   const revenueData = displayMetrics?.revenueByMonth || [];
+  const revenueSpark = revenueData.map((item) => ({ month: item.month, value: item.revenue }));
+  const profitSpark = revenueData.map((item) => ({ month: item.month, value: item.profit }));
+  const proposalsSpark = (displayMetrics.proposalsByMonth || []).map((item: any) => ({ month: item.month, value: item.proposals }));
+  const conversionSpark = (displayMetrics.conversionByMonth || []).map((item: any) => ({ month: item.month, value: item.conversion }));
   const closedCount = metrics?.closedProposalsCount ?? 0;
   const ticketMedio = closedCount > 0 ? (metrics?.totalRevenue || 0) / closedCount : 0;
-  const agenciasAtivas = (agencies ?? []).length;
   const pipelineValor = displayMetrics.openValue ?? 0;
   const currentMonth = revenueData[revenueData.length - 1];
   const colorForStage = (stage: string, index: number) => {
@@ -293,15 +263,54 @@ export default function Dashboard() {
     );
   };
 
+  const miniChartConfig = (color: string): ChartConfig => ({
+    value: { label: 'Valor', color },
+  });
+
+  const MiniChartTooltip = ({
+    active,
+    payload,
+    label,
+    formatValue,
+  }: {
+    active?: boolean;
+    payload?: Array<{ value?: number }>;
+    label?: string;
+    formatValue: (value: number) => string;
+  }) => {
+    if (!active || !payload?.length) return null;
+    const value = Number(payload[0]?.value ?? 0);
+    return (
+      <div className="rounded-md border border-slate-200 bg-white px-2.5 py-1.5 text-xs shadow-sm">
+        <div className="text-slate-500">{label}</div>
+        <div className="font-mono font-medium text-slate-900">{formatValue(value)}</div>
+      </div>
+    );
+  };
+
+  const MiniBarChart = ({
+    data,
+    color,
+    formatValue,
+  }: {
+    data: Array<{ month: string; value: number }>;
+    color: string;
+    formatValue: (value: number) => string;
+  }) => (
+    <ChartContainer config={miniChartConfig(color)} className="h-16 w-full aspect-auto">
+      <BarChart accessibilityLayer data={data}>
+        <XAxis dataKey="month" hide />
+        <ChartTooltip cursor={false} content={<MiniChartTooltip formatValue={formatValue} />} />
+        <Bar dataKey="value" fill="var(--color-value)" radius={6} barSize={10} />
+      </BarChart>
+    </ChartContainer>
+  );
+
   return (
     <div
-      className={`min-h-screen overflow-x-hidden transition-colors duration-500 ${
-        isDark
-          ? 'bg-gradient-to-b from-[#140a08] via-[#130c09] to-[#140a08] text-slate-50'
-          : 'bg-gradient-to-b from-[#fff3ea] via-white to-[#fff7e6] text-slate-900'
-      }`}
+      className="min-h-screen overflow-x-hidden transition-colors duration-500 bg-transparent text-slate-900 font-sans"
     >
-      <div className="max-w-[1400px] mx-auto px-4 sm:px-6 lg:px-8 py-6 space-y-6 transition-all duration-500 relative">
+      <div className="w-full px-0 py-0 space-y-6 transition-all duration-500 relative">
         <RefreshOverlay show={showRefreshing} isDark={isDark} />
 
         {showFullSkeleton ? (
@@ -310,141 +319,112 @@ export default function Dashboard() {
           <>
             {/* Hero + Performance side by side */}
             <div className="grid gap-3 lg:grid-cols-[7fr,3fr] items-stretch">
-              <div
-                className={`relative overflow-hidden rounded-2xl border p-6 transition-colors duration-500 w-full ${softShadow} ${
-                  isDark
-                    ? 'border-[hsl(var(--primary-start)/0.35)] bg-gradient-to-r from-[#f12711] via-[#f48a17] to-[#f5af19]'
-                    : 'border-[hsl(var(--primary-start)/0.2)] bg-gradient-to-r from-[#ffe1d5] via-[#ffd8b7] to-[#ffe6bf] text-slate-900'
-                }`}
-              >
-                <div className="absolute inset-0 bg-[radial-gradient(circle_at_20%_20%,rgba(255,255,255,0.12),transparent_35%),radial-gradient(circle_at_80%_0%,rgba(255,255,255,0.1),transparent_30%)]" />
+              <div className="relative overflow-hidden rounded-3xl p-6 transition-colors duration-500 w-full text-white h-[470px] flex flex-col justify-end">
+                <img
+                  src="/cardhero.jpg"
+                  alt=""
+                  className="absolute inset-0 h-full w-full object-cover scale-110"
+                />
+                <div className="absolute bottom-0 left-0 right-0 h-[40%] bg-gradient-to-t from-[rgba(60,30,12,0.65)] to-transparent" />
                 <div className="relative flex flex-col gap-4">
                   <div className="space-y-2">
-                    <p className={`text-sm font-medium ${isDark ? 'text-white/80' : 'text-slate-900/80'}`}>Painel Inteligente</p>
-                    <h1 className={`text-3xl font-bold ${isDark ? 'text-white' : 'text-slate-900'}`}>Performance em tempo real</h1>
-                    <p className={`${isDark ? 'text-white/80' : 'text-slate-800/80'} max-w-3xl`}>
-                      Acompanhe faturamento, margens e conversões de todas as agências em um só lugar.
+                    <p className="text-sm font-medium text-white/80">Tourbine</p>
+                    <h1 className="text-3xl font-bold text-white">Centralize e impulsione sua agência</h1>
+                    <p className="max-w-3xl text-white/80">
+                      Vendas, propostas, comissões, financeiro e operação girando juntos em um só lugar.
                     </p>
-                    <div className="flex flex-wrap gap-3">
-                      <div className={`rounded-full px-3 py-1 text-sm font-medium flex items-center gap-2 ${isDark ? 'bg-white/20 text-white' : 'bg-white/80 text-slate-900'}`}>
-                        <ShieldCheck size={16} />
-                        Operações ativas
-                      </div>
-                      <div className={`rounded-full px-3 py-1 text-sm font-medium flex items-center gap-2 ${isDark ? 'bg-black/30 text-white' : 'bg-[#ffd8b7] text-slate-900'}`}>
-                        <Compass size={16} />
-                        Visão multiagência
-                      </div>
-                    </div>
                   </div>
                 </div>
               </div>
 
-              <div className="flex h-full w-full">
+              <div className="flex h-[470px] w-full">
                 {perfLoading ? (
-                  <Skeleton className="h-[280px] w-full rounded-2xl" />
+                  <Skeleton className="h-full w-full rounded-3xl" />
                 ) : myPerformance ? (
-                  <div className="h-full w-full">
-                    <PerformanceCard performance={myPerformance} formatCurrency={formatCurrency} />
+                  <div className="h-full w-full [&>div]:h-full">
+                    <PerformanceCard
+                      performance={myPerformance}
+                      formatCurrency={formatCurrency}
+                      className="border-0 shadow-none"
+                    />
                   </div>
                 ) : (
-                  <Card className="h-full w-full flex items-center justify-center flex-1">
-                    <CardContent className="text-sm text-muted-foreground">
-                      Nenhum dado de performance para você neste período.
+                  <Card className="h-full w-full flex flex-col justify-center flex-1 border-0 shadow-none">
+                    <CardContent className="space-y-2 text-center">
+                      <p className="text-sm font-medium text-slate-900">Meta não definida</p>
+                      <p className="text-xs text-muted-foreground">
+                        Defina uma meta para visualizar sua performance aqui.
+                      </p>
                     </CardContent>
                   </Card>
                 )}
               </div>
             </div>
 
-            {/* Filters */}
-            <div className={`rounded-2xl p-4 backdrop-blur-md shadow-lg border ${surfaceCard}`}>
-              <div className="flex flex-wrap items-center gap-3">
-                <div className={`flex items-center gap-2 rounded-full px-3 py-2 ${isDark ? 'bg-black/30 text-[hsl(var(--primary-end))]' : 'bg-[#fff1e2] text-slate-900'}`}>
-                  <Filter className="w-4 h-4" />
-                  <span className="text-sm font-medium">Filtros</span>
-                </div>
-
-                {isSuperAdmin && (
-                  <Select value={filters.agencyId || 'all'} onValueChange={(v) => updateFilter('agencyId', v === 'all' ? undefined : v)}>
-                    <SelectTrigger className={`w-[200px] border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
-                      <SelectValue placeholder="Todas agências" />
-                    </SelectTrigger>
-                    <SelectContent className={`border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
-                      <SelectItem value="all">Todas agências</SelectItem>
-                      {agencies.map((agency) => (
-                        <SelectItem key={agency.id} value={agency.id}>
-                          {agency.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                )}
-
-                <Select value={filters.clientId || 'all'} onValueChange={(v) => updateFilter('clientId', v === 'all' ? undefined : v)}>
-                  <SelectTrigger className={`w-[200px] border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
-                    <SelectValue placeholder="Todos clientes" />
-                  </SelectTrigger>
-                  <SelectContent className={`border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
-                    <SelectItem value="all">Todos clientes</SelectItem>
-                    {clients.map((client) => (
-                      <SelectItem key={client.id} value={client.id}>
-                        {client.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={filters.year?.toString() || 'all'} onValueChange={(v) => updateFilter('year', v === 'all' ? undefined : parseInt(v, 10))}>
-                  <SelectTrigger className={`w-[140px] border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
-                    <SelectValue placeholder="Ano" />
-                  </SelectTrigger>
-                  <SelectContent className={`border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
-                    <SelectItem value="all">Todos anos</SelectItem>
-                    {years.map((y) => (
-                      <SelectItem key={y} value={y.toString()}>
-                        {y}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-
-                <Select value={filters.month?.toString() || 'all'} onValueChange={(v) => updateFilter('month', v === 'all' ? undefined : parseInt(v, 10))}>
-                  <SelectTrigger className={`w-[160px] border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-black/40 text-white' : 'bg-white text-slate-900'}`}>
-                    <SelectValue placeholder="Mês" />
-                  </SelectTrigger>
-                  <SelectContent className={`border-[hsl(var(--primary-start)/0.25)] ${isDark ? 'bg-slate-900 text-white' : 'bg-white text-slate-900'}`}>
-                    <SelectItem value="all">Todos meses</SelectItem>
-                    {months.map((m) => (
-                      <SelectItem key={m.value} value={m.value.toString()}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <div className="rounded-2xl p-4 bg-white border-0 shadow-none">
+              <div className="flex items-center justify-end">
+                <p className="text-sm text-slate-500">
+                  Resuldados do mês de <span className="font-medium text-slate-900">{currentMonthLabel}</span>
+                </p>
               </div>
             </div>
 
             {/* KPIs principais - 6 cards em linha responsiva */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-6 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4 gap-4">
               {[
-                { label: 'Faturamento', value: metrics?.totalRevenue ?? 0, icon: DollarSign, hint: 'Propostas fechadas', fmt: (v: number) => formatCurrency(v) },
-                { label: 'Lucro estimado', value: metrics?.totalProfit ?? 0, icon: TrendingUp, hint: 'Comissões previstas', fmt: (v: number) => formatCurrency(v) },
-                { label: 'Propostas', value: metrics?.totalProposals ?? 0, icon: FileText, hint: 'Emitidas no período', fmt: (v: number) => v },
-                { label: 'Conversão', value: metrics?.conversionRate ?? 0, icon: Target, hint: 'Fechadas / total', fmt: (v: number) => `${v}%` },
-                { label: 'Ticket médio', value: ticketMedio, icon: DollarSign, hint: 'Por proposta emitida', fmt: (v: number) => formatCurrency(v) },
-                { label: 'Clientes ativos', value: clients.length, icon: Users, hint: 'Base cadastrada', fmt: (v: number) => v },
+                {
+                  label: 'Faturamento',
+                  value: metrics?.totalRevenue ?? 0,
+                  icon: DollarSign,
+                  hint: 'Propostas fechadas',
+                  fmt: (v: number) => formatCurrency(v),
+                  spark: revenueSpark,
+                  sparkFormat: formatCurrency,
+                },
+                {
+                  label: 'Lucro estimado',
+                  value: metrics?.totalProfit ?? 0,
+                  icon: TrendingUp,
+                  hint: 'Comissões previstas',
+                  fmt: (v: number) => formatCurrency(v),
+                  spark: profitSpark,
+                  sparkFormat: formatCurrency,
+                },
+                {
+                  label: 'Propostas',
+                  value: metrics?.totalProposals ?? 0,
+                  icon: FileText,
+                  hint: 'Emitidas no período',
+                  fmt: (v: number) => formatNumber(v),
+                  spark: proposalsSpark,
+                  sparkFormat: formatNumber,
+                },
+                {
+                  label: 'Ticket médio',
+                  value: ticketMedio,
+                  icon: DollarSign,
+                  hint: 'Por proposta emitida',
+                  fmt: (v: number) => formatCurrency(v),
+                  spark: revenueSpark,
+                  sparkFormat: formatCurrency,
+                },
               ].map((card) => (
-                <Card key={card.label} className={`backdrop-blur-lg border ${surfaceCard}`}>
-                  <CardContent className="p-5 flex items-center justify-between">
-                    <div>
-                      <p className={`text-sm ${textMuted}`}>{card.label}</p>
-                      <div className={`text-2xl font-semibold ${textStrong}`}>
-                        {showRefreshing ? <Skeleton className="h-7 w-24 rounded bg-white/20" /> : card.fmt(card.value)}
+                <Card key={card.label} className="backdrop-blur-lg border-0 shadow-none">
+                  <CardContent className="p-5">
+                    <div className="flex items-center justify-between">
+                      <div>
+                        <p className={`text-sm ${textMuted}`}>{card.label}</p>
+                        <div className={`text-2xl font-semibold ${textStrong}`}>
+                          {showRefreshing ? <Skeleton className="h-7 w-24 rounded bg-white/20" /> : card.fmt(card.value)}
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1">{card.hint}</p>
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1">{card.hint}</p>
+                      <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-[hsl(var(--primary-start)/0.2)] text-[hsl(var(--primary-end))]' : 'bg-[#ffe1d5] text-[#c2410c]'}`}>
+                        <card.icon className="w-6 h-6" />
+                      </div>
                     </div>
-                    <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${isDark ? 'bg-[hsl(var(--primary-start)/0.2)] text-[hsl(var(--primary-end))]' : 'bg-[#ffe1d5] text-[#c2410c]'}`}>
-                      <card.icon className="w-6 h-6" />
+                    <div className="mt-3">
+                      <MiniBarChart data={card.spark} color="hsl(var(--primary-start))" formatValue={card.sparkFormat} />
                     </div>
                   </CardContent>
                 </Card>
@@ -453,7 +433,7 @@ export default function Dashboard() {
 
             {/* Charts */}
             <div className="grid grid-cols-1 xl:grid-cols-[3fr,2fr] gap-6 overflow-hidden">
-              <Card className={`backdrop-blur-lg border ${surfaceCard} min-w-0`}>
+              <Card className="backdrop-blur-lg border-0 shadow-none min-w-0">
                 <CardHeader>
                   <CardTitle className={`text-lg ${textStrong}`}>Faturamento x Lucro</CardTitle>
                 </CardHeader>
@@ -462,28 +442,40 @@ export default function Dashboard() {
                     <ChartContainer
                       config={
                         {
-                          revenue: { label: 'Faturamento', color: isDark ? '#f5af19' : '#f48a17' },
-                          profit: { label: 'Lucro', color: isDark ? '#f12711' : '#f5af19' },
+                          revenue: { label: 'Faturamento', color: isDark ? '#f48a17' : '#f06a12' },
+                          profit: { label: 'Lucro', color: '#f06a12bd' },
                         } satisfies ChartConfig
                       }
                       className="h-[320px] w-full"
                     >
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart accessibilityLayer data={revenueData}>
-                          <CartesianGrid vertical={false} strokeDasharray="3 3" stroke={isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'} />
-                          <XAxis
-                            dataKey="month"
-                            tickLine={false}
-                            tickMargin={10}
-                            axisLine={false}
-                            tick={{ fill: isDark ? '#e5e7eb' : '#0f172a' }}
-                          />
-                          <ChartTooltip content={<ChartTooltipContent formatter={(v) => formatCurrency(Number(v))} />} />
-                          <ChartLegend content={<ChartLegendContent />} />
-                          <Bar dataKey="revenue" fill="var(--color-revenue)" radius={[4, 4, 0, 0]} isAnimationActive={!showRefreshing} />
-                          <Bar dataKey="profit" fill="var(--color-profit)" radius={[0, 0, 4, 4]} isAnimationActive={!showRefreshing} />
-                        </BarChart>
-                      </ResponsiveContainer>
+                      <BarChart accessibilityLayer data={revenueData}>
+                        <XAxis
+                          dataKey="month"
+                          tickLine={false}
+                          tickMargin={10}
+                          axisLine={false}
+                          tick={{ fill: isDark ? '#e5e7eb' : '#0f172a' }}
+                        />
+                        <Bar
+                          dataKey="revenue"
+                          stackId="a"
+                          fill="var(--color-revenue)"
+                          radius={[0, 0, 4, 4]}
+                          isAnimationActive={!showRefreshing}
+                        />
+                        <Bar
+                          dataKey="profit"
+                          stackId="a"
+                          fill="var(--color-profit)"
+                          radius={[4, 4, 0, 0]}
+                          isAnimationActive={!showRefreshing}
+                        />
+                        <ChartTooltip
+                          content={<ChartTooltipContent hideIndicator formatter={(v) => formatCurrency(Number(v))} />}
+                          cursor={false}
+                        />
+                        <ChartLegend content={<ChartLegendContent />} />
+                      </BarChart>
                     </ChartContainer>
                   ) : (
                     <div className={`h-[320px] flex items-center justify-center ${textMuted}`}>Sem dados para exibir</div>
@@ -491,7 +483,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card className={`backdrop-blur-lg border ${surfaceCard} min-w-0`}>
+              <Card className="backdrop-blur-lg border-0 shadow-none min-w-0">
                 <CardHeader>
                   <CardTitle className={`text-lg ${textStrong}`}>Pipeline por estágio</CardTitle>
                 </CardHeader>
@@ -543,7 +535,7 @@ export default function Dashboard() {
 
             {/* Listas principais */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
+              <Card className="backdrop-blur-lg border-0 shadow-none">
                 <CardHeader>
                   <CardTitle className={`text-lg flex items-center gap-2 ${textStrong}`}>
                     <Users className={`${isDark ? 'text-[hsl(var(--primary-end))]' : 'text-[#c2410c]'} w-5 h-5`} />
@@ -577,7 +569,7 @@ export default function Dashboard() {
                 </CardContent>
               </Card>
 
-              <Card className={`backdrop-blur-lg border ${surfaceCard}`}>
+              <Card className="backdrop-blur-lg border-0 shadow-none">
                 <CardHeader>
                   <CardTitle className={`text-lg flex items-center gap-2 ${textStrong}`}>
                     <Target className={`${isDark ? 'text-[hsl(var(--primary-end))]' : 'text-[#c2410c]'} w-5 h-5`} />

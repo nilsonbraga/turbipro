@@ -137,12 +137,11 @@ export function AppSidebar() {
         className={cn(
           'group flex items-center gap-3 px-3 py-2 rounded-lg text-[14px] font-medium transition-colors duration-200',
           'text-slate-500 hover:text-slate-900 hover:bg-slate-50',
-          'dark:text-white/80 dark:hover:text-white dark:hover:bg-[hsl(var(--primary-start)/0.12)]',
           collapsed && 'justify-center px-2'
         )}
-        activeClassName={cn('bg-slate-100 text-slate-900 shadow-sm', 'dark:bg-[hsl(var(--primary-start)/0.2)] dark:text-white')}
+        activeClassName={cn('bg-slate-100 text-slate-900 shadow-none')}
       >
-        <item.icon className="w-4 h-4 flex-shrink-0 transition-colors duration-200 text-[hsl(var(--primary-start))]" />
+        <item.icon className="w-4 h-4 flex-shrink-0 transition-colors duration-200 text-current" />
         {!collapsed && <span>{item.title}</span>}
       </NavLink>
     ));
@@ -152,8 +151,8 @@ export function AppSidebar() {
     if (!filtered.length) return null;
     return (
       <>
-        <Separator className="my-3 bg-slate-200/50 dark:bg-white/10" />
-        <p className={cn('px-3 text-[10px] font-medium uppercase tracking-[0.18em] mb-2 text-slate-400 dark:text-white/60', collapsed && 'hidden')}>
+        <Separator className="my-3 bg-slate-200/40" />
+        <p className={cn('px-3 text-[10px] font-medium uppercase tracking-[0.18em] mt-3 pt-2 mb-2 text-slate-400', collapsed && 'hidden')}>
           {label}
         </p>
         {renderNavItems(items)}
@@ -172,9 +171,9 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-col font-['Poppins'] transition-all duration-500 shadow-[4px_0_18px_rgba(0,0,0,0.12)]",
+        "flex flex-col font-['Poppins'] transition-all duration-500 shadow-sm",
         collapsed ? 'w-16' : 'w-64',
-        'bg-white text-slate-900 border-r border-slate-200 dark:border-transparent dark:bg-gradient-to-b dark:from-[#0b1210] dark:via-[#0c1512] dark:to-[#0b1210] dark:text-white'
+        'rounded-2xl bg-white text-slate-900'
       )}
     >
       {/* Logo */}
@@ -187,18 +186,13 @@ export function AppSidebar() {
           </div>
         )}
         {!collapsed && (
-          <div className="flex-1 min-w-0">
-            <img
-              src="/name-logo-white.png"
-              alt={platformName}
-              className="h-6 w-auto max-w-[160px] object-contain pb-1 hidden dark:block"
-            />
+          <div className="flex-1 min-w-0 h-10 flex flex-col justify-center items-start">
             <img
               src="/name-logo.png"
               alt={platformName}
-              className="h-6 w-auto max-w-[160px] object-contain pb-1 block dark:hidden"
+              className="h-6 w-auto max-w-[160px] object-contain block -ml-1"
             />
-            {agency && <p className="text-xs truncate text-slate-500 dark:text-[hsl(var(--primary-end)/0.7)]">{agency.name}</p>}
+            {agency && <p className="text-xs leading-tight truncate text-slate-500">{agency.name}</p>}
           </div>
         )}
       </div>
@@ -213,13 +207,13 @@ export function AppSidebar() {
         {renderSection('Configurações', buildSettingsItems())}
       </nav>
 
-      <div className="p-3 border-t border-slate-200 dark:border-[hsl(var(--primary-start)/0.2)]">
+      <div className="p-3 border-t border-slate-200">
         <Button
           variant="ghost"
           size="sm"
           onClick={() => setCollapsed(!collapsed)}
           className={cn(
-            'w-full justify-center transition-colors duration-300 text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-[hsl(var(--primary-end)/0.7)] dark:hover:text-white dark:hover:bg-[hsl(var(--primary-start)/0.12)]',
+            'w-full justify-center transition-colors duration-300 text-slate-500 hover:text-slate-900 hover:bg-slate-50',
             !collapsed && 'justify-start'
           )}
         >
@@ -228,7 +222,7 @@ export function AppSidebar() {
         </Button>
       </div>
 
-      <div className={cn('p-3 border-t border-slate-200 dark:border-[hsl(var(--primary-start)/0.2)]', collapsed && 'flex flex-col items-center')}>
+      <div className={cn('p-3 border-t border-slate-200', collapsed && 'flex flex-col items-center')}>
         <div className={cn('flex items-center gap-3', collapsed && 'flex-col')}>
           <Avatar className="w-9 h-9">
             <AvatarFallback className="text-sm bg-[hsl(var(--primary-start)/0.2)] text-[hsl(var(--primary-start))]">
@@ -237,15 +231,15 @@ export function AppSidebar() {
           </Avatar>
           {!collapsed && (
             <div className="flex-1 min-w-0">
-              <p className="text-sm font-medium truncate text-slate-900 dark:text-white">{profile?.name || 'Usuário'}</p>
-              <p className="text-xs truncate text-slate-500 dark:text-[hsl(var(--primary-end)/0.7)]">{user?.email}</p>
+              <p className="text-sm font-medium truncate text-slate-900">{profile?.name || 'Usuário'}</p>
+              <p className="text-xs truncate text-slate-500">{user?.email}</p>
             </div>
           )}
           <Button
             variant="ghost"
             size="icon"
             onClick={logout}
-            className="transition-colors duration-300 text-slate-500 hover:text-slate-900 hover:bg-slate-100 dark:text-[hsl(var(--primary-end)/0.7)] dark:hover:text-white dark:hover:bg-[hsl(var(--primary-start)/0.12)]"
+            className="transition-colors duration-300 text-slate-500 hover:text-slate-900 hover:bg-slate-50"
           >
             <LogOut className="w-4 h-4" />
           </Button>

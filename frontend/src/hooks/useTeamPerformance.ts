@@ -57,35 +57,6 @@ export function useTeamPerformance(filters: {
   const { data, isLoading, error } = useQuery({
     queryKey: ['team-performance', effectiveAgencyId, filters],
     queryFn: async () => {
-      const mapCollaborator = (c: any): Collaborator => ({
-        id: c.id,
-        agency_id: c.agencyId,
-        team_id: c.teamId,
-        user_id: c.userId,
-        name: c.name,
-        email: c.email,
-        phone: c.phone,
-        cpf: c.cpf,
-        status: c.status,
-        employment_type: c.employmentType,
-        position: c.position,
-        level: c.level,
-        commission_percentage: c.commissionPercentage,
-        commission_base: c.commissionBase,
-        created_at: c.createdAt,
-        updated_at: c.updatedAt,
-        team: c.team
-          ? {
-              id: c.team.id,
-              agency_id: c.team.agencyId,
-              name: c.team.name,
-              description: c.team.description,
-              is_active: c.team.isActive,
-              created_at: c.team.createdAt,
-              updated_at: c.team.updatedAt,
-            }
-          : undefined,
-      });
 
       const collaboratorWhere: Record<string, unknown> = { status: 'active' };
       if (effectiveAgencyId && !isSuperAdmin) collaboratorWhere.agencyId = effectiveAgencyId;
@@ -146,6 +117,55 @@ export function useTeamPerformance(filters: {
 
       const [{ data: collaborators }, { data: commissions }, { data: goals }, { data: proposals }, { data: teams }] =
         await Promise.all([collaboratorsPromise, commissionsPromise, goalsPromise, proposalsPromise, teamsPromise]);
+
+      const profileByUserId = new Map<string, any>();
+      const userIds = Array.from(
+        new Set((collaborators || []).map((c: any) => c.userId).filter(Boolean)),
+      ) as string[];
+
+      if (userIds.length) {
+        const { data: profiles } = await apiFetch<{ data: any[] }>(
+          `/api/profile?${new URLSearchParams({
+            where: JSON.stringify({ id: { in: userIds } }),
+          }).toString()}`,
+        );
+        (profiles || []).forEach((profile: any) => {
+          if (profile?.id) {
+            profileByUserId.set(profile.id, profile);
+          }
+        });
+      }
+
+      const mapCollaborator = (c: any): Collaborator => ({
+        id: c.id,
+        agency_id: c.agencyId,
+        team_id: c.teamId,
+        user_id: c.userId,
+        name: c.name,
+        email: c.email,
+        phone: c.phone,
+        cpf: c.cpf,
+        status: c.status,
+        employment_type: c.employmentType,
+        position: c.position,
+        level: c.level,
+        commission_percentage: c.commissionPercentage,
+        commission_base: c.commissionBase,
+        avatar_url: c.userId ? profileByUserId.get(c.userId)?.avatarUrl ?? null : null,
+        created_at: c.createdAt,
+        updated_at: c.updatedAt,
+        team: c.team
+          ? {
+              id: c.team.id,
+              agency_id: c.team.agencyId,
+              name: c.team.name,
+              description: c.team.description,
+              is_active: c.team.isActive,
+              created_at: c.team.createdAt,
+              updated_at: c.team.updatedAt,
+            }
+          : undefined,
+      });
 
       // Calculate collaborator performance
       const collaboratorPerformance: CollaboratorPerformance[] = (collaborators || []).map((collab: any) => {
