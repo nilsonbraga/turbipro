@@ -7,6 +7,7 @@ export interface AgencyUser {
   id: string;
   name: string | null;
   email: string | null;
+  avatar_url: string | null;
   phone: string | null;
   agency_id: string | null;
   created_at: string;
@@ -51,6 +52,7 @@ export function useAgencyUsers(agencyFilterId?: string | null) {
             id: profile.id,
             name: profile.name,
             email: profile.email || profile.user?.email || null,
+            avatar_url: profile.avatarUrl || profile.avatar_url || profile.user?.avatarUrl || null,
             phone: profile.phone || profile.user?.phone || null,
             agency_id: profile.agencyId,
             created_at: profile.createdAt,
@@ -58,7 +60,7 @@ export function useAgencyUsers(agencyFilterId?: string | null) {
           } as AgencyUser;
         });
     },
-    enabled: (!!agency?.id || isSuperAdmin) && (role === 'admin' || isSuperAdmin),
+    enabled: !!agency?.id || isSuperAdmin,
   });
 
   const createMutation = useMutation({

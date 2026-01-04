@@ -1,14 +1,18 @@
 import { useMemo, useState, useEffect } from 'react';
 import { useQuery } from '@tanstack/react-query';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import {
   TrendingUp,
   DollarSign,
   FileText,
   Target,
   Users,
+  ListTodo,
+  Layers,
+  BarChart3,
 } from 'lucide-react';
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, ResponsiveContainer, Cell, LabelList } from 'recharts';
+import { BarChart, Bar, XAxis, RadialBarChart, RadialBar } from 'recharts';
+import { endOfMonth, endOfWeek, isSameDay, isWithinInterval, startOfMonth, startOfWeek } from 'date-fns';
 import { useDashboard, DashboardFilters } from '@/hooks/useDashboard';
 import { useAuth } from '@/contexts/AuthContext';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -17,6 +21,9 @@ import { usePipelineStages } from '@/hooks/usePipelineStages';
 import { apiFetch } from '@/lib/api';
 import { useTeamPerformance } from '@/hooks/useTeamPerformance';
 import { PerformanceCard } from '@/components/team/PerformanceCard';
+import { TaskTodoListView } from '@/components/tasks/TaskTodoListView';
+import { TaskDialog } from '@/components/tasks/TaskDialog';
+import { useTaskColumns, useTasks, Task, TaskInput } from '@/hooks/useTasks';
 
 const formatCurrency = (value: number) =>
   new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
@@ -89,31 +96,39 @@ function RefreshOverlay({ show, isDark }: { show: boolean; isDark: boolean }) {
 export default function Dashboard() {
   const { isSuperAdmin, profile, user } = useAuth() as any;
   const [theme, setTheme] = useState<'dark' | 'light'>('dark');
+  const [taskFilter, setTaskFilter] = useState<'today' | 'week' | 'month' | 'all'>('all');
   const now = useMemo(() => new Date(), []);
-  const filters = useMemo<DashboardFilters>(
-    () => ({ year: now.getFullYear(), month: now.getMonth() + 1 }),
-    [now]
-  );
+  const [resultsFilter, setResultsFilter] = useState<'today' | 'week' | 'month' | 'year' | 'all'>('month');
+  const resultsFilters = useMemo<DashboardFilters>(() => {
+    const base: DashboardFilters = { period: resultsFilter };
+    if (resultsFilter === 'month') {
+      return { ...base, year: now.getFullYear(), month: now.getMonth() + 1 };
+    }
+    if (resultsFilter === 'year') {
+      return { ...base, year: now.getFullYear() };
+    }
+    return base;
+  }, [resultsFilter, now]);
 
-  const { metrics, isLoading, isFetching } = useDashboard(filters);
+  const { metrics, isLoading, isFetching } = useDashboard(resultsFilters);
   const { stages: pipelineStages } = usePipelineStages();
-  const effectiveMonth = filters.month ?? now.getMonth() + 1;
-  const effectiveYear = filters.year ?? now.getFullYear();
+  const effectiveMonth = resultsFilters.month ?? now.getMonth() + 1;
+  const effectiveYear = resultsFilters.year ?? now.getFullYear();
   const myUserId = user?.id ?? profile?.id ?? (profile as any)?.user_id ?? null;
   const { collaboratorPerformance, isLoading: perfLoading } = useTeamPerformance({
     month: effectiveMonth,
     year: effectiveYear,
-    agencyIdFilter: filters.agencyId,
+    agencyIdFilter: resultsFilters.agencyId,
   });
   const { data: myProposals = [] } = useQuery({
-    queryKey: ['dashboard-my-proposals', filters, myUserId],
+    queryKey: ['dashboard-my-proposals', resultsFilters, myUserId],
     queryFn: async () => {
       if (!myUserId) return [];
 
       const where: Record<string, unknown> = {};
       if (!isSuperAdmin && profile?.agency_id) where.agencyId = profile.agency_id;
-      else if (filters.agencyId) where.agencyId = filters.agencyId;
-      if (filters.clientId) where.clientId = filters.clientId;
+      else if (resultsFilters.agencyId) where.agencyId = resultsFilters.agencyId;
+      if (resultsFilters.clientId) where.clientId = resultsFilters.clientId;
 
       const startDate = new Date(effectiveYear, effectiveMonth - 1, 1);
       const endDate = new Date(effectiveYear, effectiveMonth, 0, 23, 59, 59);
@@ -157,10 +172,144 @@ export default function Dashboard() {
     return { ...perf, leadsCount } as any;
   }, [collaboratorPerformance, myProposals, myUserId, profile?.email]);
 
-  const currentMonthLabel = useMemo(() => {
-    const label = new Date(effectiveYear, effectiveMonth - 1, 1).toLocaleDateString('pt-BR', { month: 'long' });
-    return label.charAt(0).toUpperCase() + label.slice(1);
-  }, [effectiveMonth, effectiveYear]);
+  const tasksAgencyId = resultsFilters.agencyId ?? profile?.agency_id;
+  const { columns: taskColumns = [], isLoading: taskColumnsLoading } = useTaskColumns(tasksAgencyId);
+  const { tasks: allTasks = [], isLoading: tasksLoading, moveTask, createTask, updateTask } = useTasks({ agencyId: tasksAgencyId });
+  const [completingTaskId, setCompletingTaskId] = useState<string | null>(null);
+  const [taskDialogOpen, setTaskDialogOpen] = useState(false);
+  const [selectedTask, setSelectedTask] = useState<Task | null>(null);
+
+  const completedTaskColumn = useMemo(() => {
+    if (taskColumns.length === 0) return undefined;
+    const normalize = (value: string) =>
+      value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '');
+    const keywords = ['feito', 'concluido', 'concluida', 'done', 'completed'];
+    return (
+      taskColumns.find((column) => {
+        const normalizedName = normalize(column.name);
+        return keywords.some((keyword) => normalizedName.includes(keyword));
+      }) || taskColumns[taskColumns.length - 1]
+    );
+  }, [taskColumns]);
+
+  const incompleteTasks = useMemo(() => {
+    if (!completedTaskColumn) return allTasks;
+    return allTasks.filter((task) => task.column_id !== completedTaskColumn.id);
+  }, [allTasks, completedTaskColumn]);
+
+  const completedTasks = useMemo(() => {
+    if (!completedTaskColumn) return [];
+    return allTasks.filter((task) => task.column_id === completedTaskColumn.id);
+  }, [allTasks, completedTaskColumn]);
+  const taskFilterNow = useMemo(() => new Date(), [taskFilter]);
+
+  const filteredIncompleteTasks = useMemo(() => {
+    if (taskFilter === 'all') return incompleteTasks;
+    return incompleteTasks.filter((task) => {
+      const rawDate = task.due_date ?? task.start_date ?? task.created_at;
+      if (!rawDate) return false;
+      const date = new Date(rawDate);
+      if (Number.isNaN(date.getTime())) return false;
+
+      if (taskFilter === 'today') {
+        return isSameDay(date, taskFilterNow);
+      }
+
+      if (taskFilter === 'week') {
+        const start = startOfWeek(taskFilterNow, { weekStartsOn: 1 });
+        const end = endOfWeek(taskFilterNow, { weekStartsOn: 1 });
+        return isWithinInterval(date, { start, end });
+      }
+
+      const start = startOfMonth(taskFilterNow);
+      const end = endOfMonth(taskFilterNow);
+      return isWithinInterval(date, { start, end });
+    });
+  }, [incompleteTasks, taskFilter, taskFilterNow]);
+
+  const filteredCompletedTasks = useMemo(() => {
+    if (taskFilter === 'all') return completedTasks;
+    return completedTasks.filter((task) => {
+      const rawDate = task.due_date ?? task.start_date ?? task.created_at;
+      if (!rawDate) return false;
+      const date = new Date(rawDate);
+      if (Number.isNaN(date.getTime())) return false;
+
+      if (taskFilter === 'today') {
+        return isSameDay(date, taskFilterNow);
+      }
+
+      if (taskFilter === 'week') {
+        const start = startOfWeek(taskFilterNow, { weekStartsOn: 1 });
+        const end = endOfWeek(taskFilterNow, { weekStartsOn: 1 });
+        return isWithinInterval(date, { start, end });
+      }
+
+      const start = startOfMonth(taskFilterNow);
+      const end = endOfMonth(taskFilterNow);
+      return isWithinInterval(date, { start, end });
+    });
+  }, [completedTasks, taskFilter, taskFilterNow]);
+
+  const handleOpenTask = (task: Task) => {
+    setSelectedTask(task);
+    setTaskDialogOpen(true);
+  };
+
+  const handleCompleteTask = (taskId: string) => {
+    if (!completedTaskColumn?.id) return;
+    setCompletingTaskId(taskId);
+    moveTask.mutate(
+      { taskId, columnId: completedTaskColumn.id },
+      { onSettled: () => setCompletingTaskId(null) },
+    );
+  };
+
+  const handleSaveTask = (data: TaskInput & { id?: string }) => {
+    if (data.id) {
+      updateTask.mutate(data as any, {
+        onSuccess: () => {
+          setTaskDialogOpen(false);
+          setSelectedTask(null);
+        },
+      });
+    } else {
+      createTask.mutate(
+        { ...data, column_id: data.column_id || taskColumns[0]?.id },
+        {
+          onSuccess: () => {
+            setTaskDialogOpen(false);
+            setSelectedTask(null);
+          },
+        },
+      );
+    }
+  };
+
+  const resultsLabel = useMemo(() => {
+    if (resultsFilter === 'today') {
+      const label = now.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+      return `Resultados de hoje (${label})`;
+    }
+    if (resultsFilter === 'week') {
+      const start = startOfWeek(now, { weekStartsOn: 1 });
+      const end = endOfWeek(now, { weekStartsOn: 1 });
+      const startLabel = start.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+      const endLabel = end.toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' });
+      return `Resultados da semana (${startLabel} - ${endLabel})`;
+    }
+    if (resultsFilter === 'month') {
+      const label = new Date(effectiveYear, effectiveMonth - 1, 1).toLocaleDateString('pt-BR', { month: 'long' });
+      return `Resultados do mês de ${label.charAt(0).toUpperCase() + label.slice(1)}`;
+    }
+    if (resultsFilter === 'year') {
+      return `Resultados de ${effectiveYear}`;
+    }
+    return 'Resultados de todos os períodos';
+  }, [resultsFilter, now, effectiveMonth, effectiveYear]);
 
   // Aplica tema vindo do perfil quando houver
   useEffect(() => {
@@ -207,61 +356,37 @@ export default function Dashboard() {
     }));
   }, [metrics, displayMetrics?.proposalsByStage, pipelineStages]);
 
-  const pipelineCountMap = useMemo(() => {
-    const map = new Map<string, number>();
-    pipelineData.forEach((p) => map.set(p.stage, p.count));
-    return map;
+  const pipelineRadialData = useMemo(() => {
+    const toKey = (value: string, index: number) => {
+      const slug = value
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '');
+      return slug || `stage-${index}`;
+    };
+    return pipelineData.map((item, index) => {
+      const stageKey = toKey(item.stage, index);
+      return {
+        stage: item.stage,
+        stageKey,
+        count: item.count,
+        fill: `var(--color-${stageKey})`,
+        color: item.color,
+      };
+    });
   }, [pipelineData]);
 
-  const pipelineStageLabel = (props: any) => {
-    const { x = 0, y = 0, width = 0, height = 0, payload, value } = props || {};
-    if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') return null;
-    const stage = typeof value === 'string' ? value : String(payload?.stage ?? '');
-    const count = pipelineCountMap.get(stage) ?? 0;
-    const stageColor = pipelineData.find((p) => p.stage === stage)?.color || colorForStage(stage, 0);
-    const hasBar = count > 0;
-    const color = hasBar ? '#ffffff' : stageColor;
-    const centerY = y + height / 2;
-    return (
-      <text x={x + 8} y={centerY} dy={0} fill={color} fontSize={12} fontWeight={700} dominantBaseline="central" textAnchor="start">
-        {stage}
-      </text>
-    );
-  };
-
-  const pipelineCountLabel = (props: any) => {
-    const { x, y, width, height, value } = props || {};
-    if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number' || typeof height !== 'number') return null;
-    if (typeof value !== 'number' || value === 0) return null;
-    const centerY = y + height / 2;
-    return (
-      <text x={x + width - 8} y={centerY} dy={0} fill="#ffffff" fontSize={12} textAnchor="end" dominantBaseline="central">
-        {value}
-      </text>
-    );
-  };
-
-  const pipelineLabelRenderer = (props: any) => {
-    const { x, y, width, value, payload } = props || {};
-    if (typeof x !== 'number' || typeof y !== 'number' || typeof width !== 'number') return null;
-    const stage = String(payload?.stage ?? '');
-    const count = typeof value === 'number' ? value : 0;
-    const stageColor = pipelineData.find((p) => p.stage === stage)?.color || colorForStage(stage, 0);
-    const stageFill = count === 0 ? stageColor : '#ffffff';
-    const textY = y + 4;
-    return (
-      <g>
-        <text x={x + 8} y={textY} dy={0} fill={stageFill} fontSize={12}>
-          {stage}
-        </text>
-        {count > 0 && (
-          <text x={x + width - 8} y={textY} dy={0} fill="#ffffff" fontSize={12} textAnchor="end">
-            {count}
-          </text>
-        )}
-      </g>
-    );
-  };
+  const pipelineRadialConfig = useMemo<ChartConfig>(() => {
+    const config: ChartConfig = {
+      count: { label: 'Propostas' },
+    };
+    pipelineRadialData.forEach((item) => {
+      config[item.stageKey] = { label: item.stage, color: item.color };
+    });
+    return config;
+  }, [pipelineRadialData]);
 
   const miniChartConfig = (color: string): ChartConfig => ({
     value: { label: 'Valor', color },
@@ -288,6 +413,25 @@ export default function Dashboard() {
     );
   };
 
+  const PipelineTooltip = ({
+    active,
+    payload,
+  }: {
+    active?: boolean;
+    payload?: Array<{ value?: number; payload?: { stage?: string } }>;
+  }) => {
+    if (!active || !payload?.length) return null;
+    const item = payload[0];
+    const stage = item.payload?.stage ?? 'Etapa';
+    const value = Number(item.value ?? 0);
+    return (
+      <div className="rounded-md border border-border/50 bg-background px-2.5 py-1.5 text-xs shadow-xl">
+        <div className="text-muted-foreground">{stage}</div>
+        <div className="mt-1 font-mono font-medium text-foreground">{value}</div>
+      </div>
+    );
+  };
+
   const MiniBarChart = ({
     data,
     color,
@@ -310,7 +454,7 @@ export default function Dashboard() {
     <div
       className="min-h-screen overflow-x-hidden transition-colors duration-500 bg-transparent text-slate-900 font-sans"
     >
-      <div className="w-full px-0 py-0 space-y-6 transition-all duration-500 relative">
+      <div className="w-full px-0 py-0 space-y-5 transition-all duration-500 relative">
         <RefreshOverlay show={showRefreshing} isDark={isDark} />
 
         {showFullSkeleton ? (
@@ -362,15 +506,38 @@ export default function Dashboard() {
             </div>
 
             <div className="rounded-2xl p-4 bg-white border-0 shadow-none">
-              <div className="flex items-center justify-end">
-                <p className="text-sm text-slate-500">
-                  Resuldados do mês de <span className="font-medium text-slate-900">{currentMonthLabel}</span>
-                </p>
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <p className="text-sm text-slate-500">{resultsLabel}</p>
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { label: 'Hoje', value: 'today' },
+                    { label: 'Semana', value: 'week' },
+                    { label: 'Mês', value: 'month' },
+                    { label: 'Ano', value: 'year' },
+                    { label: 'Todos', value: 'all' },
+                  ].map((option) => {
+                    const isActive = resultsFilter === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setResultsFilter(option.value as typeof resultsFilter)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          isActive
+                            ? 'bg-[#f06a12] text-white'
+                            : 'bg-slate-100 text-slate-600 hover:bg-slate-200'
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
             </div>
 
             {/* KPIs principais - 6 cards em linha responsiva */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-2 2xl:grid-cols-4 gap-5">
               {[
                 {
                   label: 'Faturamento',
@@ -385,7 +552,7 @@ export default function Dashboard() {
                   label: 'Lucro estimado',
                   value: metrics?.totalProfit ?? 0,
                   icon: TrendingUp,
-                  hint: 'Comissões previstas',
+                  hint: 'Lucro previsto',
                   fmt: (v: number) => formatCurrency(v),
                   spark: profitSpark,
                   sparkFormat: formatCurrency,
@@ -432,10 +599,108 @@ export default function Dashboard() {
             </div>
 
             {/* Charts */}
-            <div className="grid grid-cols-1 xl:grid-cols-[3fr,2fr] gap-6 overflow-hidden">
+            <div className="grid grid-cols-1 xl:grid-cols-2 2xl:grid-cols-4 gap-5 overflow-hidden">
+              <Card className="relative overflow-hidden border-0 shadow-none min-w-0 2xl:col-span-2 bg-[#f06a12] text-white">
+                <CardHeader className="relative z-10">
+                  <div className="flex flex-wrap items-center justify-between gap-4">
+                    <div className="flex items-center gap-2">
+                      <ListTodo className="h-5 w-5 text-white/80" />
+                      <CardTitle className="text-lg text-white">Tarefas</CardTitle>
+                    </div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {[
+                        { label: 'Hoje', value: 'today' },
+                        { label: 'Semana', value: 'week' },
+                        { label: 'Mês', value: 'month' },
+                        { label: 'Todos', value: 'all' },
+                      ].map((option) => {
+                        const isActive = taskFilter === option.value;
+                        return (
+                          <button
+                            key={option.value}
+                            type="button"
+                            onClick={() => setTaskFilter(option.value as typeof taskFilter)}
+                            className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                              isActive
+                                ? 'bg-white text-[#f06a12]'
+                                : 'bg-white/15 text-white/80 hover:bg-white/25'
+                            }`}
+                          >
+                            {option.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                  <CardDescription className="text-white/70">
+                    Pendências e acompanhamentos do time
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="relative z-10 p-0">
+                  {tasksLoading || taskColumnsLoading ? (
+                    <div className="h-[320px] flex items-center justify-center">
+                      <Skeleton className="h-24 w-32" />
+                    </div>
+                  ) : (
+                    <div className="h-[320px] overflow-y-auto [&_.shadow-sm]:shadow-none [&_.bg-card\\/80]:!bg-white [&_.bg-muted\\/40]:!bg-white [&_.bg-card\\/80]:border-0 [&_.bg-muted\\/40]:border-0 [&_.bg-card\\/80]:shadow-none [&_.bg-muted\\/40]:shadow-none [&_[role=checkbox]]:self-start [&_[role=checkbox]]:border-orange-200 [&_[role=checkbox]]:bg-white [&_[role=checkbox]]:shadow-sm [&_[role=checkbox]]:shadow-white/40 [&_[role=checkbox][data-state=checked]]:bg-white [&_[role=checkbox][data-state=checked]]:text-[#f06a12]">
+                      <TaskTodoListView
+                        tasks={filteredIncompleteTasks}
+                        completedTasks={filteredCompletedTasks}
+                        columns={taskColumns}
+                        completedColumnId={completedTaskColumn?.id}
+                        completedColumnName={completedTaskColumn?.name}
+                        completingTaskId={completingTaskId}
+                        onEditTask={handleOpenTask}
+                        onCompleteTask={handleCompleteTask}
+                        solidCards
+                        alignHeaderTop
+                      />
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+
               <Card className="backdrop-blur-lg border-0 shadow-none min-w-0">
                 <CardHeader>
-                  <CardTitle className={`text-lg ${textStrong}`}>Faturamento x Lucro</CardTitle>
+                  <div className="flex items-center gap-2">
+                    <Layers className={`h-5 w-5 ${isDark ? 'text-[hsl(var(--primary-end))]' : 'text-[#f06a12]'}`} />
+                    <CardTitle className={`text-lg ${textStrong}`}>Pipeline por estágio</CardTitle>
+                  </div>
+                  <CardDescription className={textMuted}>
+                    Distribuição das propostas por etapa
+                  </CardDescription>
+                </CardHeader>
+                <CardContent className="overflow-hidden">
+                  {pipelineData.length ? (
+                    <ChartContainer
+                      config={pipelineRadialConfig}
+                      className="mx-auto aspect-square max-h-[260px]"
+                    >
+                      <RadialBarChart
+                        accessibilityLayer
+                        data={pipelineRadialData}
+                        innerRadius={36}
+                        outerRadius={120}
+                      >
+                        <ChartTooltip cursor={false} content={<PipelineTooltip />} />
+                        <RadialBar dataKey="count" background cornerRadius={8} />
+                      </RadialBarChart>
+                    </ChartContainer>
+                  ) : (
+                    <div className={`h-[320px] flex items-center justify-center ${textMuted}`}>Sem dados para exibir</div>
+                  )}
+                </CardContent>
+              </Card>
+
+              <Card className="backdrop-blur-lg border-0 shadow-none min-w-0">
+                <CardHeader>
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className={`h-5 w-5 ${isDark ? 'text-[hsl(var(--primary-end))]' : 'text-[#f06a12]'}`} />
+                    <CardTitle className={`text-lg ${textStrong}`}>Faturamento x Lucro</CardTitle>
+                  </div>
+                  <CardDescription className={textMuted}>
+                    Comparativo dos últimos 6 meses
+                  </CardDescription>
                 </CardHeader>
                 <CardContent className="overflow-hidden">
                   {revenueData.length ? (
@@ -482,56 +747,21 @@ export default function Dashboard() {
                   )}
                 </CardContent>
               </Card>
-
-              <Card className="backdrop-blur-lg border-0 shadow-none min-w-0">
-                <CardHeader>
-                  <CardTitle className={`text-lg ${textStrong}`}>Pipeline por estágio</CardTitle>
-                </CardHeader>
-                <CardContent className="overflow-hidden">
-                  {pipelineData.length ? (
-                    <ChartContainer
-                      config={
-                        {
-                          count: { label: 'Propostas', color: isDark ? '#f5af19' : '#f48a17' },
-                          label: { color: 'var(--background)' },
-                        } satisfies ChartConfig
-                      }
-                      className="h-[320px] w-full"
-                    >
-                      <ResponsiveContainer width="100%" height="100%">
-                        <BarChart
-                          accessibilityLayer
-                          data={pipelineData}
-                          layout="vertical"
-                          margin={{ right: 12, left: 8 }}
-                        >
-                          <CartesianGrid horizontal={false} strokeDasharray="3 3" stroke={isDark ? 'rgba(255,255,255,0.08)' : '#e5e7eb'} />
-                          <YAxis dataKey="stage" type="category" hide />
-                          <XAxis dataKey="count" type="number" hide />
-                          <ChartTooltip cursor={false} content={<ChartTooltipContent indicator="line" />} />
-                          <Bar
-                            dataKey="count"
-                            layout="vertical"
-                            radius={4}
-                            barSize={26}
-                            minPointSize={2}
-                            isAnimationActive={!showRefreshing}
-                          >
-                            <LabelList dataKey="stage" content={pipelineStageLabel} />
-                            <LabelList dataKey="count" content={pipelineCountLabel} />
-                            {pipelineData.map((entry, idx) => (
-                              <Cell key={entry.stage} fill={entry.color || colorForStage(entry.stage, idx)} fillOpacity={entry.count === 0 ? 0.15 : 1} />
-                            ))}
-                          </Bar>
-                        </BarChart>
-                      </ResponsiveContainer>
-                    </ChartContainer>
-                  ) : (
-                    <div className={`h-[320px] flex items-center justify-center ${textMuted}`}>Sem dados para exibir</div>
-                  )}
-                </CardContent>
-              </Card>
             </div>
+
+            <TaskDialog
+              open={taskDialogOpen}
+              onOpenChange={(open) => {
+                setTaskDialogOpen(open);
+                if (!open) setSelectedTask(null);
+              }}
+              task={selectedTask}
+              columns={taskColumns}
+              defaultColumnId={taskColumns[0]?.id}
+              agencyId={tasksAgencyId}
+              onSave={handleSaveTask}
+              isLoading={createTask.isPending || updateTask.isPending}
+            />
 
             {/* Listas principais */}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
@@ -541,25 +771,32 @@ export default function Dashboard() {
                     <Users className={`${isDark ? 'text-[hsl(var(--primary-end))]' : 'text-[#c2410c]'} w-5 h-5`} />
                     Top Clientes
                   </CardTitle>
+                  <CardDescription className={textMuted}>
+                    Ranking por faturamento acumulado
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {metrics?.topClients?.length ? (
                       metrics.topClients.map((client, index) => (
                         <div
                           key={client.name}
-                          className={`flex items-center justify-between rounded-xl px-4 py-3 border ${isDark ? 'border-[hsl(var(--primary-start)/0.15)] bg-black/20' : 'border-[hsl(var(--primary-start)/0.2)] bg-white'}`}
+                          className={`rounded-2xl px-4 py-3 border transition-colors ${isDark ? 'border-white/10 bg-white/5' : 'border-slate-200/70 bg-white'}`}
                         >
-                          <div className="flex items-center gap-3">
-                            <span className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${isDark ? 'bg-[hsl(var(--primary-start)/0.2)] text-[hsl(var(--primary-end))]' : 'bg-[#ffe1d5] text-[#9a3412]'}`}>
-                              {index + 1}
-                            </span>
-                            <div>
-                              <p className={`font-medium ${textStrong}`}>{client.name}</p>
-                              <p className={`text-xs ${textMuted}`}>Faturamento direto</p>
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <span className="w-8 h-8 rounded-xl text-[11px] font-bold tracking-tight flex items-center justify-center bg-gradient-to-br from-[hsl(var(--primary-start))] to-[hsl(var(--primary-end))] text-white">
+                                {index + 1}
+                              </span>
+                              <div>
+                                <p className={`font-semibold tracking-tight ${textStrong}`}>{client.name}</p>
+                                <p className={`text-xs ${textMuted}`}>Faturamento direto</p>
+                              </div>
+                            </div>
+                            <div className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold whitespace-nowrap ${isDark ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-900'}`}>
+                              {showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(client.revenue)}
                             </div>
                           </div>
-                          <div className={`font-medium ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(client.revenue)}</div>
                         </div>
                       ))
                     ) : (
@@ -575,25 +812,32 @@ export default function Dashboard() {
                     <Target className={`${isDark ? 'text-[hsl(var(--primary-end))]' : 'text-[#c2410c]'} w-5 h-5`} />
                     Top Fornecedores
                   </CardTitle>
+                  <CardDescription className={textMuted}>
+                    Volume de serviços por parceiro
+                  </CardDescription>
                 </CardHeader>
                 <CardContent>
-                  <div className="space-y-4">
+                  <div className="space-y-3">
                     {metrics?.topPartners?.length ? (
                       metrics.topPartners.map((partner, index) => (
                         <div
                           key={partner.name}
-                          className={`flex items-center justify-between rounded-xl px-4 py-3 border ${isDark ? 'border-[hsl(var(--primary-start)/0.15)] bg-black/20' : 'border-[hsl(var(--primary-start)/0.2)] bg-white'}`}
+                          className={`rounded-2xl px-4 py-3 border transition-colors ${isDark ? 'border-white/10 bg-white/5' : 'border-slate-200/70 bg-white'}`}
                         >
-                          <div className="flex items-center gap-3">
-                            <span className={`w-7 h-7 rounded-full text-xs font-bold flex items-center justify-center ${isDark ? 'bg-[hsl(var(--primary-start)/0.2)] text-[hsl(var(--primary-end))]' : 'bg-[#ffe1d5] text-[#9a3412]'}`}>
-                              {index + 1}
-                            </span>
-                            <div>
-                              <p className={`font-medium ${textStrong}`}>{partner.name}</p>
-                              <p className={`text-xs ${textMuted}`}>Volume em serviços</p>
+                          <div className="flex items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                              <span className="w-8 h-8 rounded-xl text-[11px] font-bold tracking-tight flex items-center justify-center bg-gradient-to-br from-[hsl(var(--primary-start))] to-[hsl(var(--primary-end))] text-white">
+                                {index + 1}
+                              </span>
+                              <div>
+                                <p className={`font-semibold tracking-tight ${textStrong}`}>{partner.name}</p>
+                                <p className={`text-xs ${textMuted}`}>Volume em serviços</p>
+                              </div>
+                            </div>
+                            <div className={`inline-flex items-center rounded-full px-3 py-1 text-sm font-semibold whitespace-nowrap ${isDark ? 'bg-white/10 text-white' : 'bg-slate-100 text-slate-900'}`}>
+                              {showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(partner.revenue)}
                             </div>
                           </div>
-                          <div className={`font-medium ${textStrong}`}>{showRefreshing ? <Skeleton className="h-4 w-20 rounded bg-white/20" /> : formatCurrency(partner.revenue)}</div>
                         </div>
                       ))
                     ) : (

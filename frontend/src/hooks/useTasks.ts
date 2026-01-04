@@ -321,7 +321,12 @@ export function useTasks(filters?: {
       user_id: a.userId,
       created_at: a.createdAt,
       user: a.user
-        ? { id: a.user.id, name: a.user.name, email: a.user.email, avatarUrl: a.user.avatarUrl }
+        ? {
+            id: a.user.id,
+            name: a.user.name,
+            email: a.user.email,
+            avatarUrl: a.user.avatarUrl || a.user.avatar_url || a.user.profile?.avatarUrl || null,
+          }
         : undefined,
     })),
     checklists: (t.checklists || []).map((c: any) => ({
@@ -345,7 +350,12 @@ export function useTasks(filters?: {
       content: c.content,
       created_at: c.createdAt,
       user: c.user
-        ? { id: c.user.id, name: c.user.name, email: c.user.email, avatarUrl: c.user.avatarUrl }
+        ? {
+            id: c.user.id,
+            name: c.user.name,
+            email: c.user.email,
+            avatarUrl: c.user.avatarUrl || c.user.avatar_url || c.user.profile?.avatarUrl || null,
+          }
         : undefined,
     })),
     histories: (t.histories || []).map((h: any) => ({
@@ -385,9 +395,33 @@ export function useTasks(filters?: {
         include: JSON.stringify({
           client: { select: { id: true, name: true } },
           proposal: { select: { id: true, title: true, number: true } },
-          assignees: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } } },
+          assignees: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  avatarUrl: true,
+                  profile: { select: { avatarUrl: true } },
+                },
+              },
+            },
+          },
           checklists: { include: { items: true } },
-          comments: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } } },
+          comments: {
+            include: {
+              user: {
+                select: {
+                  id: true,
+                  name: true,
+                  email: true,
+                  avatarUrl: true,
+                  profile: { select: { avatarUrl: true } },
+                },
+              },
+            },
+          },
           histories: { include: { user: { select: { id: true, name: true, email: true, avatarUrl: true } } }, orderBy: { createdAt: 'desc' } },
           files: true,
         }),
@@ -400,19 +434,36 @@ export function useTasks(filters?: {
       // Apply additional filters
       let filteredTasks = mapped;
 
-      if (filters?.startDate) {
-        const start = new Date(filters.startDate);
-        filteredTasks = filteredTasks.filter(task => {
-          if (!task.due_date) return false;
-          return new Date(task.due_date) >= start;
-        });
+      if (filters?.assigneeId) {
+        filteredTasks = filteredTasks.filter((task) =>
+          task.assignees?.some((assignee) => assignee.user_id === filters.assigneeId)
+        );
       }
 
-      if (filters?.endDate) {
-        const end = new Date(filters.endDate);
-        filteredTasks = filteredTasks.filter(task => {
-          if (!task.due_date) return false;
-          return new Date(task.due_date) <= end;
+      if (filters?.startDate || filters?.endDate) {
+        const parseDate = (value?: string | null) => {
+          if (!value) return null;
+          const parsed = new Date(value);
+          return Number.isNaN(parsed.getTime()) ? null : parsed;
+        };
+
+        const isInRange = (date: Date, start?: Date | null, end?: Date | null) => {
+          if (start && date < start) return false;
+          if (end && date > end) return false;
+          return true;
+        };
+
+        const start = filters?.startDate ? new Date(filters.startDate) : null;
+        const end = filters?.endDate ? new Date(filters.endDate) : null;
+
+        filteredTasks = filteredTasks.filter((task) => {
+          const taskStart = parseDate(task.start_date);
+          const taskDue = parseDate(task.due_date);
+          if (!taskStart && !taskDue) return false;
+          return (
+            (taskStart && isInRange(taskStart, start, end)) ||
+            (taskDue && isInRange(taskDue, start, end))
+          );
         });
       }
 

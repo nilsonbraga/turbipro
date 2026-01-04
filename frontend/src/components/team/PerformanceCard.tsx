@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Progress } from '@/components/ui/progress';
 import { Badge } from '@/components/ui/badge';
@@ -27,6 +28,53 @@ export function PerformanceCard({ performance, rank, formatCurrency, onCardClick
     if (rank === 3) return <Badge className="bg-amber-600 text-amber-950">🥉 3º</Badge>;
     return <Badge variant="outline">{rank}º</Badge>;
   };
+
+  const [animatedSales, setAnimatedSales] = useState(0);
+  const [animatedProfit, setAnimatedProfit] = useState(0);
+  const [animatedDeals, setAnimatedDeals] = useState(0);
+  const [animatedProgress, setAnimatedProgress] = useState({
+    sales: 0,
+    profit: 0,
+    deals: 0,
+  });
+
+  useEffect(() => {
+    if (!goalProgress) return;
+
+    const rafIds: number[] = [];
+    const animateValue = (to: number, setter: (value: number) => void, duration = 900) => {
+      const from = 0;
+      let start: number | null = null;
+      const step = (timestamp: number) => {
+        if (start === null) start = timestamp;
+        const progress = Math.min((timestamp - start) / duration, 1);
+        const eased = 1 - Math.pow(1 - progress, 3);
+        setter(from + (to - from) * eased);
+        if (progress < 1) {
+          rafIds.push(requestAnimationFrame(step));
+        }
+      };
+      rafIds.push(requestAnimationFrame(step));
+    };
+
+    animateValue(totalSales, setAnimatedSales);
+    animateValue(totalProfit, setAnimatedProfit);
+    animateValue(dealsCount, setAnimatedDeals, 700);
+
+    setAnimatedProgress({ sales: 0, profit: 0, deals: 0 });
+    const progressId = requestAnimationFrame(() =>
+      setAnimatedProgress({
+        sales: Math.min(goalProgress.salesProgress, 100),
+        profit: Math.min(goalProgress.profitProgress, 100),
+        deals: Math.min(goalProgress.dealsProgress, 100),
+      }),
+    );
+    rafIds.push(progressId);
+
+    return () => {
+      rafIds.forEach((id) => cancelAnimationFrame(id));
+    };
+  }, [goalProgress, totalSales, totalProfit, dealsCount]);
 
   return (
     <Card className={`${onCardClick ? "cursor-pointer hover:shadow-md transition-shadow" : ""} ${className || ""}`} onClick={onCardClick}>
@@ -86,9 +134,9 @@ export function PerformanceCard({ performance, rank, formatCurrency, onCardClick
                   <DollarSign className="h-3 w-3 text-slate-500" />
                   Vendas
                 </span>
-                <span>{formatCurrency(totalSales)} / {formatCurrency(goal.target_sales_value)}</span>
+                <span>{formatCurrency(goalProgress ? animatedSales : totalSales)} / {formatCurrency(goal.target_sales_value)}</span>
               </div>
-              <Progress value={Math.min(goalProgress.salesProgress, 100)} className="h-2" />
+              <Progress value={animatedProgress.sales} className="h-2 [&>div]:duration-700 [&>div]:ease-out" />
             </div>
 
             <div className="space-y-2">
@@ -97,9 +145,9 @@ export function PerformanceCard({ performance, rank, formatCurrency, onCardClick
                   <TrendingUp className="h-3 w-3 text-slate-500" />
                   Lucro
                 </span>
-                <span>{formatCurrency(totalProfit)} / {formatCurrency(goal.target_profit)}</span>
+                <span>{formatCurrency(goalProgress ? animatedProfit : totalProfit)} / {formatCurrency(goal.target_profit)}</span>
               </div>
-              <Progress value={Math.min(goalProgress.profitProgress, 100)} className="h-2" />
+              <Progress value={animatedProgress.profit} className="h-2 [&>div]:duration-700 [&>div]:ease-out" />
             </div>
 
             <div className="space-y-2">
@@ -108,9 +156,9 @@ export function PerformanceCard({ performance, rank, formatCurrency, onCardClick
                   <Trophy className="h-3 w-3 text-slate-500" />
                   Número de Vendas Fechadas
                 </span>
-                <span>{dealsCount} / {goal.target_deals_count}</span>
+                <span>{goalProgress ? Math.round(animatedDeals) : dealsCount} / {goal.target_deals_count}</span>
               </div>
-              <Progress value={Math.min(goalProgress.dealsProgress, 100)} className="h-2" />
+              <Progress value={animatedProgress.deals} className="h-2 [&>div]:duration-700 [&>div]:ease-out" />
             </div>
           </div>
         )}

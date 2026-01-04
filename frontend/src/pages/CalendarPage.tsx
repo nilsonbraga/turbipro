@@ -5,6 +5,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTasks, useTaskColumns, Task, TaskInput } from '@/hooks/useTasks';
+import { useToast } from '@/hooks/use-toast';
 import { TaskDialog } from '@/components/tasks/TaskDialog';
 import { useAgencies } from '@/hooks/useAgencies';
 import { useProposals } from '@/hooks/useProposals';
@@ -22,6 +23,7 @@ const TYPE_LABELS: Record<string, string> = {
   transfer: 'Transfer',
   other: 'Outro',
   task: 'Tarefa',
+  calendar: 'Evento',
 };
 
 const TYPE_COLORS: Record<string, string> = {
@@ -35,13 +37,17 @@ const TYPE_COLORS: Record<string, string> = {
   transfer: 'orange',
   other: 'blue',
   task: 'green',
+  calendar: 'orange',
 };
+
+const CALENDAR_TAG = 'Calendário';
 
 export default function CalendarPage() {
   const navigate = useNavigate();
   const { data: events = [], isLoading } = useCalendarEvents();
   const { user } = useAuth();
   const { agencies } = useAgencies();
+  const { toast } = useToast();
 
   const defaultAgencyId = user?.isSuperAdmin ? agencies[0]?.id : user?.agencyId;
   const [selectedAgencyId, setSelectedAgencyId] = useState<string | undefined>(defaultAgencyId);
@@ -54,6 +60,7 @@ export default function CalendarPage() {
     tasks = [],
     createTask,
     updateTask,
+    deleteTask,
   } = useTasks({ agencyId: selectedAgencyId });
 
   const { columns = [] } = useTaskColumns(selectedAgencyId);
@@ -87,10 +94,8 @@ export default function CalendarPage() {
     }
 
     if (evt.type === 'task') {
-      const column = evt.column_name || details.column;
-      const priority = evt.priority ? `Prioridade: ${evt.priority}` : '';
       const taskTitle = details.taskTitle || evt.proposal_title || 'Tarefa';
-      return [taskTitle, column, priority].filter(Boolean).join(' - ') || 'Tarefa';
+      return taskTitle;
     }
 
     if (evt.type === 'car') {
@@ -112,14 +117,27 @@ export default function CalendarPage() {
       const start = new Date(evt.start_date);
       const end = evt.end_date ? new Date(evt.end_date) : new Date(start.getTime() + 60 * 60 * 1000);
       const isTask = evt.type === 'task';
+      const rawTags = Array.isArray(evt.tags) ? evt.tags : [];
+      const visibleTags = rawTags.filter((tag) => tag.toLowerCase() !== CALENDAR_TAG.toLowerCase());
+      const isCalendarEvent = isTask && rawTags.some((tag) => tag.toLowerCase() === CALENDAR_TAG.toLowerCase());
+      const categoryTag = visibleTags[0];
+      const category = isCalendarEvent
+        ? categoryTag || TYPE_LABELS.calendar
+        : TYPE_LABELS[evt.type] || 'Outro';
       const color = isTask ? priorityColor(evt.priority) : TYPE_COLORS[evt.type] || 'green';
-      const tags = [
-        TYPE_LABELS[evt.type] || 'Evento',
-        evt.client_name,
-        evt.proposal_title,
-        evt.column_name,
-        ...(evt.assignees || []),
-      ].filter(Boolean) as string[];
+      const columnTag = isCalendarEvent ? null : evt.column_name;
+      const tags = Array.from(
+        new Set(
+          [
+            category,
+            ...visibleTags,
+            evt.client_name,
+            evt.proposal_title,
+            columnTag,
+            ...(evt.assignees || []),
+          ].filter(Boolean) as string[],
+        ),
+      );
 
       return {
         id: evt.id,
@@ -128,8 +146,9 @@ export default function CalendarPage() {
         startTime: start,
         endTime: end,
         color,
-        category: TYPE_LABELS[evt.type] || 'Outro',
+        category,
         tags,
+        isAllDay: evt.isAllDay,
       };
     });
   }, [events]);
@@ -158,6 +177,7 @@ export default function CalendarPage() {
   }
 
   const serviceCategories = Object.values(TYPE_LABELS).filter((c) => c !== 'Tarefa');
+  const defaultColumnId = columns[0]?.id;
 
   return (
     <div className="w-full space-y-4 px-4 pb-6 pt-2">
@@ -169,6 +189,53 @@ export default function CalendarPage() {
         clientOptions={clientOptions}
         defaultView="month"
         className="min-h-[calc(100vh-180px)] w-full rounded-2xl border-none bg-card p-4"
+        onEventCreate={(event) => {
+          if (!defaultColumnId) {
+            toast({
+              title: 'Não foi possível criar o evento',
+              description: 'Crie uma coluna de tarefas antes de adicionar eventos.',
+              variant: 'destructive',
+            });
+            return;
+          }
+
+          const tags = [CALENDAR_TAG, event.category, ...(event.tags || [])].filter(Boolean) as string[];
+          createTask.mutate({
+            title: event.title,
+            description: event.description,
+            start_date: event.startTime.toISOString(),
+            due_date: event.endTime?.toISOString() || null,
+            column_id: defaultColumnId,
+            priority: 'medium',
+            tags: Array.from(new Set(tags)),
+          });
+        }}
+        onEventUpdate={(id, update) => {
+          const task = tasks.find((t) => t.id === id);
+          if (!task) return;
+          const hadCalendarTag = (task.tags || []).some(
+            (tag) => tag.toLowerCase() === CALENDAR_TAG.toLowerCase(),
+          );
+          const incomingTags = update.tags ?? task.tags ?? [];
+          const normalizedTags = hadCalendarTag
+            ? Array.from(
+                new Set([CALENDAR_TAG, ...incomingTags.filter((tag) => tag !== CALENDAR_TAG)]),
+              )
+            : incomingTags;
+          updateTask.mutate({
+            id,
+            title: update.title ?? task.title,
+            description: update.description ?? task.description ?? undefined,
+            start_date: update.startTime ? update.startTime.toISOString() : task.start_date ?? undefined,
+            due_date: update.endTime ? update.endTime.toISOString() : task.due_date ?? undefined,
+            tags: normalizedTags,
+          });
+        }}
+        onEventDelete={(id) => {
+          const task = tasks.find((t) => t.id === id);
+          if (!task) return;
+          deleteTask.mutate(id);
+        }}
         onEventClickOverride={(event) => {
           if (event.category === 'Tarefa') {
             const task = tasks.find((t) => t.id === event.id);
@@ -197,6 +264,7 @@ export default function CalendarPage() {
         task={selectedTask}
         columns={columns}
         defaultColumnId={columns[0]?.id}
+        agencyId={selectedAgencyId}
         onSave={(data: TaskInput & { id?: string }) => {
           if (data.id) {
             updateTask.mutate(data as any, {

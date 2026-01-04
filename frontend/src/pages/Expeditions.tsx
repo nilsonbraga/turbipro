@@ -470,6 +470,7 @@ export default function Expeditions() {
         onOpenChange={setTaskDialogOpen}
         columns={columns}
         defaultColumnId={columns[0]?.id}
+        agencyId={agencyFilter ?? agency?.id ?? null}
         onSave={handleSaveTask}
         isLoading={createTask.isPending}
         prefillData={taskPrefill}

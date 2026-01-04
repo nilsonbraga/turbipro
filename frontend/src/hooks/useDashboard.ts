@@ -8,6 +8,7 @@ export interface DashboardFilters {
   clientId?: string;
   year?: number;
   month?: number;
+  period?: 'today' | 'week' | 'month' | 'year' | 'all';
 }
 
 type AgencyOption = { id: string; name: string };
@@ -82,8 +83,9 @@ export function useDashboard(filters: DashboardFilters = {}) {
       clientId: filters.clientId ?? null,
       year: filters.year ?? null,
       month: filters.month ?? null,
+      period: filters.period ?? null,
     }),
-    [filters.agencyId, filters.clientId, filters.year, filters.month]
+    [filters.agencyId, filters.clientId, filters.year, filters.month, filters.period]
   );
 
   // Agencies (somente super admin)
@@ -206,17 +208,47 @@ export function useDashboard(filters: DashboardFilters = {}) {
 
   // métricas calculadas SEM criar hooks condicionais
   const metrics = useMemo(() => {
+    const resolvePeriod = () => {
+      if (filters.period) return filters.period;
+      if (filters.month) return 'month';
+      if (filters.year) return 'year';
+      return 'all';
+    };
+
+    const period = resolvePeriod();
+    const periodNow = new Date();
+    const targetYear = filters.year ?? periodNow.getFullYear();
+    const targetMonthIndex = (filters.month ?? periodNow.getMonth() + 1) - 1;
+
+    let rangeStart: Date | null = null;
+    let rangeEnd: Date | null = null;
+
+    if (period === 'today') {
+      rangeStart = new Date(periodNow.getFullYear(), periodNow.getMonth(), periodNow.getDate(), 0, 0, 0, 0);
+      rangeEnd = new Date(periodNow.getFullYear(), periodNow.getMonth(), periodNow.getDate(), 23, 59, 59, 999);
+    } else if (period === 'week') {
+      const weekday = periodNow.getDay();
+      const diff = weekday === 0 ? -6 : 1 - weekday;
+      rangeStart = new Date(periodNow);
+      rangeStart.setDate(periodNow.getDate() + diff);
+      rangeStart.setHours(0, 0, 0, 0);
+      rangeEnd = new Date(rangeStart);
+      rangeEnd.setDate(rangeStart.getDate() + 6);
+      rangeEnd.setHours(23, 59, 59, 999);
+    } else if (period === 'month') {
+      rangeStart = new Date(targetYear, targetMonthIndex, 1, 0, 0, 0, 0);
+      rangeEnd = new Date(targetYear, targetMonthIndex + 1, 0, 23, 59, 59, 999);
+    } else if (period === 'year') {
+      rangeStart = new Date(targetYear, 0, 1, 0, 0, 0, 0);
+      rangeEnd = new Date(targetYear, 11, 31, 23, 59, 59, 999);
+    }
+
     const matchesFilterDate = (dateValue: string | null | undefined) => {
-      if (!filters.year && !filters.month) return true;
+      if (period === 'all') return true;
       const date = new Date(dateValue || '');
       if (!Number.isFinite(date.getTime())) return false;
-      if (filters.year && filters.month) {
-        return date.getFullYear() === filters.year && date.getMonth() === filters.month - 1;
-      }
-      if (filters.year) {
-        return date.getFullYear() === filters.year;
-      }
-      return true;
+      if (!rangeStart || !rangeEnd) return true;
+      return date >= rangeStart && date <= rangeEnd;
     };
 
     const proposalsCreatedScope = proposals.filter((p) => matchesFilterDate(p.createdAt));
@@ -457,7 +489,7 @@ export function useDashboard(filters: DashboardFilters = {}) {
       conversionByMonth,
       sellerSummary,
     };
-  }, [proposals, services, financial, filters.year, filters.month]);
+  }, [proposals, services, financial, filters.year, filters.month, filters.period]);
 
   // estados
   const isInitialLoading =

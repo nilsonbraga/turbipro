@@ -53,6 +53,7 @@ export function useProposalTags(proposalId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['proposal-tags', proposalId] });
+      queryClient.invalidateQueries({ queryKey: ['all-proposal-tags'] });
       toast({ title: 'Tag adicionada!' });
     },
     onError: (error) => {
@@ -69,6 +70,7 @@ export function useProposalTags(proposalId: string | null) {
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['proposal-tags', proposalId] });
+      queryClient.invalidateQueries({ queryKey: ['all-proposal-tags'] });
       toast({ title: 'Tag removida!' });
     },
     onError: (error) => {

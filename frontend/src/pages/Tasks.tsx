@@ -31,7 +31,7 @@ import { ProposalDetail } from '@/components/proposals/ProposalDetail';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { Skeleton } from '@/components/ui/skeleton';
@@ -95,7 +95,7 @@ export default function Tasks() {
   const tasksList = tasks ?? [];
 
   const { clients } = useClients();
-  const { users } = useAgencyUsers();
+  const { users } = useAgencyUsers(effectiveAgencyId);
   const { proposals } = useProposals();
 
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
@@ -153,11 +153,11 @@ export default function Tasks() {
   }, [prefillTask, columns, navigate, location.pathname]);
 
   useEffect(() => {
-    if (dateRange?.from) {
+    if (dateRange?.from && dateRange?.to) {
       setFilters((prev) => ({
         ...prev,
-        startDate: dateRange.from?.toISOString(),
-        endDate: dateRange.to?.toISOString(),
+        startDate: dateRange.from.toISOString(),
+        endDate: dateRange.to.toISOString(),
       }));
     } else {
       setFilters((prev) => ({
@@ -332,7 +332,43 @@ export default function Tasks() {
   };
 
   const selectedProposal = proposals?.find((p) => p.id === selectedProposalId);
-  const hasActiveFilters = !!(filters.clientId || filters.assigneeId || filters.status || dateRange);
+  const hasActiveFilters = !!(
+    filters.clientId ||
+    filters.assigneeId ||
+    filters.status ||
+    (dateRange?.from && dateRange?.to)
+  );
+  const agencyOptions = useMemo(
+    () => agencies.map((agencyItem) => ({ value: agencyItem.id, label: agencyItem.name })),
+    [agencies]
+  );
+  const clientOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todos os clientes' },
+      ...(clients ?? []).map((client) => ({ value: client.id, label: client.name })),
+    ],
+    [clients]
+  );
+  const assigneeOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todos os responsáveis' },
+      ...(users ?? []).map((user) => ({
+        value: user.id,
+        label: user.name || user.email || 'Usuário',
+      })),
+    ],
+    [users]
+  );
+  const statusOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todos os status' },
+      { value: 'overdue', label: 'Vencidas' },
+      { value: 'due_soon', label: 'Vence em breve' },
+      { value: 'on_time', label: 'No prazo' },
+      { value: 'no_date', label: 'Sem prazo' },
+    ],
+    []
+  );
 
   if (columnsLoading && effectiveAgencyId) {
     return (
@@ -355,19 +391,19 @@ export default function Tasks() {
             {/* Agency Selector for Super Admin */}
             {isSuperAdmin && (
               <>
-                <Select value={selectedAgencyId || ''} onValueChange={(value) => setSelectedAgencyId(value)}>
-                  <SelectTrigger className="w-56 h-9">
-                    <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="Selecionar agência" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {agencies.map((a) => (
-                      <SelectItem key={a.id} value={a.id}>
-                        {a.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Combobox
+                    options={agencyOptions}
+                    value={selectedAgencyId || ''}
+                    onValueChange={(value) => setSelectedAgencyId(value)}
+                    placeholder="Selecionar agência"
+                    searchPlaceholder="Buscar agência..."
+                    emptyText="Nenhuma agência encontrada"
+                    buttonClassName="w-56 h-9 pl-9"
+                    contentClassName="w-56"
+                  />
+                </div>
                 <div className="h-6 w-px bg-border" />
               </>
             )}
@@ -383,7 +419,7 @@ export default function Tasks() {
               onClick={() => setShowFilters(!showFilters)}
             >
               <Filter className="h-4 w-4" />
-              Filter
+              Filtros
               {hasActiveFilters && (
                 <span className="ml-1 bg-primary text-primary-foreground text-xs px-1.5 py-0.5 rounded-full">!</span>
               )}
@@ -394,7 +430,7 @@ export default function Tasks() {
             <div className="relative w-64">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
-                placeholder="Search tasks..."
+                placeholder="Buscar tarefas..."
                 className="pl-9 h-9 bg-background"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
@@ -411,7 +447,7 @@ export default function Tasks() {
               disabled={!effectiveAgencyId}
             >
               <Settings className="h-4 w-4 mr-1.5" />
-              Columns
+              Colunas
             </Button>
 
             <Button
@@ -424,7 +460,7 @@ export default function Tasks() {
               disabled={!effectiveAgencyId || columns.length === 0}
             >
               <Plus className="h-4 w-4 mr-1.5" />
-              Add Task
+              Adicionar tarefa
             </Button>
           </div>
         </div>
@@ -432,61 +468,44 @@ export default function Tasks() {
         {/* Filters */}
         {showFilters && (
           <div className="flex flex-wrap gap-3 px-4 pb-4">
-            <Select
+            <Combobox
+              options={clientOptions}
               value={filters.clientId || 'all'}
               onValueChange={(value) =>
                 setFilters((prev) => ({ ...prev, clientId: value === 'all' ? undefined : value }))
               }
-            >
-              <SelectTrigger className="w-44 h-9">
-                <SelectValue placeholder="Client" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Clients</SelectItem>
-                {clients?.map((c) => (
-                  <SelectItem key={c.id} value={c.id}>
-                    {c.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Cliente"
+              searchPlaceholder="Buscar cliente..."
+              emptyText="Nenhum cliente encontrado"
+              buttonClassName="w-44 h-9"
+              contentClassName="w-56"
+            />
 
-            <Select
+            <Combobox
+              options={assigneeOptions}
               value={filters.assigneeId || 'all'}
               onValueChange={(value) =>
                 setFilters((prev) => ({ ...prev, assigneeId: value === 'all' ? undefined : value }))
               }
-            >
-              <SelectTrigger className="w-44 h-9">
-                <SelectValue placeholder="Assignee" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Assignees</SelectItem>
-                {users?.map((u) => (
-                  <SelectItem key={u.id} value={u.id}>
-                    {u.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Responsável"
+              searchPlaceholder="Buscar responsável..."
+              emptyText="Nenhum responsável encontrado"
+              buttonClassName="w-44 h-9"
+              contentClassName="w-56"
+            />
 
-            <Select
+            <Combobox
+              options={statusOptions}
               value={filters.status || 'all'}
               onValueChange={(value) =>
                 setFilters((prev) => ({ ...prev, status: value === 'all' ? undefined : (value as any) }))
               }
-            >
-              <SelectTrigger className="w-44 h-9">
-                <SelectValue placeholder="Due Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Status</SelectItem>
-                <SelectItem value="overdue">Overdue</SelectItem>
-                <SelectItem value="due_soon">Due Soon</SelectItem>
-                <SelectItem value="on_time">On Time</SelectItem>
-                <SelectItem value="no_date">No Due Date</SelectItem>
-              </SelectContent>
-            </Select>
+              placeholder="Status do prazo"
+              searchPlaceholder="Buscar status..."
+              emptyText="Nenhum status encontrado"
+              buttonClassName="w-44 h-9"
+              contentClassName="w-56"
+            />
 
             <Popover>
               <PopoverTrigger asChild>
@@ -506,7 +525,7 @@ export default function Tasks() {
                       format(dateRange.from, 'dd/MM/yyyy', { locale: ptBR })
                     )
                   ) : (
-                    'Date Range'
+                    'Período'
                   )}
                 </Button>
               </PopoverTrigger>
@@ -525,7 +544,7 @@ export default function Tasks() {
             {hasActiveFilters && (
               <Button variant="ghost" size="sm" className="h-9" onClick={clearFilters}>
                 <X className="h-4 w-4 mr-1" />
-                Clear
+                Limpar
               </Button>
             )}
           </div>
@@ -608,6 +627,7 @@ export default function Tasks() {
                 completingTaskId={completingTaskId}
                 onEditTask={handleEditTask}
                 onCompleteTask={handleCompleteTask}
+                alignHeaderTop
               />
             </div>
           )}
@@ -624,6 +644,7 @@ export default function Tasks() {
         task={selectedTask}
         columns={columns}
         defaultColumnId={defaultColumnId}
+        agencyId={effectiveAgencyId}
         onSave={handleSaveTask}
         isLoading={createTask.isPending || updateTask.isPending}
         prefillData={prefillData}

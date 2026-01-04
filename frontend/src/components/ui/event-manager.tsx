@@ -7,6 +7,8 @@ import { Input } from "@/components/ui/input"
 import { Label } from "@/components/ui/label"
 import { Textarea } from "@/components/ui/textarea"
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select"
+import { Calendar } from "@/components/ui/calendar"
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover"
 import {
   Dialog,
   DialogContent,
@@ -15,8 +17,9 @@ import {
   DialogHeader,
   DialogTitle,
 } from "@/components/ui/dialog"
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetDescription } from "@/components/ui/sheet"
 import { Badge } from "@/components/ui/badge"
-import { ChevronLeft, ChevronRight, Plus, Calendar, Clock, Grid3X3, List, Search, Filter, X } from "lucide-react"
+import { ChevronLeft, ChevronRight, Plus, Calendar as CalendarIcon, Clock, Grid3X3, List, Search, Filter, X } from "lucide-react"
 import { cn } from "@/lib/utils"
 import { Tooltip, TooltipContent, TooltipProvider, TooltipTrigger } from "@/components/ui/tooltip"
 import { ClipboardList, Briefcase, Slash } from "lucide-react"
@@ -41,6 +44,7 @@ export interface Event {
   category?: string
   attendees?: string[]
   tags?: string[]
+  isAllDay?: boolean
 }
 
 export interface EventManagerProps {
@@ -66,11 +70,92 @@ const defaultColors = [
   { name: "Red", value: "red", bg: "bg-red-500", text: "text-red-700" },
 ]
 
+const timeOptions = Array.from({ length: 48 }).map((_, idx) => {
+  const hours = Math.floor(idx / 2)
+    .toString()
+    .padStart(2, "0")
+  const minutes = idx % 2 === 0 ? "00" : "30"
+  return `${hours}:${minutes}`
+})
+
 const formatRange = (start: Date, end: Date) =>
   `${start.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" })} - ${end.toLocaleDateString("pt-BR", {
     day: "2-digit",
     month: "2-digit",
   })}`
+
+const formatDateInput = (date: Date) => {
+  const year = date.getFullYear()
+  const month = String(date.getMonth() + 1).padStart(2, "0")
+  const day = String(date.getDate()).padStart(2, "0")
+  return `${year}-${month}-${day}`
+}
+
+const formatDateLabel = (date: Date) => date.toLocaleDateString("pt-BR")
+
+const getLocalDateValue = (date?: Date | null) => (date ? formatDateInput(date) : "")
+const getLocalTimeValue = (date?: Date | null) => {
+  if (!date) return ""
+  const hours = String(date.getHours()).padStart(2, "0")
+  const minutes = String(date.getMinutes()).padStart(2, "0")
+  return `${hours}:${minutes}`
+}
+
+const parseDateInput = (value?: string) => {
+  if (!value) return undefined
+  const [year, month, day] = value.split("-").map(Number)
+  if (!year || !month || !day) return undefined
+  return new Date(year, month - 1, day)
+}
+
+const combineDateTime = (date?: string, time?: string) => {
+  if (!date) return null
+  const [year, month, day] = date.split("-").map(Number)
+  if (!year || !month || !day) return null
+  const [hours, minutes] = (time || "00:00").split(":").map(Number)
+  return new Date(year, month - 1, day, hours || 0, minutes || 0)
+}
+
+const isAllDayEvent = (event: Event) => Boolean(event.isAllDay)
+
+const DatePickerField = ({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value?: string
+  onChange: (value: string) => void
+  placeholder?: string
+}) => {
+  const [open, setOpen] = useState(false)
+  const dateObj = parseDateInput(value)
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          type="button"
+          variant="outline"
+          className={cn("w-full justify-start text-left font-normal h-9", !value && "text-muted-foreground")}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {dateObj ? formatDateLabel(dateObj) : placeholder || "Selecionar"}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={dateObj}
+          onSelect={(day) => {
+            onChange(day ? formatDateInput(day) : "")
+            setOpen(false)
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  )
+}
 
 export function EventManager({
   events: initialEvents = [],
@@ -106,7 +191,10 @@ export function EventManager({
   const [selectedCategories, setSelectedCategories] = useState<string[]>([])
   const [clientFilter, setClientFilter] = useState("")
   const [clientSearch, setClientSearch] = useState("")
+  const [tagInput, setTagInput] = useState("")
   const [dayModalEvents, setDayModalEvents] = useState<Event[] | null>(null)
+  const [dayDrawerOpen, setDayDrawerOpen] = useState(false)
+  const [selectedDay, setSelectedDay] = useState<Date | null>(null)
 
   const capitalizeDate = (value: string) => (value ? value.charAt(0).toUpperCase() + value.slice(1) : "")
 
@@ -115,11 +203,19 @@ export function EventManager({
     setEvents(initialEvents)
   }, [initialEvents])
 
+  const normalizeTag = (value: string) =>
+    value
+      .toLowerCase()
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+
   const filteredEvents = useMemo(() => {
     return events.filter((event) => {
-      const isTask = (event.category || "").toLowerCase() === "tarefa"
+      const hasCalendarTag = (event.tags || []).some((tag) => normalizeTag(tag) === "calendario")
+      const isTask = (event.category || "").toLowerCase() === "tarefa" && !hasCalendarTag
+      const isLeadEvent = !isTask && !hasCalendarTag
       if (!showTasks && isTask) return false
-      if (!showLeads && !isTask) return false
+      if (!showLeads && isLeadEvent) return false
 
       // Search filter
       if (searchQuery) {
@@ -164,14 +260,16 @@ export function EventManager({
   }, [clientOptions, clientSearch])
 
   const handleCreateEvent = useCallback(() => {
-    if (!newEvent.title || !newEvent.startTime || !newEvent.endTime) return
+    if (!newEvent.title || !newEvent.startTime) return
+    const fallbackEnd = new Date(newEvent.startTime.getTime() + 60 * 60 * 1000)
+    const endTime = newEvent.endTime || fallbackEnd
 
     const event: Event = {
       id: Math.random().toString(36).substr(2, 9),
       title: newEvent.title,
       description: newEvent.description,
       startTime: newEvent.startTime,
-      endTime: newEvent.endTime,
+      endTime,
       color: newEvent.color || colors[0].value,
       category: newEvent.category,
       attendees: newEvent.attendees,
@@ -192,10 +290,15 @@ export function EventManager({
   }, [newEvent, colors, categories, onEventCreate])
 
   const handleUpdateEvent = useCallback(() => {
-    if (!selectedEvent) return
+    if (!selectedEvent || !selectedEvent.startTime) return
+    const fallbackEnd = new Date(selectedEvent.startTime.getTime() + 60 * 60 * 1000)
+    const normalizedEvent = {
+      ...selectedEvent,
+      endTime: selectedEvent.endTime || fallbackEnd,
+    }
 
-    setEvents((prev) => prev.map((e) => (e.id === selectedEvent.id ? selectedEvent : e)))
-    onEventUpdate?.(selectedEvent.id, selectedEvent)
+    setEvents((prev) => prev.map((e) => (e.id === selectedEvent.id ? normalizedEvent : e)))
+    onEventUpdate?.(selectedEvent.id, normalizedEvent)
     setIsDialogOpen(false)
     setSelectedEvent(null)
   }, [selectedEvent, onEventUpdate])
@@ -285,6 +388,39 @@ export function EventManager({
     }
   }
 
+  const addTag = (rawValue: string, isCreating: boolean) => {
+    const value = rawValue.trim()
+    if (!value) return
+    if (isCreating) {
+      setNewEvent((prev) => {
+        const tags = prev.tags || []
+        if (tags.includes(value)) return prev
+        return { ...prev, tags: [...tags, value] }
+      })
+    } else {
+      setSelectedEvent((prev) => {
+        if (!prev) return prev
+        const tags = prev.tags || []
+        if (tags.includes(value)) return prev
+        return { ...prev, tags: [...tags, value] }
+      })
+    }
+    setTagInput("")
+  }
+
+  const removeTag = (value: string, isCreating: boolean) => {
+    if (isCreating) {
+      setNewEvent((prev) => ({
+        ...prev,
+        tags: prev.tags?.filter((tag) => tag !== value) || [],
+      }))
+    } else {
+      setSelectedEvent((prev) =>
+        prev ? { ...prev, tags: prev.tags?.filter((tag) => tag !== value) || [] } : null,
+      )
+    }
+  }
+
   const handleEventSelection = useCallback(
     (event: Event) => {
       const intercepted = onEventClickOverride?.(event)
@@ -295,8 +431,27 @@ export function EventManager({
     [onEventClickOverride],
   )
 
+  const handleDayClick = useCallback((day: Date) => {
+    setSelectedDay(day)
+    setDayDrawerOpen(true)
+  }, [])
+
+  const activeStartTime = isCreating ? newEvent.startTime : selectedEvent?.startTime
+  const activeEndTime = isCreating ? newEvent.endTime : selectedEvent?.endTime
+  const startDateValue = getLocalDateValue(activeStartTime || null)
+  const startTimeValue = getLocalTimeValue(activeStartTime || null)
+  const endDateValue = getLocalDateValue(activeEndTime || null)
+  const endTimeValue = getLocalTimeValue(activeEndTime || null)
+  const activeTags = (isCreating ? newEvent.tags : selectedEvent?.tags) || []
+
   return (
-    <div className={cn("flex flex-col gap-4", className)}>
+    <div
+      className={cn("flex flex-col gap-4", className)}
+      style={{
+        fontFamily:
+          "Poppins, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, 'Noto Sans', sans-serif",
+      }}
+    >
       {/* Header */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:gap-4">
@@ -349,7 +504,7 @@ export function EventManager({
               <SelectContent>
                 <SelectItem value="month">
                   <div className="flex items-center gap-2">
-                    <Calendar className="h-4 w-4" />
+                    <CalendarIcon className="h-4 w-4" />
                     Visão mensal
                   </div>
                 </SelectItem>
@@ -383,7 +538,7 @@ export function EventManager({
               onClick={() => setView("month")}
               className="h-8"
             >
-              <Calendar className="h-4 w-4" />
+              <CalendarIcon className="h-4 w-4" />
               <span className="ml-1">Mês</span>
             </Button>
             <Button
@@ -620,6 +775,7 @@ export function EventManager({
           events={filteredEvents}
           dayModalEvents={dayModalEvents}
           setDayModalEvents={setDayModalEvents}
+          onDayClick={handleDayClick}
           onEventClick={(event) => {
             handleEventSelection(event)
           }}
@@ -673,32 +829,32 @@ export function EventManager({
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="max-w-md max-h-[90vh] overflow-y-auto">
           <DialogHeader>
-            <DialogTitle>{isCreating ? "Create Event" : "Event Details"}</DialogTitle>
+            <DialogTitle>{isCreating ? "Novo evento" : "Detalhes do evento"}</DialogTitle>
             <DialogDescription>
-              {isCreating ? "Add a new event to your calendar" : "View and edit event details"}
+              {isCreating ? "Adicione um evento ao seu calendário" : "Visualize e edite os detalhes do evento"}
             </DialogDescription>
           </DialogHeader>
 
           <div className="space-y-4">
             <div className="space-y-2">
-              <Label htmlFor="title">Title</Label>
+              <Label htmlFor="title">Título</Label>
               <Input
                 id="title"
-                value={isCreating ? newEvent.title : selectedEvent?.title}
+                value={(isCreating ? newEvent.title : selectedEvent?.title) ?? ""}
                 onChange={(e) =>
                   isCreating
                     ? setNewEvent((prev) => ({ ...prev, title: e.target.value }))
                     : setSelectedEvent((prev) => (prev ? { ...prev, title: e.target.value } : null))
                 }
-                placeholder="Event title"
+                placeholder="Título do evento"
               />
             </div>
 
             <div className="space-y-2">
-              <Label htmlFor="description">Description</Label>
+              <Label htmlFor="description">Descrição</Label>
               <Textarea
                 id="description"
-                value={isCreating ? newEvent.description : selectedEvent?.description}
+                value={(isCreating ? newEvent.description : selectedEvent?.description) ?? ""}
                 onChange={(e) =>
                   isCreating
                     ? setNewEvent((prev) => ({
@@ -707,74 +863,104 @@ export function EventManager({
                       }))
                     : setSelectedEvent((prev) => (prev ? { ...prev, description: e.target.value } : null))
                 }
-                placeholder="Event description"
+                placeholder="Descrição do evento"
                 rows={3}
               />
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="startTime">Start Time</Label>
-                <Input
-                  id="startTime"
-                  type="datetime-local"
-                  value={
+                <Label>Data início</Label>
+                <DatePickerField
+                  value={startDateValue}
+                  placeholder="Selecionar data"
+                  onChange={(date) => {
+                    if (!date) return
+                    const next = combineDateTime(date, startTimeValue || "09:00")
+                    if (!next) return
                     isCreating
-                      ? newEvent.startTime
-                        ? new Date(newEvent.startTime.getTime() - newEvent.startTime.getTimezoneOffset() * 60000)
-                            .toISOString()
-                            .slice(0, 16)
-                        : ""
-                      : selectedEvent
-                        ? new Date(
-                            selectedEvent.startTime.getTime() - selectedEvent.startTime.getTimezoneOffset() * 60000,
-                          )
-                            .toISOString()
-                            .slice(0, 16)
-                        : ""
-                  }
-                  onChange={(e) => {
-                    const date = new Date(e.target.value)
-                    isCreating
-                      ? setNewEvent((prev) => ({ ...prev, startTime: date }))
-                      : setSelectedEvent((prev) => (prev ? { ...prev, startTime: date } : null))
+                      ? setNewEvent((prev) => ({ ...prev, startTime: next }))
+                      : setSelectedEvent((prev) => (prev ? { ...prev, startTime: next } : null))
                   }}
                 />
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="endTime">End Time</Label>
-                <Input
-                  id="endTime"
-                  type="datetime-local"
-                  value={
+                <Label>Hora início</Label>
+                <Select
+                  value={startTimeValue || undefined}
+                  onValueChange={(time) => {
+                    const date = startDateValue || formatDateInput(new Date())
+                    const next = combineDateTime(date, time)
+                    if (!next) return
                     isCreating
-                      ? newEvent.endTime
-                        ? new Date(newEvent.endTime.getTime() - newEvent.endTime.getTimezoneOffset() * 60000)
-                            .toISOString()
-                            .slice(0, 16)
-                        : ""
-                      : selectedEvent
-                        ? new Date(selectedEvent.endTime.getTime() - selectedEvent.endTime.getTimezoneOffset() * 60000)
-                            .toISOString()
-                            .slice(0, 16)
-                        : ""
-                  }
-                  onChange={(e) => {
-                    const date = new Date(e.target.value)
-                    isCreating
-                      ? setNewEvent((prev) => ({ ...prev, endTime: date }))
-                      : setSelectedEvent((prev) => (prev ? { ...prev, endTime: date } : null))
+                      ? setNewEvent((prev) => ({ ...prev, startTime: next }))
+                      : setSelectedEvent((prev) => (prev ? { ...prev, startTime: next } : null))
                   }}
-                />
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar hora" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeOptions.map((opt) => (
+                      <SelectItem key={opt} value={opt}>
+                        {opt}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
               </div>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
-                <Label htmlFor="category">Category</Label>
+                <Label>Data fim</Label>
+                <DatePickerField
+                  value={endDateValue}
+                  placeholder="Selecionar data"
+                  onChange={(date) => {
+                    if (!date) return
+                    const next = combineDateTime(date, endTimeValue || "18:00")
+                    if (!next) return
+                    isCreating
+                      ? setNewEvent((prev) => ({ ...prev, endTime: next }))
+                      : setSelectedEvent((prev) => (prev ? { ...prev, endTime: next } : null))
+                  }}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <Label>Hora fim</Label>
                 <Select
-                  value={isCreating ? newEvent.category : selectedEvent?.category}
+                  value={endTimeValue || undefined}
+                  onValueChange={(time) => {
+                    const date = endDateValue || formatDateInput(new Date())
+                    const next = combineDateTime(date, time)
+                    if (!next) return
+                    isCreating
+                      ? setNewEvent((prev) => ({ ...prev, endTime: next }))
+                      : setSelectedEvent((prev) => (prev ? { ...prev, endTime: next } : null))
+                  }}
+                >
+                  <SelectTrigger>
+                    <SelectValue placeholder="Selecionar hora" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    {timeOptions.map((opt) => (
+                      <SelectItem key={opt} value={opt}>
+                        {opt}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="category">Categoria</Label>
+                <Select
+                  value={(isCreating ? newEvent.category : selectedEvent?.category) ?? ""}
                   onValueChange={(value) =>
                     isCreating
                       ? setNewEvent((prev) => ({ ...prev, category: value }))
@@ -782,7 +968,7 @@ export function EventManager({
                   }
                 >
                   <SelectTrigger id="category">
-                    <SelectValue placeholder="Select category" />
+                    <SelectValue placeholder="Selecione a categoria" />
                   </SelectTrigger>
                   <SelectContent>
                     {categories.map((cat) => (
@@ -795,9 +981,9 @@ export function EventManager({
               </div>
 
               <div className="space-y-2">
-                <Label htmlFor="color">Color</Label>
+                <Label htmlFor="color">Cor</Label>
                 <Select
-                  value={isCreating ? newEvent.color : selectedEvent?.color}
+                  value={(isCreating ? newEvent.color : selectedEvent?.color) ?? ""}
                   onValueChange={(value) =>
                     isCreating
                       ? setNewEvent((prev) => ({ ...prev, color: value }))
@@ -805,7 +991,7 @@ export function EventManager({
                   }
                 >
                   <SelectTrigger id="color">
-                    <SelectValue placeholder="Select color" />
+                    <SelectValue placeholder="Selecione a cor" />
                   </SelectTrigger>
                   <SelectContent>
                     {colors.map((color) => (
@@ -823,20 +1009,48 @@ export function EventManager({
 
             <div className="space-y-2">
               <Label>Tags</Label>
-              <div className="flex flex-wrap gap-2">
-                {availableTags.map((tag) => {
-                  const isSelected = isCreating ? newEvent.tags?.includes(tag) : selectedEvent?.tags?.includes(tag)
-                  return (
-                    <Badge
-                      key={tag}
-                      variant={isSelected ? "default" : "outline"}
-                      className="cursor-pointer transition-all hover:scale-105"
-                      onClick={() => toggleTag(tag, isCreating)}
-                    >
-                      {tag}
-                    </Badge>
-                  )
-                })}
+              <div className="rounded-lg border bg-muted/20 p-3 space-y-3">
+                <div className="flex flex-wrap gap-2">
+                  {activeTags.length > 0 ? (
+                    activeTags.map((tag) => (
+                      <Badge key={tag} variant="secondary" className="gap-1">
+                        {tag}
+                        <button
+                          type="button"
+                          className="ml-1 rounded-full p-0.5 hover:bg-muted/40"
+                          onClick={() => removeTag(tag, isCreating)}
+                          aria-label={`Remover tag ${tag}`}
+                        >
+                          <X className="h-3 w-3" />
+                        </button>
+                      </Badge>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">Nenhuma tag selecionada</span>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-2">
+                  <Input
+                    value={tagInput}
+                    onChange={(e) => setTagInput(e.target.value)}
+                    placeholder="Adicionar tag"
+                    className="h-9"
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter") {
+                        e.preventDefault()
+                        addTag(tagInput, isCreating)
+                      }
+                    }}
+                  />
+                  <Button type="button" variant="outline" size="sm" onClick={() => addTag(tagInput, isCreating)}>
+                    Adicionar
+                  </Button>
+                </div>
+
+                <p className="text-xs text-muted-foreground">
+                  Digite uma tag e pressione Enter ou clique em Adicionar.
+                </p>
               </div>
             </div>
           </div>
@@ -844,7 +1058,7 @@ export function EventManager({
           <DialogFooter>
             {!isCreating && (
               <Button variant="destructive" onClick={() => selectedEvent && handleDeleteEvent(selectedEvent.id)}>
-                Delete
+                Excluir
               </Button>
             )}
             <Button
@@ -855,14 +1069,59 @@ export function EventManager({
                 setSelectedEvent(null)
               }}
             >
-              Cancel
+              Cancelar
             </Button>
             <Button onClick={isCreating ? handleCreateEvent : handleUpdateEvent}>
-              {isCreating ? "Create" : "Save"}
+              {isCreating ? "Criar" : "Salvar"}
             </Button>
           </DialogFooter>
         </DialogContent>
       </Dialog>
+
+      <Sheet
+        open={dayDrawerOpen}
+        onOpenChange={(open) => {
+          setDayDrawerOpen(open)
+          if (!open) {
+            setSelectedDay(null)
+          }
+        }}
+      >
+        <SheetContent side="right" className="w-full sm:max-w-xl lg:max-w-2xl">
+          <SheetHeader>
+            <SheetTitle>
+              {selectedDay
+                ? capitalizeDate(
+                    selectedDay.toLocaleDateString("pt-BR", {
+                      weekday: "long",
+                      day: "2-digit",
+                      month: "long",
+                      year: "numeric",
+                    }),
+                  )
+                : "Visão do dia"}
+            </SheetTitle>
+            <SheetDescription>Eventos do dia selecionado.</SheetDescription>
+          </SheetHeader>
+          <div className="mt-4">
+            {selectedDay ? (
+              <DayView
+                currentDate={selectedDay}
+                events={filteredEvents}
+                onEventClick={(event) => {
+                  handleEventSelection(event)
+                }}
+                onDragStart={handleDragStart}
+                onDragEnd={handleDragEnd}
+                onDrop={handleDrop}
+                getColorClasses={getColorClasses}
+              />
+            ) : (
+              <div className="text-sm text-muted-foreground">Selecione um dia no calendário.</div>
+            )}
+          </div>
+        </SheetContent>
+      </Sheet>
     </div>
   )
 }
@@ -875,6 +1134,7 @@ function EventCard({
   onDragEnd,
   getColorClasses,
   variant = "default",
+  popoverAlign = "left",
 }: {
   event: Event
   onEventClick: (event: Event) => void
@@ -882,9 +1142,11 @@ function EventCard({
   onDragEnd: () => void
   getColorClasses: (color: string) => { bg: string; text: string }
   variant?: "default" | "compact" | "detailed"
+  popoverAlign?: "left" | "right"
 }) {
   const [isHovered, setIsHovered] = useState(false)
   const colorClasses = getColorClasses(event.color)
+  const isAllDay = isAllDayEvent(event)
 
   const formatTime = (date: Date) => {
     return date.toLocaleTimeString("en-US", {
@@ -906,6 +1168,7 @@ function EventCard({
   if (variant === "compact") {
     return (
       <div
+        data-event-card
         draggable
         onDragStart={() => onDragStart(event)}
         onDragEnd={onDragEnd}
@@ -925,7 +1188,12 @@ function EventCard({
           {event.title}
         </div>
         {isHovered && (
-          <div className="absolute left-0 top-full z-50 mt-1 w-64 animate-in fade-in slide-in-from-top-2 duration-200">
+          <div
+            className={cn(
+              "absolute top-full z-50 mt-1 w-64 animate-in fade-in slide-in-from-top-2 duration-200",
+              popoverAlign === "right" ? "right-0 left-auto" : "left-0",
+            )}
+          >
             <Card className="border-2 p-3 shadow-xl">
               <div className="space-y-2">
                 <div className="flex items-start justify-between gap-2">
@@ -935,10 +1203,16 @@ function EventCard({
                 {event.description && <p className="text-xs text-muted-foreground line-clamp-2">{event.description}</p>}
                 <div className="flex items-center gap-1 text-xs text-muted-foreground">
                   <Clock className="h-3 w-3" />
-                  <span>
-                    {formatTime(event.startTime)} - {formatTime(event.endTime)}
-                  </span>
-                  <span className="text-[10px]">({getDuration()})</span>
+                  {isAllDay ? (
+                    <span>Dia inteiro</span>
+                  ) : (
+                    <>
+                      <span>
+                        {formatTime(event.startTime)} - {formatTime(event.endTime)}
+                      </span>
+                      <span className="text-[10px]">({getDuration()})</span>
+                    </>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {event.category && (
@@ -963,6 +1237,7 @@ function EventCard({
   if (variant === "detailed") {
     return (
       <div
+        data-event-card
         draggable
         onDragStart={() => onDragStart(event)}
         onDragEnd={onDragEnd}
@@ -980,7 +1255,7 @@ function EventCard({
         {event.description && <div className="mt-1 text-sm opacity-90 line-clamp-2">{event.description}</div>}
         <div className="mt-2 flex items-center gap-2 text-xs opacity-80">
           <Clock className="h-3 w-3" />
-          {formatTime(event.startTime)} - {formatTime(event.endTime)}
+          {isAllDay ? "Dia inteiro" : `${formatTime(event.startTime)} - ${formatTime(event.endTime)}`}
         </div>
         {isHovered && (
           <div className="mt-2 flex flex-wrap gap-1 animate-in fade-in slide-in-from-bottom-1 duration-200">
@@ -1002,6 +1277,7 @@ function EventCard({
 
   return (
     <div
+      data-event-card
       draggable
       onDragStart={() => onDragStart(event)}
       onDragEnd={onDragEnd}
@@ -1032,10 +1308,16 @@ function EventCard({
               <div className="space-y-1.5">
                 <div className="flex items-center gap-2 text-xs text-muted-foreground">
                   <Clock className="h-3.5 w-3.5" />
-                  <span>
-                    {formatTime(event.startTime)} - {formatTime(event.endTime)}
-                  </span>
-                  <span className="text-[10px]">({getDuration()})</span>
+                  {isAllDay ? (
+                    <span>Dia inteiro</span>
+                  ) : (
+                    <>
+                      <span>
+                        {formatTime(event.startTime)} - {formatTime(event.endTime)}
+                      </span>
+                      <span className="text-[10px]">({getDuration()})</span>
+                    </>
+                  )}
                 </div>
                 <div className="flex flex-wrap gap-1">
                   {event.category && (
@@ -1064,6 +1346,7 @@ function MonthView({
   events,
   dayModalEvents,
   setDayModalEvents,
+  onDayClick,
   onEventClick,
   onDragStart,
   onDragEnd,
@@ -1074,6 +1357,7 @@ function MonthView({
   events: Event[]
   dayModalEvents: Event[] | null
   setDayModalEvents: (events: Event[] | null) => void
+  onDayClick: (day: Date) => void
   onEventClick: (event: Event) => void
   onDragStart: (event: Event) => void
   onDragEnd: () => void
@@ -1116,7 +1400,7 @@ function MonthView({
     })
 
   return (
-    <Card className="overflow-hidden">
+    <Card className="overflow-visible shadow-none">
       <div className="grid grid-cols-7 border-b">
         {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
           <div key={day} className="border-r p-2 text-center text-xs font-medium last:border-r-0 sm:text-sm">
@@ -1154,6 +1438,13 @@ function MonthView({
                         "min-h-24 border-r p-1 sm:p-2 last:border-r-0 transition-colors hover:bg-accent/50",
                         !isCurrentMonth && "bg-muted/30",
                       )}
+                      onClick={(event) => {
+                        const target = event.target as HTMLElement
+                        if (target.closest("[data-event-card]") || target.closest("[data-day-control]")) {
+                          return
+                        }
+                        onDayClick(day)
+                      }}
                       onDragOver={(e) => e.preventDefault()}
                       onDrop={() => onDrop(day)}
                     >
@@ -1175,13 +1466,18 @@ function MonthView({
                             onDragEnd={onDragEnd}
                             getColorClasses={getColorClasses}
                             variant="compact"
+                            popoverAlign={dayIdx === 6 ? "right" : "left"}
                           />
                         ))}
                         {overflow && (
                           <button
                             type="button"
                             className="text-[10px] text-muted-foreground underline sm:text-xs"
-                            onClick={() => setDayModalEvents(dayEvents)}
+                            data-day-control
+                            onClick={(event) => {
+                              event.stopPropagation()
+                              setDayModalEvents(dayEvents)
+                            }}
                           >
                             +{dayEvents.length - 3} mais
                           </button>
@@ -1348,10 +1644,12 @@ function WeekView({
   const weekStart = startOfDay(weekDays[0])
   const weekEnd = endOfDay(weekDays[6])
 
-  const singleDayEvents = events.filter((event) => isSameDay(event.startTime, event.endTime))
+  const singleDayEvents = events.filter(
+    (event) => !isAllDayEvent(event) && isSameDay(event.startTime, event.endTime),
+  )
   const multidayEvents = events.filter(
     (event) =>
-      !isSameDay(event.startTime, event.endTime) &&
+      (isAllDayEvent(event) || !isSameDay(event.startTime, event.endTime)) &&
       startOfDay(event.startTime) <= weekEnd &&
       endOfDay(event.endTime) >= weekStart,
   )
@@ -1381,10 +1679,10 @@ function WeekView({
   const allDayHeight = Math.max(32, multidayEvents.length * 32 + 12)
 
   return (
-    <Card className="overflow-auto relative">
+    <Card className="overflow-auto relative shadow-none">
       {/* Linha all-day para eventos multiday */}
       <div className="grid grid-cols-8 border-b">
-        <div className="border-r p-2 text-center text-xs font-medium sm:text-sm">All-day</div>
+        <div className="border-r p-2 text-center text-xs font-medium sm:text-sm">Dia inteiro</div>
         <div
           className="col-span-7 relative px-1 sm:px-2"
           style={{ minHeight: allDayHeight }}
@@ -1539,8 +1837,18 @@ function DayView({
   const isSameDay = (a: Date, b: Date) =>
     a.getFullYear() === b.getFullYear() && a.getMonth() === b.getMonth() && a.getDate() === b.getDate()
 
+  const allDayEvents = events.filter((event) => {
+    if (!isAllDayEvent(event)) return false
+    const start = new Date(event.startTime)
+    const end = new Date(event.endTime)
+    const dayStart = startOfDay(currentDate)
+    const dayEnd = endOfDay(currentDate)
+    return start <= dayEnd && end >= dayStart
+  })
+
   const getEventsForHour = (hour: number) =>
     events.filter((event) => {
+      if (isAllDayEvent(event)) return false
       const start = new Date(event.startTime)
       const end = new Date(event.endTime)
       const dayStart = startOfDay(currentDate)
@@ -1563,8 +1871,30 @@ function DayView({
     })
 
   return (
-    <Card className="overflow-auto">
+    <Card className="overflow-auto shadow-none">
       <div className="space-y-0">
+        {allDayEvents.length > 0 && (
+          <div className="flex border-b bg-muted/30">
+            <div className="w-14 flex-shrink-0 border-r p-2 text-[10px] text-muted-foreground sm:w-20 sm:p-3 sm:text-xs">
+              Dia inteiro
+            </div>
+            <div className="min-h-12 flex-1 p-1 sm:min-h-14 sm:p-2">
+              <div className="space-y-2">
+                {allDayEvents.map((event) => (
+                  <EventCard
+                    key={event.id}
+                    event={event}
+                    onEventClick={onEventClick}
+                    onDragStart={onDragStart}
+                    onDragEnd={onDragEnd}
+                    getColorClasses={getColorClasses}
+                    variant="default"
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        )}
         {hours.map((hour) => {
           const hourEvents = getEventsForHour(hour)
           return (
@@ -1630,7 +1960,7 @@ function ListView({
   )
 
   return (
-    <Card className="p-3 sm:p-4">
+    <Card className="p-3 sm:p-4 shadow-none">
       <div className="space-y-6">
         {Object.entries(groupedEvents).map(([date, dateEvents]) => (
           <div key={date} className="space-y-3">
@@ -1666,19 +1996,19 @@ function ListView({
                             )}
                           </div>
                         </div>
-                        <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground sm:gap-4 sm:text-xs">
-                          <div className="flex items-center gap-1">
-                            <Clock className="h-3 w-3" />
-                            {event.startTime.toLocaleTimeString("en-US", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}{" "}
-                            -{" "}
-                            {event.endTime.toLocaleTimeString("en-US", {
-                              hour: "2-digit",
-                              minute: "2-digit",
-                            })}
-                          </div>
+                      <div className="mt-2 flex flex-wrap items-center gap-2 text-[10px] text-muted-foreground sm:gap-4 sm:text-xs">
+                        <div className="flex items-center gap-1">
+                          <Clock className="h-3 w-3" />
+                          {isAllDayEvent(event)
+                            ? "Dia inteiro"
+                            : `${event.startTime.toLocaleTimeString("en-US", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })} - ${event.endTime.toLocaleTimeString("en-US", {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}`}
+                        </div>
                           {event.tags && event.tags.length > 0 && (
                             <div className="flex flex-wrap gap-1">
                               {event.tags.map((tag) => (

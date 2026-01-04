@@ -17,9 +17,11 @@ export interface CalendarEvent {
   client_id: string | null;
   value: number;
   details?: unknown;
+  tags?: string[];
   priority?: string | null;
   column_name?: string | null;
   assignees?: string[];
+  isAllDay?: boolean;
 }
 
 export function useCalendarEvents() {
@@ -101,11 +103,43 @@ export function useCalendarEvents() {
       const taskEvents: CalendarEvent[] = (tasks || [])
         .filter((t) => t.startDate || t.dueDate)
         .map((task) => {
+          const isDateOnly = (value?: string | null) => {
+            if (!value) return false;
+            const parsed = new Date(value);
+            if (Number.isNaN(parsed.getTime())) return false;
+            return (
+              parsed.getHours() === 0 &&
+              parsed.getMinutes() === 0 &&
+              parsed.getSeconds() === 0 &&
+              parsed.getMilliseconds() === 0
+            );
+          };
+
           const start = task.startDate ? new Date(task.startDate) : task.dueDate ? new Date(task.dueDate) : null;
           if (!start || Number.isNaN(start.getTime())) return null;
 
           const hasStart = Boolean(task.startDate);
           const hasDue = Boolean(task.dueDate);
+          const startIsDateOnly = task.startDate ? isDateOnly(task.startDate) : true;
+          const dueIsDateOnly = task.dueDate ? isDateOnly(task.dueDate) : true;
+          const isAllDay = startIsDateOnly && dueIsDateOnly;
+
+          const normalizeStart = (value: Date) => {
+            const normalized = new Date(value);
+            if (isAllDay) {
+              normalized.setHours(0, 0, 0, 0);
+            }
+            return normalized;
+          };
+
+          const normalizeEnd = (value: Date) => {
+            const normalized = new Date(value);
+            if (isAllDay) {
+              normalized.setHours(23, 59, 59, 999);
+            }
+            return normalized;
+          };
+
           let end = new Date(start.getTime() + 60 * 60 * 1000);
           if (hasStart && hasDue) {
             const tmp = new Date(task.dueDate);
@@ -115,12 +149,18 @@ export function useCalendarEvents() {
             if (!Number.isNaN(tmp.getTime())) end = new Date(tmp.getTime() + 60 * 60 * 1000);
           }
 
+          const normalizedStart = normalizeStart(start);
+          const normalizedEnd = normalizeEnd(end);
+
           return {
             id: task.id,
             type: 'task',
-          description: task.description || '',
-          start_date: start.toISOString(),
-          end_date: end && !Number.isNaN(end.getTime()) ? end.toISOString() : start.toISOString(),
+            description: task.description || '',
+            start_date: normalizedStart.toISOString(),
+            end_date:
+              normalizedEnd && !Number.isNaN(normalizedEnd.getTime())
+                ? normalizedEnd.toISOString()
+                : normalizedStart.toISOString(),
             origin: null,
             destination: null,
             proposal_id: task.proposalId ?? '',
@@ -129,6 +169,7 @@ export function useCalendarEvents() {
             client_name: task.client?.name ?? null,
             client_id: task.clientId ?? null,
             value: 0,
+            tags: Array.isArray(task.tags) ? task.tags : [],
             details: {
               column: task.column?.name ?? '',
               priority: task.priority ?? 'medium',
@@ -139,6 +180,7 @@ export function useCalendarEvents() {
             assignees: (task.assignees || [])
               .map((a: any) => a.user?.name)
               .filter(Boolean),
+            isAllDay,
           } as CalendarEvent;
         })
         .filter(Boolean) as CalendarEvent[];

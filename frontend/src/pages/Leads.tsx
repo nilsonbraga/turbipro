@@ -12,10 +12,12 @@ import { LeadViewToggle, LeadViewMode } from '@/components/leads/LeadViewToggle'
 import { LeadListView } from '@/components/leads/LeadListView';
 import { useCollaboratorCommissions } from '@/hooks/useCollaboratorCommissions';
 import { useCollaborators } from '@/hooks/useCollaborators';
+import { useAgencyUsers } from '@/hooks/useAgencyUsers';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
 import { 
@@ -24,6 +26,7 @@ import {
   DialogHeader,
   DialogTitle
 } from '@/components/ui/dialog';
+import { Switch } from '@/components/ui/switch';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -40,10 +43,10 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
-import { Plus, Search, Eye, Edit, Trash2, Calendar as CalendarIcon, MoreHorizontal, Loader2, AlertTriangle, CheckCircle, Filter, Building2, X, DollarSign, ExternalLink } from 'lucide-react';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Plus, Search, Eye, Edit, Trash2, Calendar as CalendarIcon, MoreHorizontal, Loader2, AlertTriangle, CheckCircle, Filter, Building2, X, DollarSign, ExternalLink, History, Pencil } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useQuery } from '@tanstack/react-query';
+import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
@@ -103,6 +106,7 @@ interface ProposalCardProps {
   proposal: Proposal;
   tags: { name: string; color: string }[];
   serviceTotals: { value: number; commission: number } | undefined;
+  lastMovement?: { id: string; name: string; email?: string | null; avatar_url?: string | null } | null;
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
@@ -111,7 +115,18 @@ interface ProposalCardProps {
   onCopyLink: () => void;
 }
 
-function ProposalCard({ proposal, tags, serviceTotals, onView, onEdit, onDelete, onClose, onDragStart, onCopyLink }: ProposalCardProps) {
+function ProposalCard({
+  proposal,
+  tags,
+  serviceTotals,
+  lastMovement,
+  onView,
+  onEdit,
+  onDelete,
+  onClose,
+  onDragStart,
+  onCopyLink,
+}: ProposalCardProps) {
   const client = proposal.clients;
   const totalValue = serviceTotals?.value || 0;
   const totalCommission = serviceTotals?.commission || 0;
@@ -124,11 +139,24 @@ function ProposalCard({ proposal, tags, serviceTotals, onView, onEdit, onDelete,
       .toUpperCase()
       .slice(0, 2);
   };
-  const sellerName = proposal.assigned_collaborator?.name || proposal.created_by?.name || 'Responsável não definido';
+  const creatorName =
+    proposal.created_by?.name ||
+    proposal.created_by?.email ||
+    proposal.assigned_collaborator?.name ||
+    'Responsável não definido';
+  const creatorAvatar =
+    proposal.created_by?.avatar_url || (proposal.created_by as any)?.avatarUrl || null;
+  const lastMovementName = lastMovement?.name || lastMovement?.email || null;
+  const lastMovementAvatar = lastMovement?.avatar_url || null;
+  const isDifferentMover = lastMovementName
+    ? proposal.created_by?.id
+      ? proposal.created_by.id !== lastMovement?.id
+      : lastMovementName !== creatorName
+    : false;
 
   return (
     <div 
-      className="bg-card p-4 rounded-lg border border-border shadow-sm hover:shadow-md transition-shadow cursor-grab group"
+      className="bg-card p-4 rounded-lg border-0 shadow-sm hover:shadow-md transition-shadow cursor-grab group"
       draggable
       onDragStart={onDragStart}
       onClick={onView}
@@ -203,9 +231,37 @@ function ProposalCard({ proposal, tags, serviceTotals, onView, onEdit, onDelete,
 
       <div className="flex items-center gap-2 mb-2 flex-wrap">
         <Badge variant="outline" className="text-xs">#{proposal.number}</Badge>
-        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary">
-          {sellerName}
+        <Badge variant="secondary" className="text-xs bg-primary/10 text-primary gap-1">
+          <Avatar className="h-4 w-4">
+            {creatorAvatar ? (
+              <AvatarImage src={creatorAvatar} alt={creatorName} />
+            ) : (
+              <AvatarFallback className="text-[9px] bg-primary text-primary-foreground">
+                {getInitials(creatorName)}
+              </AvatarFallback>
+            )}
+          </Avatar>
+          {creatorName}
         </Badge>
+        {isDifferentMover && lastMovementName && (
+          <Badge
+            variant="secondary"
+            className="text-xs bg-slate-100 text-slate-700 gap-1"
+            title="Última movimentação"
+          >
+            <History className="h-3 w-3" />
+            <Avatar className="h-4 w-4">
+              {lastMovementAvatar ? (
+                <AvatarImage src={lastMovementAvatar} alt={lastMovementName} />
+              ) : (
+                <AvatarFallback className="text-[9px] bg-slate-300 text-slate-700">
+                  {getInitials(lastMovementName)}
+                </AvatarFallback>
+              )}
+            </Avatar>
+            {lastMovementName}
+          </Badge>
+        )}
       </div>
       
       {/* Valor e Lucro */}
@@ -241,12 +297,14 @@ interface KanbanColumnProps {
   proposals: Proposal[];
   proposalTags: Record<string, { name: string; color: string }[]>;
   serviceTotals: Record<string, { value: number; commission: number }>;
+  lastMovements: Record<string, { id: string; name: string; email?: string | null } | null>;
   onProposalView: (proposal: Proposal) => void;
   onProposalEdit: (proposal: Proposal) => void;
   onProposalDelete: (proposal: Proposal) => void;
   onProposalClose: (proposal: Proposal) => void;
   onDrop: (proposalId: string, stageId: string) => void;
   onAddProposal: (stageId: string) => void;
+  onEditColumn: (stage: PipelineStage) => void;
   onProposalCopyLink: (proposal: Proposal) => void;
 }
 
@@ -255,12 +313,14 @@ function KanbanColumn({
   proposals,
   proposalTags,
   serviceTotals,
+  lastMovements,
   onProposalView, 
   onProposalEdit, 
   onProposalDelete,
   onProposalClose,
   onDrop,
   onAddProposal,
+  onEditColumn,
   onProposalCopyLink,
 }: KanbanColumnProps) {
   const totalValue = proposals.reduce((sum, p) => sum + (serviceTotals[p.id]?.value || 0), 0);
@@ -287,27 +347,42 @@ function KanbanColumn({
   return (
     <div 
       className={cn(
-        "flex flex-col min-w-[320px] max-w-[320px] rounded-lg transition-colors",
+        "flex flex-col min-w-[320px] max-w-[320px] rounded-xl border-0 bg-muted/30 transition-colors",
         isDragOver && "bg-accent/50"
       )}
       onDragOver={handleDragOver}
       onDragLeave={handleDragLeave}
       onDrop={handleDrop}
     >
-      <div className="flex items-center justify-between mb-3 px-1">
+      <div className="flex items-center justify-between p-3 border-b border-border/60">
         <div className="flex items-center gap-2">
           <div className="w-3 h-3 rounded-full" style={{ backgroundColor: stage.color }} />
           <h3 className="font-semibold text-sm">{stage.name}</h3>
-          <Badge variant="secondary" className="text-xs">
+          <span className="text-xs text-muted-foreground bg-muted px-1.5 py-0.5 rounded">
             {proposals.length}
-          </Badge>
+          </span>
         </div>
-        <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddProposal(stage.id)}>
-          <Plus className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button variant="ghost" size="icon" className="h-7 w-7" onClick={() => onAddProposal(stage.id)}>
+            <Plus className="w-4 h-4" />
+          </Button>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <Button variant="ghost" size="icon" className="h-7 w-7">
+                <MoreHorizontal className="h-4 w-4" />
+              </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end">
+              <DropdownMenuItem onClick={() => onEditColumn(stage)}>
+                <Pencil className="mr-2 h-4 w-4" />
+                Editar coluna
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </div>
       </div>
 
-      <div className="px-1 mb-2">
+      <div className="px-3 pt-3 pb-2">
         <div className="h-1 rounded-full bg-muted overflow-hidden">
           <div 
             className="h-full rounded-full transition-all" 
@@ -320,13 +395,14 @@ function KanbanColumn({
         <p className="text-xs text-muted-foreground mt-1">{formatCurrency(totalValue)}</p>
       </div>
 
-      <div className="flex-1 space-y-3 overflow-y-auto pr-1 pb-4">
+      <div className="flex-1 space-y-3 overflow-y-auto px-3 pb-4">
         {proposals.map((proposal) => (
           <ProposalCard 
             key={proposal.id} 
             proposal={proposal}
             tags={proposalTags[proposal.id] || []}
             serviceTotals={serviceTotals[proposal.id]}
+            lastMovement={lastMovements[proposal.id] ?? null}
             onView={() => onProposalView(proposal)}
             onEdit={() => onProposalEdit(proposal)}
             onDelete={() => onProposalDelete(proposal)}
@@ -352,10 +428,11 @@ export default function Leads() {
   const navigate = useNavigate();
   const prefillLead = (location.state as { prefillLead?: PrefillLeadData })?.prefillLead;
   const { toast } = useToast();
+  const queryClient = useQueryClient();
 
   const { agency, isSuperAdmin, isAdmin, profile } = useAuth();
   const { proposals, isLoading, createProposalAsync, updateProposal, updateProposalStage, deleteProposal, isCreating, isUpdating, isDeleting } = useProposals();
-  const { stages } = usePipelineStages();
+  const { stages, updateStage, isUpdating: isUpdatingStage } = usePipelineStages();
   const { clients } = useClients();
   const { agencies } = useAgencies();
   const { tags: allTags } = useTags();
@@ -374,6 +451,12 @@ export default function Leads() {
   const [proposalToDelete, setProposalToDelete] = useState<Proposal | null>(null);
   const [defaultStageId, setDefaultStageId] = useState<string | null>(null);
   const [prefillData, setPrefillData] = useState<PrefillLeadData | null>(null);
+  const [stageDialogOpen, setStageDialogOpen] = useState(false);
+  const [editingStage, setEditingStage] = useState<PipelineStage | null>(null);
+  const [stageName, setStageName] = useState('');
+  const [stageColor, setStageColor] = useState('#3B82F6');
+  const [stageIsClosed, setStageIsClosed] = useState(false);
+  const [stageIsLost, setStageIsLost] = useState(false);
   
   // Financial confirmation dialogs
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
@@ -390,6 +473,11 @@ export default function Leads() {
   const [selectedTagId, setSelectedTagId] = useState<string>('all');
   const [selectedSellerId, setSelectedSellerId] = useState<string>('all');
   const [dateRange, setDateRange] = useState<DateRange | undefined>();
+  const effectiveUsersAgencyId =
+    isSuperAdmin && selectedAgencyId !== 'all'
+      ? selectedAgencyId
+      : profile?.agency_id ?? null;
+  const { users: agencyUsers = [] } = useAgencyUsers(effectiveUsersAgencyId);
 
   const logStageHistory = async (proposal: Proposal, fromStageId: string | null, toStageId: string | null) => {
     try {
@@ -406,9 +494,31 @@ export default function Leads() {
           newValue: toStage?.name || null,
         }),
       });
+      queryClient.invalidateQueries({ queryKey: ['proposal-last-movements'] });
     } catch (error) {
       console.error('Erro ao registrar histórico de etapa:', error);
     }
+  };
+
+  const openStageDialog = (stage: PipelineStage) => {
+    setEditingStage(stage);
+    setStageName(stage.name);
+    setStageColor(stage.color || '#3B82F6');
+    setStageIsClosed(stage.is_closed);
+    setStageIsLost(stage.is_lost);
+    setStageDialogOpen(true);
+  };
+
+  const handleSaveStage = () => {
+    if (!editingStage) return;
+    updateStage({
+      id: editingStage.id,
+      name: stageName.trim() || editingStage.name,
+      color: stageColor,
+      is_closed: stageIsClosed,
+      is_lost: stageIsLost,
+    });
+    setStageDialogOpen(false);
   };
 
   // Helpers para refletir serviços no calendário
@@ -562,6 +672,57 @@ export default function Leads() {
   const getProposalsByStage = (stageId: string) => {
     return filteredProposals.filter(p => p.stage_id === stageId);
   };
+  const proposalIds = useMemo(() => filteredProposals.map((proposal) => proposal.id), [filteredProposals]);
+  const { data: lastMovementsByProposal = {} } = useQuery({
+    queryKey: ['proposal-last-movements', proposalIds],
+    queryFn: async () => {
+      if (proposalIds.length === 0) return {};
+      const params = new URLSearchParams({
+        where: JSON.stringify({ proposalId: { in: proposalIds } }),
+        include: JSON.stringify({ user: { select: { id: true, name: true, email: true, avatarUrl: true, profile: { select: { avatarUrl: true } } } } }),
+        orderBy: JSON.stringify({ createdAt: 'desc' }),
+      });
+      const { data } = await apiFetch<{ data: any[] }>(`/api/proposalHistory?${params.toString()}`);
+      const map: Record<string, { id: string; name: string; email?: string | null; avatar_url?: string | null } | null> = {};
+      (data || []).forEach((history) => {
+        const proposalId = history.proposalId;
+        if (!proposalId || map[proposalId]) return;
+        const user = history.user;
+        if (!user) return;
+        map[proposalId] = {
+          id: user.id,
+          name: user.name || user.email || 'Usuário',
+          email: user.email ?? null,
+          avatar_url: user.avatarUrl || user.profile?.avatarUrl || null,
+        };
+      });
+      return map;
+    },
+    enabled: proposalIds.length > 0,
+  });
+  const userAvatarById = useMemo(() => {
+    const map = new Map<string, string>();
+    agencyUsers.forEach((u) => {
+      if (u.id && u.avatar_url) map.set(u.id, u.avatar_url);
+    });
+    return map;
+  }, [agencyUsers]);
+  const lastMovementsWithAvatars = useMemo(() => {
+    const next: Record<string, { id: string; name: string; email?: string | null; avatar_url?: string | null } | null> = {};
+    Object.entries(lastMovementsByProposal).forEach(([proposalId, movement]) => {
+      if (!movement) {
+        next[proposalId] = null;
+        return;
+      }
+      if (movement.avatar_url) {
+        next[proposalId] = movement;
+        return;
+      }
+      const fallback = userAvatarById.get(movement.id);
+      next[proposalId] = fallback ? { ...movement, avatar_url: fallback } : movement;
+    });
+    return next;
+  }, [lastMovementsByProposal, userAvatarById]);
   const sellerOptions = useMemo(() => {
     const map = new Map<string, string>();
     filteredProposals.forEach((p) => {
@@ -572,6 +733,41 @@ export default function Leads() {
     });
     return Array.from(map.entries()).map(([id, name]) => ({ id, name }));
   }, [filteredProposals]);
+  const agencyFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todas as agências' },
+      ...(agencies ?? []).map((agency) => ({ value: agency.id, label: agency.name })),
+    ],
+    [agencies],
+  );
+  const clientFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todos os clientes' },
+      ...(clients ?? []).map((client) => ({ value: client.id, label: client.name })),
+    ],
+    [clients],
+  );
+  const stageFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todos os estágios' },
+      ...(stages ?? []).map((stage) => ({ value: stage.id, label: stage.name })),
+    ],
+    [stages],
+  );
+  const tagFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todas as tags' },
+      ...(allTags ?? []).map((tag) => ({ value: tag.id, label: tag.name })),
+    ],
+    [allTags],
+  );
+  const sellerFilterOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todos os responsáveis' },
+      ...sellerOptions.map((seller) => ({ value: seller.id, label: seller.name })),
+    ],
+    [sellerOptions],
+  );
 
   const handleAddProposal = (stageId?: string) => {
     setEditingProposal(null);
@@ -840,23 +1036,19 @@ export default function Leads() {
             {/* Agency Selector for Super Admin */}
             {isSuperAdmin && (
               <>
-                <Select
-                  value={selectedAgencyId}
-                  onValueChange={setSelectedAgencyId}
-                >
-                  <SelectTrigger className="w-56 h-9">
-                    <Building2 className="h-4 w-4 mr-2 text-muted-foreground" />
-                    <SelectValue placeholder="Todas as agências" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as agências</SelectItem>
-                    {agencies.map((agency) => (
-                      <SelectItem key={agency.id} value={agency.id}>
-                        {agency.name}
-                      </SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                <div className="relative">
+                  <Building2 className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Combobox
+                    options={agencyFilterOptions}
+                    value={selectedAgencyId}
+                    onValueChange={setSelectedAgencyId}
+                    placeholder="Todas as agências"
+                    searchPlaceholder="Buscar agência..."
+                    emptyText="Nenhuma agência encontrada"
+                    buttonClassName="w-56 h-9 pl-9"
+                    contentClassName="w-56"
+                  />
+                </div>
                 <div className="h-6 w-px bg-border" />
               </>
             )}
@@ -902,79 +1094,49 @@ export default function Leads() {
         {/* Filters */}
         {showFilters && (
           <div className="flex flex-wrap gap-3 px-4 pb-4">
-            <Select
+            <Combobox
+              options={clientFilterOptions}
               value={selectedClientId}
               onValueChange={setSelectedClientId}
-            >
-              <SelectTrigger className="w-44 h-9">
-                <SelectValue placeholder="Cliente" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os clientes</SelectItem>
-                {clients?.map((client) => (
-                  <SelectItem key={client.id} value={client.id}>
-                    {client.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Cliente"
+              searchPlaceholder="Buscar cliente..."
+              emptyText="Nenhum cliente encontrado"
+              buttonClassName="w-44 h-9"
+              contentClassName="w-56"
+            />
 
-            <Select
+            <Combobox
+              options={sellerFilterOptions}
               value={selectedSellerId}
               onValueChange={setSelectedSellerId}
-            >
-              <SelectTrigger className="w-60 h-9">
-                <SelectValue placeholder="Responsável" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os responsáveis</SelectItem>
-                {sellerOptions.map((s) => (
-                  <SelectItem key={s.id} value={s.id}>
-                    {s.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Responsável"
+              searchPlaceholder="Buscar responsável..."
+              emptyText="Nenhum responsável encontrado"
+              buttonClassName="w-60 h-9"
+              contentClassName="w-60"
+            />
 
-            <Select
+            <Combobox
+              options={stageFilterOptions}
               value={selectedStageId}
               onValueChange={setSelectedStageId}
-            >
-              <SelectTrigger className="w-44 h-9">
-                <SelectValue placeholder="Estágio" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos os estágios</SelectItem>
-                {stages?.map((stage) => (
-                  <SelectItem key={stage.id} value={stage.id}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: stage.color }} />
-                      {stage.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Estágio"
+              searchPlaceholder="Buscar estágio..."
+              emptyText="Nenhum estágio encontrado"
+              buttonClassName="w-44 h-9"
+              contentClassName="w-56"
+            />
 
-            <Select
+            <Combobox
+              options={tagFilterOptions}
               value={selectedTagId}
               onValueChange={setSelectedTagId}
-            >
-              <SelectTrigger className="w-44 h-9">
-                <SelectValue placeholder="Tag" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as tags</SelectItem>
-                {allTags?.map((tag) => (
-                  <SelectItem key={tag.id} value={tag.id}>
-                    <div className="flex items-center gap-2">
-                      <div className="w-2 h-2 rounded-full" style={{ backgroundColor: tag.color }} />
-                      {tag.name}
-                    </div>
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
+              placeholder="Tag"
+              searchPlaceholder="Buscar tag..."
+              emptyText="Nenhuma tag encontrada"
+              buttonClassName="w-44 h-9"
+              contentClassName="w-56"
+            />
 
             <Popover>
               <PopoverTrigger asChild>
@@ -1046,12 +1208,14 @@ export default function Leads() {
                   proposals={getProposalsByStage(stage.id)}
                   proposalTags={proposalTagsMap}
                   serviceTotals={serviceTotals || {}}
+                  lastMovements={lastMovementsWithAvatars}
                   onProposalView={setViewingProposal}
                   onProposalEdit={handleEdit}
                   onProposalDelete={handleDelete}
                   onProposalClose={handleCloseProposal}
                   onDrop={handleDrop}
                   onAddProposal={handleAddProposal}
+                  onEditColumn={openStageDialog}
                   onProposalCopyLink={(proposal) => handleCopyProposalLink(proposal.id)}
                 />
               ))}
@@ -1086,6 +1250,66 @@ export default function Leads() {
           )}
         </div>
       )}
+
+      <Dialog open={stageDialogOpen} onOpenChange={setStageDialogOpen}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Editar coluna</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div className="space-y-2">
+              <Label htmlFor="stage-name">Nome da coluna</Label>
+              <Input
+                id="stage-name"
+                value={stageName}
+                onChange={(e) => setStageName(e.target.value)}
+                placeholder="Nome do estágio"
+              />
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="stage-color">Cor</Label>
+              <div className="flex items-center gap-3">
+                <input
+                  id="stage-color"
+                  type="color"
+                  value={stageColor}
+                  onChange={(e) => setStageColor(e.target.value)}
+                  className="h-9 w-12 rounded-md border border-input bg-background p-1"
+                />
+                <Input
+                  value={stageColor}
+                  onChange={(e) => setStageColor(e.target.value)}
+                  className="h-9 w-28"
+                />
+              </div>
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="stage-closed">Fechado</Label>
+              <Switch
+                id="stage-closed"
+                checked={stageIsClosed}
+                onCheckedChange={setStageIsClosed}
+              />
+            </div>
+            <div className="flex items-center justify-between">
+              <Label htmlFor="stage-lost">Perdido</Label>
+              <Switch
+                id="stage-lost"
+                checked={stageIsLost}
+                onCheckedChange={setStageIsLost}
+              />
+            </div>
+          </div>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button variant="ghost" onClick={() => setStageDialogOpen(false)}>
+              Cancelar
+            </Button>
+            <Button onClick={handleSaveStage} disabled={isUpdatingStage}>
+              Salvar
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
 
       {/* Proposal Dialog */}
       <ProposalDialog

@@ -128,9 +128,8 @@ function ColumnSection({ column, tasks, onEditTask, onDeleteTask, onOpenProposal
             <TableHeader>
               <TableRow className="hover:bg-transparent">
                 <TableHead className="min-w-[200px]">Nome</TableHead>
-                <TableHead className="w-[150px]">Cliente</TableHead>
+                <TableHead className="w-[220px]">Cliente</TableHead>
                 <TableHead className="w-[150px]">Responsável</TableHead>
-                <TableHead className="w-[120px]">Lead</TableHead>
                 <TableHead className="w-[100px]">Data início</TableHead>
                 <TableHead className="w-[100px]">Prazo</TableHead>
                 <TableHead className="w-[100px]">Prioridade</TableHead>
@@ -183,23 +182,6 @@ function ColumnSection({ column, tasks, onEditTask, onDeleteTask, onOpenProposal
                             </span>
                           )}
                         </div>
-                      ) : (
-                        <span className="text-sm text-muted-foreground">-</span>
-                      )}
-                    </TableCell>
-                    <TableCell>
-                      {task.proposal ? (
-                        <Badge 
-                          variant="outline" 
-                          className="text-xs gap-1 h-5 cursor-pointer hover:bg-primary hover:text-primary-foreground"
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            onOpenProposal?.(task.proposal!.id);
-                          }}
-                        >
-                          <FileText className="h-3 w-3" />
-                          #{task.proposal.number}
-                        </Badge>
                       ) : (
                         <span className="text-sm text-muted-foreground">-</span>
                       )}

@@ -171,7 +171,7 @@ export function AppSidebar() {
   return (
     <aside
       className={cn(
-        "flex flex-col font-['Poppins'] transition-all duration-500 shadow-sm",
+        "flex h-full min-h-0 flex-col font-['Poppins'] transition-all duration-500 shadow-sm",
         collapsed ? 'w-16' : 'w-64',
         'rounded-2xl bg-white text-slate-900'
       )}

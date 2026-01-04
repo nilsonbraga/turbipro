@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react';
+import { useMemo, useState, useEffect, useRef } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Combobox } from '@/components/ui/combobox';
 import { Checkbox } from '@/components/ui/checkbox';
 import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
@@ -49,6 +49,7 @@ interface TaskDialogProps {
   task?: Task | null;
   columns: TaskColumn[];
   defaultColumnId?: string;
+  agencyId?: string | null;
   onSave: (data: TaskInput & { id?: string }) => void;
   isLoading?: boolean;
   prefillData?: { title?: string; description?: string } | null;
@@ -60,13 +61,14 @@ export function TaskDialog({
   task,
   columns,
   defaultColumnId,
+  agencyId,
   onSave,
   isLoading,
   prefillData,
 }: TaskDialogProps) {
   const { clients } = useClients();
   const { proposals } = useProposals();
-  const { users } = useAgencyUsers();
+  const { users } = useAgencyUsers(agencyId ?? null);
   const { user } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
@@ -98,6 +100,38 @@ export function TaskDialog({
   const [showHistoryPanel, setShowHistoryPanel] = useState(false);
   const [showFilesPanel, setShowFilesPanel] = useState(false);
   const [fileView, setFileView] = useState<'grid' | 'list'>('grid');
+  const selectedUsers = useMemo(
+    () => users.filter((u) => selectedAssignees.includes(u.id)),
+    [users, selectedAssignees]
+  );
+  const clientOptions = useMemo(
+    () => [
+      { value: 'none', label: 'Nenhum' },
+      ...(clients ?? []).map((client) => ({
+        value: client.id,
+        label: client.name,
+      })),
+    ],
+    [clients]
+  );
+  const proposalOptions = useMemo(
+    () => [
+      { value: 'none', label: 'Nenhuma' },
+      ...(proposals ?? []).map((proposal) => ({
+        value: proposal.id,
+        label: `#${proposal.number} - ${proposal.title}`,
+      })),
+    ],
+    [proposals]
+  );
+  const priorityOptions = useMemo(
+    () => [
+      { value: 'high', label: 'Alta' },
+      { value: 'medium', label: 'Média' },
+      { value: 'low', label: 'Baixa' },
+    ],
+    []
+  );
 
   useEffect(() => {
     if (open) {
@@ -755,35 +789,29 @@ export function TaskDialog({
                 <div className="grid grid-cols-2 gap-3 md:col-span-1">
                   <div className="space-y-2">
                     <Label>Cliente</Label>
-                    <Select value={clientId || "none"} onValueChange={(val) => setClientId(val === "none" ? "" : val)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Nenhum" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhum</SelectItem>
-                        {clients?.map((client) => (
-                          <SelectItem key={client.id} value={client.id}>
-                            {client.name}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Combobox
+                      options={clientOptions}
+                      value={clientId || 'none'}
+                      onValueChange={(val) => setClientId(val === 'none' ? '' : val)}
+                      placeholder="Nenhum"
+                      searchPlaceholder="Buscar cliente..."
+                      emptyText="Nenhum cliente encontrado"
+                      buttonClassName="w-full h-9"
+                      contentClassName="w-72"
+                    />
                   </div>
                   <div className="space-y-2">
                     <Label>Cotação</Label>
-                    <Select value={proposalId || "none"} onValueChange={(val) => setProposalId(val === "none" ? "" : val)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Nenhuma" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="none">Nenhuma</SelectItem>
-                        {proposals?.map((proposal) => (
-                          <SelectItem key={proposal.id} value={proposal.id}>
-                            #{proposal.number} - {proposal.title}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                    <Combobox
+                      options={proposalOptions}
+                      value={proposalId || 'none'}
+                      onValueChange={(val) => setProposalId(val === 'none' ? '' : val)}
+                      placeholder="Nenhuma"
+                      searchPlaceholder="Buscar cotação..."
+                      emptyText="Nenhuma cotação encontrada"
+                      buttonClassName="w-full h-9"
+                      contentClassName="w-72"
+                    />
                   </div>
                 </div>
               </div>
@@ -854,49 +882,117 @@ export function TaskDialog({
                 </div>
                 <div className="space-y-2">
                   <Label>Prioridade</Label>
-                  <Select value={priority} onValueChange={(val) => setPriority(val as 'low' | 'medium' | 'high')}>
-                    <SelectTrigger>
-                      <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="high">Alta</SelectItem>
-                      <SelectItem value="medium">Média</SelectItem>
-                      <SelectItem value="low">Baixa</SelectItem>
-                    </SelectContent>
-                  </Select>
+                  <Combobox
+                    options={priorityOptions}
+                    value={priority}
+                    onValueChange={(val) => setPriority(val as 'low' | 'medium' | 'high')}
+                    placeholder="Selecionar prioridade"
+                    searchPlaceholder="Buscar prioridade..."
+                    emptyText="Nenhuma prioridade encontrada"
+                    buttonClassName="w-full h-9"
+                    contentClassName="w-48"
+                  />
                 </div>
                 <div className="space-y-2">
                   <Label>Tags (separe por vírgula)</Label>
                   <Input
                     value={tags}
                     onChange={(e) => setTags(e.target.value)}
-                    placeholder="ex: UI, Financeiro, Urgente"
+                    placeholder="ex: Financeiro, Urgente, Comercial.."
                   />
                 </div>
               </div>
 
-              {users && users.length > 0 && (
-                <div className="space-y-2">
-                  <Label>Responsáveis</Label>
-                  <div className="border rounded-md p-3 max-h-32 overflow-y-auto space-y-2">
-                    {users.map((user) => (
-                      <div key={user.id} className="flex items-center space-x-2">
-                        <Checkbox
-                          id={`user-${user.id}`}
-                          checked={selectedAssignees.includes(user.id)}
-                          onCheckedChange={() => toggleAssignee(user.id)}
-                        />
-                        <label
-                          htmlFor={`user-${user.id}`}
-                          className="text-sm cursor-pointer"
+              <div className="space-y-2">
+                <Label>Responsáveis</Label>
+                {users.length > 0 ? (
+                  <div className="space-y-2">
+                    <Popover>
+                      <PopoverTrigger asChild>
+                        <Button
+                          variant="outline"
+                          className="w-full justify-between"
                         >
-                          {user.name} ({user.email})
-                        </label>
-                      </div>
-                    ))}
+                          <div className="flex items-center gap-2">
+                            {selectedUsers.length > 0 ? (
+                              <>
+                                <div className="flex -space-x-1">
+                                  {selectedUsers.slice(0, 4).map((user) => (
+                                    <Avatar key={user.id} className="h-6 w-6 border border-background">
+                                      {user.avatar_url ? (
+                                        <AvatarImage src={user.avatar_url} alt={user.name || user.email || 'Usuário'} />
+                                      ) : (
+                                        <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
+                                          {user.name
+                                            ? user.name
+                                                .split(' ')
+                                                .map((n) => n[0])
+                                                .join('')
+                                                .slice(0, 2)
+                                                .toUpperCase()
+                                            : (user.email || 'U').slice(0, 2).toUpperCase()}
+                                        </AvatarFallback>
+                                      )}
+                                    </Avatar>
+                                  ))}
+                                  {selectedUsers.length > 4 && (
+                                    <span className="ml-2 text-xs text-muted-foreground">
+                                      +{selectedUsers.length - 4}
+                                    </span>
+                                  )}
+                                </div>
+                                <span className="text-sm">{selectedUsers.length} selecionado(s)</span>
+                              </>
+                            ) : (
+                              <span className="text-sm text-muted-foreground">Selecionar responsáveis</span>
+                            )}
+                          </div>
+                          <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                        </Button>
+                      </PopoverTrigger>
+                      <PopoverContent className="w-80 p-2" align="start">
+                        <div className="max-h-56 overflow-y-auto space-y-1">
+                          {users.map((user) => (
+                            <label
+                              key={user.id}
+                              htmlFor={`user-${user.id}`}
+                              className="flex items-center gap-2 rounded-md px-2 py-2 hover:bg-muted/60 cursor-pointer"
+                            >
+                              <Checkbox
+                                id={`user-${user.id}`}
+                                checked={selectedAssignees.includes(user.id)}
+                                onCheckedChange={() => toggleAssignee(user.id)}
+                              />
+                              <Avatar className="h-7 w-7">
+                                {user.avatar_url ? (
+                                  <AvatarImage src={user.avatar_url} alt={user.name || user.email || 'Usuário'} />
+                                ) : (
+                                  <AvatarFallback className="text-[10px] bg-primary text-primary-foreground">
+                                    {user.name
+                                      ? user.name
+                                          .split(' ')
+                                          .map((n) => n[0])
+                                          .join('')
+                                          .slice(0, 2)
+                                          .toUpperCase()
+                                      : (user.email || 'U').slice(0, 2).toUpperCase()}
+                                  </AvatarFallback>
+                                )}
+                              </Avatar>
+                              <div className="min-w-0">
+                                <p className="text-sm font-medium truncate">{user.name || 'Usuário'}</p>
+                                <p className="text-xs text-muted-foreground truncate">{user.email}</p>
+                              </div>
+                            </label>
+                          ))}
+                        </div>
+                      </PopoverContent>
+                    </Popover>
                   </div>
-                </div>
-              )}
+                ) : (
+                  <p className="text-sm text-muted-foreground">Nenhum responsável disponível.</p>
+                )}
+              </div>
 
               {task && showChecklistPanel && (
                 <div ref={checklistRef} className="space-y-3">
@@ -1106,44 +1202,48 @@ export function TaskDialog({
                 </div>
 
                 <div className="space-y-3 max-h-[65vh] overflow-y-auto pr-1">
-                  {comments.map((comment) => (
-                    <div key={comment.id} className="flex gap-2">
-                      <Avatar className="h-9 w-9">
-                        {comment.user?.avatarUrl ? (
-                          <AvatarImage src={comment.user.avatarUrl} alt={comment.user.name || ''} />
-                        ) : (
-                          <AvatarFallback>
-                            {(comment.user?.name || 'U')
-                              .split(' ')
-                              .map((n) => n[0])
-                              .join('')
-                              .toUpperCase()
-                              .slice(0, 2)}
-                          </AvatarFallback>
-                        )}
-                      </Avatar>
-                      <div className="flex-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
-                        <div className="flex items-center justify-between">
-                          <span className="font-medium text-sm">{comment.user?.name || 'Usuário'}</span>
-                          <span className="text-[11px] text-muted-foreground">
-                            {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
-                          </span>
-                        </div>
-                        <p className="text-sm text-foreground mt-1 whitespace-pre-line">{comment.content}</p>
-                        <div className="flex justify-end">
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className="h-7 w-7 text-muted-foreground"
-                            onClick={() => handleDeleteComment(comment.id)}
-                          >
-                            <X className="h-4 w-4" />
-                          </Button>
+                  {comments.map((comment) => {
+                    const commentAvatar =
+                      comment.user?.avatarUrl || (comment.user as any)?.avatar_url || null;
+                    return (
+                      <div key={comment.id} className="flex gap-2">
+                        <Avatar className="h-9 w-9">
+                          {commentAvatar ? (
+                            <AvatarImage src={commentAvatar} alt={comment.user?.name || ''} />
+                          ) : (
+                            <AvatarFallback>
+                              {(comment.user?.name || 'U')
+                                .split(' ')
+                                .map((n) => n[0])
+                                .join('')
+                                .toUpperCase()
+                                .slice(0, 2)}
+                            </AvatarFallback>
+                          )}
+                        </Avatar>
+                        <div className="flex-1 rounded-md border border-border/60 bg-muted/30 px-3 py-2">
+                          <div className="flex items-center justify-between">
+                            <span className="font-medium text-sm">{comment.user?.name || 'Usuário'}</span>
+                            <span className="text-[11px] text-muted-foreground">
+                              {format(new Date(comment.created_at), "dd/MM/yyyy HH:mm", { locale: ptBR })}
+                            </span>
+                          </div>
+                          <p className="text-sm text-foreground mt-1 whitespace-pre-line">{comment.content}</p>
+                          <div className="flex justify-end">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className="h-7 w-7 text-muted-foreground"
+                              onClick={() => handleDeleteComment(comment.id)}
+                            >
+                              <X className="h-4 w-4" />
+                            </Button>
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {comments.length === 0 && (
                     <p className="text-sm text-muted-foreground">Nenhum comentário ainda.</p>
                   )}

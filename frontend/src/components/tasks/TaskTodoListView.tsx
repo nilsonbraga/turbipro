@@ -27,6 +27,8 @@ interface TaskTodoListViewProps {
   completingTaskId?: string | null;
   onEditTask: (task: Task) => void;
   onCompleteTask: (taskId: string) => void;
+  solidCards?: boolean;
+  alignHeaderTop?: boolean;
 }
 
 const normalizeText = (value: string) =>
@@ -45,6 +47,8 @@ export function TaskTodoListView({
   completingTaskId,
   onEditTask,
   onCompleteTask,
+  solidCards = false,
+  alignHeaderTop = false,
 }: TaskTodoListViewProps) {
   const columnById = useMemo(() => new Map(columns.map((column) => [column.id, column])), [columns]);
 
@@ -146,7 +150,11 @@ export function TaskTodoListView({
                 className="w-full text-left"
                 onClick={() => onEditTask(task)}
               >
-                <div className="flex items-center gap-3 rounded-lg border bg-muted/40 px-3 py-3 hover:border-primary/40 transition-colors">
+                <div
+                  className={`flex items-center gap-3 rounded-lg border px-3 py-3 hover:border-primary/40 transition-colors ${
+                    solidCards ? 'bg-white' : 'bg-muted/40'
+                  }`}
+                >
                   <div className="flex-1 min-w-0 space-y-1">
                     <div className="flex items-center justify-between gap-2">
                       <p className="font-medium text-sm text-foreground line-clamp-1">
@@ -276,7 +284,9 @@ export function TaskTodoListView({
           return (
             <div
               key={task.id}
-              className="flex items-start gap-3 rounded-lg border bg-card/80 px-3 py-3 shadow-sm hover:border-primary/40 transition-colors"
+              className={`flex items-start gap-3 rounded-lg border px-3 py-3 shadow-sm hover:border-primary/40 transition-colors ${
+                solidCards ? 'bg-white' : 'bg-card/80'
+              }`}
             >
               <Checkbox
                 checked={completingTaskId === task.id}
@@ -293,9 +303,16 @@ export function TaskTodoListView({
                   className="text-left w-full"
                   onClick={() => onEditTask(task)}
                 >
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="font-semibold text-sm text-foreground line-clamp-1">{task.title}</p>
-                    <div className="flex items-center gap-2">
+                  <div className={`flex justify-between gap-2 ${alignHeaderTop ? 'items-start' : 'items-center'}`}>
+                    <p
+                      data-task-title
+                      className={`font-semibold text-sm text-foreground line-clamp-1 ${
+                        alignHeaderTop ? 'leading-none relative -top-1' : ''
+                      }`}
+                    >
+                      {task.title}
+                    </p>
+                    <div className={`flex items-center gap-2 ${alignHeaderTop ? 'pt-0' : ''}`}>
                       {dueStatus && (
                         <Badge variant="secondary" className={`text-[11px] gap-1 ${dueStatus.bg} ${dueStatus.color}`}>
                           <dueStatus.icon className="h-3 w-3" />

@@ -1,5 +1,6 @@
 import { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
@@ -10,13 +11,6 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
 import { Loader2, User } from 'lucide-react';
 import { Proposal, ProposalInput } from '@/hooks/useProposals';
 import { PipelineStage } from '@/hooks/usePipelineStages';
@@ -85,6 +79,22 @@ export function ProposalDialog({
     setErrors({});
   }, [proposal, open, stages]);
 
+  const clientOptions = clients.map((client) => ({
+    value: client.id,
+    label: client.name,
+  }));
+  const stageOptions = stages.map((stage) => ({
+    value: stage.id,
+    label: stage.name,
+  }));
+  const collaboratorOptions = [
+    { value: 'none', label: 'Nenhum' },
+    ...collaborators.map((collaborator) => ({
+      value: collaborator.id,
+      label: collaborator.name,
+    })),
+  ];
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     
@@ -132,46 +142,30 @@ export function ProposalDialog({
           <div className="grid grid-cols-2 gap-4">
             <div className="space-y-2">
               <Label htmlFor="client">Cliente</Label>
-              <Select
+              <Combobox
+                options={clientOptions}
                 value={formData.client_id || ''}
                 onValueChange={(value) => setFormData({ ...formData, client_id: value || null })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {clients.map((client) => (
-                    <SelectItem key={client.id} value={client.id}>
-                      {client.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Selecione"
+                searchPlaceholder="Buscar cliente..."
+                emptyText="Nenhum cliente encontrado"
+                buttonClassName="w-full"
+                contentClassName="w-[260px]"
+              />
             </div>
             
             <div className="space-y-2">
               <Label htmlFor="stage">Estágio</Label>
-              <Select
+              <Combobox
+                options={stageOptions}
                 value={formData.stage_id || ''}
                 onValueChange={(value) => setFormData({ ...formData, stage_id: value || null })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione" />
-                </SelectTrigger>
-                <SelectContent>
-                  {stages.map((stage) => (
-                    <SelectItem key={stage.id} value={stage.id}>
-                      <div className="flex items-center gap-2">
-                        <div 
-                          className="w-3 h-3 rounded-full" 
-                          style={{ backgroundColor: stage.color }} 
-                        />
-                        {stage.name}
-                      </div>
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                placeholder="Selecione"
+                searchPlaceholder="Buscar estágio..."
+                emptyText="Nenhum estágio encontrado"
+                buttonClassName="w-full"
+                contentClassName="w-[260px]"
+              />
             </div>
           </div>
 
@@ -183,22 +177,21 @@ export function ProposalDialog({
                   Vendedor Responsável
                 </div>
               </Label>
-              <Select
+              <Combobox
+                options={collaboratorOptions}
                 value={formData.assigned_collaborator_id || 'none'}
-                onValueChange={(value) => setFormData({ ...formData, assigned_collaborator_id: value === 'none' ? null : value })}
-              >
-                <SelectTrigger>
-                  <SelectValue placeholder="Selecione o vendedor" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="none">Nenhum</SelectItem>
-                  {collaborators.map((collaborator) => (
-                    <SelectItem key={collaborator.id} value={collaborator.id}>
-                      {collaborator.name}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                onValueChange={(value) =>
+                  setFormData({
+                    ...formData,
+                    assigned_collaborator_id: value === 'none' ? null : value,
+                  })
+                }
+                placeholder="Selecione o vendedor"
+                searchPlaceholder="Buscar vendedor..."
+                emptyText="Nenhum vendedor encontrado"
+                buttonClassName="w-full"
+                contentClassName="w-[260px]"
+              />
               <p className="text-xs text-muted-foreground">
                 Ao fechar este lead, a comissão será atribuída ao vendedor selecionado
               </p>

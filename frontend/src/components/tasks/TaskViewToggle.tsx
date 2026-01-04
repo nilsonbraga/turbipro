@@ -22,7 +22,7 @@ export function TaskViewToggle({ view, onViewChange }: TaskViewToggleProps) {
         onClick={() => onViewChange('board')}
       >
         <Kanban className="h-4 w-4" />
-        <span className="hidden sm:inline">Board</span>
+        <span className="hidden sm:inline">Quadro</span>
       </Button>
       <Button
         variant="ghost"
@@ -34,7 +34,7 @@ export function TaskViewToggle({ view, onViewChange }: TaskViewToggleProps) {
         onClick={() => onViewChange('list')}
       >
         <List className="h-4 w-4" />
-        <span className="hidden sm:inline">List</span>
+        <span className="hidden sm:inline">Lista</span>
       </Button>
       <Button
         variant="ghost"
@@ -46,7 +46,7 @@ export function TaskViewToggle({ view, onViewChange }: TaskViewToggleProps) {
         onClick={() => onViewChange('todo')}
       >
         <CheckSquare className="h-4 w-4" />
-        <span className="hidden sm:inline">To-do</span>
+        <span className="hidden sm:inline">A fazer</span>
       </Button>
     </div>
   );
