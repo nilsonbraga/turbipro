@@ -495,8 +495,8 @@ export default function PublicExpedition() {
                     onClick={() => setLightboxIndex(index)}
                     className={
                       index === 0
-                        ? 'group bg-transparent text-left focus:outline-none md:col-span-2 md:row-span-2 overflow-hidden rounded-[28px] shadow-xl'
-                        : 'group bg-transparent text-left focus:outline-none overflow-hidden rounded-[28px] shadow-lg'
+                        ? 'group bg-transparent text-left focus:outline-none md:col-span-2 md:row-span-2 overflow-hidden rounded-[28px] shadow-xl transition-transform duration-500 ease-out hover:-translate-y-1'
+                        : 'group bg-transparent text-left focus:outline-none overflow-hidden rounded-[28px] shadow-lg transition-transform duration-500 ease-out hover:-translate-y-1'
                     }
                     aria-label={`Abrir foto do roteiro ${index + 1}`}
                   >
@@ -506,12 +506,12 @@ export default function PublicExpedition() {
                         alt={image.title || `Roteiro ${index + 1}`}
                         className={
                           index === 0
-                            ? 'h-72 md:h-full w-full object-cover'
-                            : 'h-56 w-full object-cover'
+                            ? 'h-72 md:h-full w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]'
+                            : 'h-56 w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.03]'
                         }
                       />
-                      <span className="absolute top-4 right-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100">
-                        <ZoomIn className="h-5 w-5" />
+                      <span className="absolute top-4 right-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity duration-500 group-hover:opacity-100">
+                        <ZoomIn className="h-5 w-5 transition-transform duration-500 group-hover:scale-110" />
                       </span>
                       {(image.title || image.description) && (
                         <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-5 text-white">
@@ -593,7 +593,7 @@ export default function PublicExpedition() {
         {hasNotRecommended && (
           <section className="rounded-[32px] bg-slate-50 p-8 md:p-12 space-y-10">
             <div className="space-y-4 max-w-3xl">
-              <p className="text-xs uppercase tracking-[0.32em] text-destructive/70">
+              <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
                 Para quem não é indicado
               </p>
               <h2 className="text-3xl md:text-4xl font-bold text-slate-900">
@@ -607,13 +607,13 @@ export default function PublicExpedition() {
               {(group.not_recommended_items || []).map((item, index) => (
                 <div
                   key={`${item.title}-${index}`}
-                  className="flex items-start gap-4 rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm"
+                  className="relative rounded-bl-[6px] rounded-br-[20px] rounded-tl-[20px] rounded-tr-[6px] bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
                 >
-                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500 font-semibold">
+                  <span className="pointer-events-none absolute right-5 top-4 text-3xl font-semibold text-primary">
                     {index + 1}
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold text-slate-900">
+                  </span>
+                  <div className="space-y-2 relative z-10 pr-12">
+                    <h3 className="text-base md:text-lg font-semibold text-slate-900">
                       {item.title}
                     </h3>
                     {renderParagraphs(
@@ -668,64 +668,113 @@ export default function PublicExpedition() {
 
         {/* Package Inclusions/Exclusions */}
         {(hasIncludedItems || hasExcludedItems) && (
-          <section>
-            <h2 className="text-3xl font-bold text-center mb-10">O que está incluso</h2>
-            <div className="grid md:grid-cols-2 gap-8">
+          <section className="relative overflow-hidden rounded-[32px] bg-gradient-to-br from-white via-slate-50 to-slate-100 px-6 py-16 md:px-10 lg:px-14">
+            <div className="relative z-10 mx-auto w-full max-w-[78.5rem] space-y-12">
+              <div className="flex flex-col gap-6 lg:flex-row lg:items-end lg:justify-between">
+                <div className="space-y-5">
+                  <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
+                    tudo feito para voce
+                  </p>
+                  <h2 className="max-w-2xl text-3xl font-bold leading-tight text-slate-900 md:text-4xl">
+                    O que está incluso?
+                  </h2>
+                </div>
+              </div>
+              <div className="h-px w-full bg-slate-200/80" />
               {hasIncludedItems && (
-                <Card className="border-0 shadow-xl overflow-hidden bg-gradient-to-br from-green-50 to-white">
-                  <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-5">
-                    <h3 className="font-bold text-xl flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                        <Check className="w-6 h-6" />
-                      </div>
-                      Incluso no pacote
-                    </h3>
-                  </div>
-                  <CardContent className="p-8">
-                    <ul className="space-y-4">
-                      {group.included_items?.map((item, index) => (
-                        <li key={index} className="flex items-start gap-4">
-                          <div className="w-6 h-6 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <Check className="w-4 h-4 text-green-600" />
+                <div className="space-y-6">
+                  <p className="text-xs uppercase tracking-[0.32em] text-slate-500">
+                    Incluso no pacote
+                  </p>
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {group.included_items?.map((item, index) => (
+                      <div
+                        key={index}
+                        className="space-y-4 rounded-bl-[6px] rounded-br-[20px] rounded-tl-[20px] rounded-tr-[6px] bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-emerald-50 text-emerald-600">
+                            <Check className="h-5 w-5" />
                           </div>
-                          <span className="text-lg">{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
+                          <h3 className="text-base md:text-lg font-semibold text-slate-900 leading-snug">
+                            {item}
+                          </h3>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
               {hasExcludedItems && (
-                <Card className="border-0 shadow-xl overflow-hidden bg-gradient-to-br from-red-50 to-white">
-                  <div className="bg-gradient-to-r from-red-500 to-red-600 text-white p-5">
-                    <h3 className="font-bold text-xl flex items-center gap-3">
-                      <div className="w-10 h-10 rounded-full bg-white/20 flex items-center justify-center">
-                        <X className="w-6 h-6" />
-                      </div>
-                      Não incluso
-                    </h3>
-                  </div>
-                  <CardContent className="p-8">
-                    <ul className="space-y-4">
-                      {group.excluded_items?.map((item, index) => (
-                        <li key={index} className="flex items-start gap-4">
-                          <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center flex-shrink-0 mt-0.5">
-                            <X className="w-4 h-4 text-red-600" />
+                <div className="space-y-6 pt-4">
+                  <p className="text-xs uppercase tracking-[0.32em] text-slate-500">
+                    Nao incluso
+                  </p>
+                  <div className="grid grid-cols-1 gap-6 md:grid-cols-2 lg:grid-cols-3">
+                    {group.excluded_items?.map((item, index) => (
+                      <div
+                        key={index}
+                        className="space-y-4 rounded-bl-[6px] rounded-br-[20px] rounded-tl-[20px] rounded-tr-[6px] bg-white p-6 shadow-[0_18px_40px_rgba(15,23,42,0.08)]"
+                      >
+                        <div className="flex items-center gap-3">
+                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-rose-50 text-rose-600">
+                            <X className="h-5 w-5" />
                           </div>
-                          <span className="text-lg">{item}</span>
-                        </li>
-                      ))}
-                    </ul>
-                  </CardContent>
-                </Card>
+                          <h3 className="text-base md:text-lg font-semibold text-slate-900 leading-snug">
+                            {item}
+                          </h3>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               )}
             </div>
           </section>
         )}
 
+        {/* FAQ Section */}
+        {hasFaqs && (
+          <section className="mx-auto w-full max-w-6xl px-4 md:px-0">
+              <div className="flex flex-col gap-10 md:flex-row md:items-start md:justify-between">
+                <div className="flex flex-col gap-4 md:sticky md:top-28 md:max-w-sm">
+                  <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
+                    Dúvidas
+                  </p>
+                  <h2 className="text-3xl md:text-4xl font-bold text-slate-900 leading-tight">
+                    Perguntas e respostas mais frequentes
+                  </h2>
+                </div>
+                <div className="w-full max-w-2xl">
+                  <Accordion type="single" collapsible>
+                    {faqs.map((faq, index) => (
+                      <AccordionItem 
+                        key={index} 
+                        value={`faq-${index}`}
+                        className="group border-t border-slate-200 py-2 first:border-t"
+                      >
+                        <AccordionTrigger className="text-left text-sm md:text-base font-medium text-slate-900 hover:no-underline py-3 [&>svg]:text-slate-400">
+                          <div className="flex items-center gap-6">
+                            <span className="text-lg font-semibold text-primary">
+                              {String(index + 1).padStart(2, '0')}.
+                            </span>
+                            <span className="text-left text-slate-900">{faq.question}</span>
+                          </div>
+                        </AccordionTrigger>
+                        <AccordionContent className="text-slate-600 pb-4 pl-12 md:pl-14 text-sm md:text-base leading-relaxed text-justify">
+                          {faq.answer}
+                        </AccordionContent>
+                      </AccordionItem>
+                    ))}
+                  </Accordion>
+                </div>
+              </div>
+          </section>
+        )}
+
         {/* Testimonials Section */}
         {hasTestimonials && (
-          <section className="rounded-[32px] bg-white border border-slate-200/60 p-10 md:p-12">
+          <section className="rounded-[32px] bg-white p-10 md:p-12">
             <div className="text-center mb-12">
               <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
                 Depoimentos
@@ -779,37 +828,6 @@ export default function PublicExpedition() {
                 </Card>
               ))}
             </div>
-          </section>
-        )}
-
-        {/* FAQ Section */}
-        {hasFaqs && (
-          <section className="max-w-4xl mx-auto">
-            <div className="text-center mb-10">
-              <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
-                Dúvidas
-              </p>
-              <h2 className="text-3xl md:text-4xl font-bold mt-3 flex items-center justify-center gap-3">
-                <HelpCircle className="w-7 h-7 text-primary" />
-                Perguntas Frequentes
-              </h2>
-            </div>
-            <Accordion type="single" collapsible className="space-y-4">
-              {faqs.map((faq, index) => (
-                <AccordionItem 
-                  key={index} 
-                  value={`faq-${index}`}
-                  className="border border-slate-200 rounded-[24px] px-6 shadow-sm bg-white overflow-hidden"
-                >
-                  <AccordionTrigger className="text-left text-lg font-semibold hover:no-underline py-5">
-                    {faq.question}
-                  </AccordionTrigger>
-                  <AccordionContent className="text-muted-foreground pb-5 text-base leading-relaxed">
-                    {faq.answer}
-                  </AccordionContent>
-                </AccordionItem>
-              ))}
-            </Accordion>
           </section>
         )}
 

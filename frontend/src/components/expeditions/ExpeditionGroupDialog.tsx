@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Upload, X, Image as ImageIcon, Plus, Youtube, Star, HelpCircle, ExternalLink, Calendar as CalendarIcon, Info, DollarSign, Package, MessageSquare, FileText } from 'lucide-react';
+import { Loader2, Upload, X, Image as ImageIcon, Plus, Youtube, Star, HelpCircle, ExternalLink, Calendar as CalendarIcon, Info, DollarSign, Package, MessageSquare, FileText, Pencil, Trash2, Check } from 'lucide-react';
 import { ExpeditionGroup, ExpeditionGroupInput, Testimonial, FAQ, ItinerarySummaryImage, NotRecommendedItem } from '@/hooks/useExpeditionGroups';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -100,6 +100,7 @@ export function ExpeditionGroupDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const carouselInputRef = useRef<HTMLInputElement>(null);
   const testimonialPhotoRef = useRef<HTMLInputElement>(null);
+  const testimonialEditPhotoRef = useRef<HTMLInputElement>(null);
   const descriptionGalleryInputRef = useRef<HTMLInputElement>(null);
   const aboutImageInputRef = useRef<HTMLInputElement>(null);
   const destinationSummaryImageInputRef = useRef<HTMLInputElement>(null);
@@ -148,10 +149,13 @@ export function ExpeditionGroupDialog({
   const [newIncludedItem, setNewIncludedItem] = useState('');
   const [newExcludedItem, setNewExcludedItem] = useState('');
   const [newTestimonial, setNewTestimonial] = useState<Testimonial>({ name: '', text: '', photo: '' });
+  const [editingTestimonialIndex, setEditingTestimonialIndex] = useState<number | null>(null);
+  const [testimonialDraft, setTestimonialDraft] = useState<Testimonial>({ name: '', text: '', photo: '' });
   const [newFaq, setNewFaq] = useState<FAQ>({ question: '', answer: '' });
   const [editingFaqIndex, setEditingFaqIndex] = useState<number | null>(null);
   const [faqDraft, setFaqDraft] = useState<FAQ>({ question: '', answer: '' });
   const [uploadingTestimonialPhoto, setUploadingTestimonialPhoto] = useState(false);
+  const [uploadingTestimonialEditPhoto, setUploadingTestimonialEditPhoto] = useState(false);
   const [priceCashInput, setPriceCashInput] = useState('');
   const [priceInstallmentInput, setPriceInstallmentInput] = useState('');
   const [newNotRecommendedItem, setNewNotRecommendedItem] = useState<NotRecommendedItem>({ title: '', description: '' });
@@ -315,6 +319,8 @@ export function ExpeditionGroupDialog({
     setNewIncludedItem('');
     setNewExcludedItem('');
     setNewTestimonial({ name: '', text: '', photo: '' });
+    setEditingTestimonialIndex(null);
+    setTestimonialDraft({ name: '', text: '', photo: '' });
     setNewFaq({ question: '', answer: '' });
     setNewNotRecommendedItem({ title: '', description: '' });
   }, [group, open]);
@@ -605,6 +611,18 @@ export function ExpeditionGroupDialog({
     setUploadingTestimonialPhoto(false);
   };
 
+  const handleTestimonialEditPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setUploadingTestimonialEditPhoto(true);
+    const url = await uploadImage(file);
+    if (url) {
+      setTestimonialDraft({ ...testimonialDraft, photo: url });
+    }
+    setUploadingTestimonialEditPhoto(false);
+  };
+
   const addTestimonial = () => {
     if (newTestimonial.name.trim() && newTestimonial.text.trim()) {
       setFormData({
@@ -619,6 +637,39 @@ export function ExpeditionGroupDialog({
     const testimonials = [...(formData.testimonials || [])];
     testimonials.splice(index, 1);
     setFormData({ ...formData, testimonials });
+    if (editingTestimonialIndex === index) {
+      setEditingTestimonialIndex(null);
+      setTestimonialDraft({ name: '', text: '', photo: '' });
+    } else if (editingTestimonialIndex !== null && index < editingTestimonialIndex) {
+      setEditingTestimonialIndex(editingTestimonialIndex - 1);
+    }
+  };
+
+  const startTestimonialEdit = (index: number) => {
+    const current = (formData.testimonials || [])[index];
+    if (!current) return;
+    setTestimonialDraft({ ...current });
+    setEditingTestimonialIndex(index);
+  };
+
+  const cancelTestimonialEdit = () => {
+    setEditingTestimonialIndex(null);
+    setTestimonialDraft({ name: '', text: '', photo: '' });
+  };
+
+  const saveTestimonialEdit = () => {
+    if (editingTestimonialIndex === null) return;
+    const testimonials = [...(formData.testimonials || [])];
+    const trimmed = {
+      ...testimonialDraft,
+      name: testimonialDraft.name.trim(),
+      text: testimonialDraft.text.trim(),
+      photo: testimonialDraft.photo?.trim() ? testimonialDraft.photo : '',
+    };
+    testimonials[editingTestimonialIndex] = trimmed;
+    setFormData({ ...formData, testimonials });
+    setEditingTestimonialIndex(null);
+    setTestimonialDraft({ name: '', text: '', photo: '' });
   };
 
   const addFaq = () => {
@@ -1483,28 +1534,147 @@ export function ExpeditionGroupDialog({
                 {(formData.testimonials || []).length > 0 && (
                   <div className="space-y-3">
                     {(formData.testimonials || []).map((testimonial, index) => (
-                      <Card key={index} className="relative">
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-2 right-2 h-6 w-6"
-                          onClick={() => removeTestimonial(index)}
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                        <CardContent className="p-4 flex gap-4">
-                          {testimonial.photo && (
-                            <img 
-                              src={testimonial.photo} 
-                              alt={testimonial.name}
-                              className="w-12 h-12 rounded-full object-cover"
-                            />
+                      <Card key={index}>
+                        <CardContent className="p-4">
+                          {editingTestimonialIndex === index ? (
+                            <div className="space-y-4">
+                              <div className="flex items-center justify-between gap-3">
+                                <p className="text-sm font-medium text-muted-foreground">Editar depoimento</p>
+                                <div className="flex items-center gap-1">
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={saveTestimonialEdit}
+                                    disabled={!testimonialDraft.name.trim() || !testimonialDraft.text.trim()}
+                                    aria-label="Salvar depoimento"
+                                  >
+                                    <Check className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={cancelTestimonialEdit}
+                                    aria-label="Cancelar edição"
+                                  >
+                                    <X className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8 text-destructive hover:text-destructive"
+                                    onClick={() => removeTestimonial(index)}
+                                    aria-label="Excluir depoimento"
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </div>
+                              </div>
+                              <div className="flex flex-col gap-4 sm:flex-row sm:items-start">
+                                <div className="flex flex-col items-center gap-2">
+                                  {testimonialDraft.photo ? (
+                                    <div
+                                      className="relative cursor-pointer"
+                                      onClick={() => testimonialEditPhotoRef.current?.click()}
+                                    >
+                                      <div className="h-14 w-14 rounded-full overflow-hidden bg-muted/40">
+                                        <img
+                                          src={testimonialDraft.photo}
+                                          alt="Preview"
+                                          className="h-full w-full object-cover"
+                                        />
+                                      </div>
+                                      <Button
+                                        type="button"
+                                        variant="destructive"
+                                        size="icon"
+                                        className="absolute -top-1 -right-1 h-5 w-5"
+                                        onClick={() => setTestimonialDraft({ ...testimonialDraft, photo: '' })}
+                                      >
+                                        <X className="w-3 h-3" />
+                                      </Button>
+                                    </div>
+                                  ) : (
+                                    <div
+                                      className="w-14 h-14 rounded-full border-2 border-dashed flex items-center justify-center cursor-pointer hover:bg-muted/50"
+                                      onClick={() => testimonialEditPhotoRef.current?.click()}
+                                    >
+                                      {uploadingTestimonialEditPhoto ? (
+                                        <Loader2 className="w-4 h-4 animate-spin" />
+                                      ) : (
+                                        <Upload className="w-4 h-4 text-muted-foreground" />
+                                      )}
+                                    </div>
+                                  )}
+                                  <span className="text-xs text-muted-foreground">Foto</span>
+                                  <input
+                                    ref={testimonialEditPhotoRef}
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={handleTestimonialEditPhotoUpload}
+                                  />
+                                </div>
+                                <div className="flex-1 space-y-2">
+                                  <Input
+                                    value={testimonialDraft.name}
+                                    onChange={(e) => setTestimonialDraft({ ...testimonialDraft, name: e.target.value })}
+                                    placeholder="Nome da pessoa"
+                                  />
+                                  <Textarea
+                                    value={testimonialDraft.text}
+                                    onChange={(e) => setTestimonialDraft({ ...testimonialDraft, text: e.target.value })}
+                                    placeholder="Depoimento..."
+                                    rows={2}
+                                  />
+                                </div>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="flex items-center gap-4">
+                                {testimonial.photo && (
+                                  <div className="h-12 w-12 rounded-full overflow-hidden bg-muted/30 shrink-0">
+                                    <img
+                                      src={testimonial.photo}
+                                      alt={testimonial.name}
+                                      className="h-full w-full object-cover"
+                                    />
+                                  </div>
+                                )}
+                                <div>
+                                  <p className="font-semibold">{testimonial.name}</p>
+                                  <p className="text-sm text-muted-foreground">{testimonial.text}</p>
+                                </div>
+                              </div>
+                              <div className="flex items-center gap-1">
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => startTestimonialEdit(index)}
+                                  aria-label="Editar depoimento"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  type="button"
+                                  variant="ghost"
+                                  size="icon"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
+                                  onClick={() => removeTestimonial(index)}
+                                  aria-label="Excluir depoimento"
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
                           )}
-                          <div className="flex-1">
-                            <p className="font-semibold">{testimonial.name}</p>
-                            <p className="text-sm text-muted-foreground">{testimonial.text}</p>
-                          </div>
                         </CardContent>
                       </Card>
                     ))}
@@ -1518,11 +1688,13 @@ export function ExpeditionGroupDialog({
                     <div className="flex flex-col items-center gap-2">
                       {newTestimonial.photo ? (
                         <div className="relative">
-                          <img 
-                            src={newTestimonial.photo} 
-                            alt="Preview"
-                            className="w-16 h-16 rounded-full object-cover"
-                          />
+                          <div className="h-16 w-16 rounded-full overflow-hidden bg-muted/40">
+                            <img 
+                              src={newTestimonial.photo} 
+                              alt="Preview"
+                              className="h-full w-full object-cover"
+                            />
+                          </div>
                           <Button
                             type="button"
                             variant="destructive"
@@ -1603,26 +1775,60 @@ export function ExpeditionGroupDialog({
                                 <p className="font-semibold text-primary">{faq.question}</p>
                                 <p className="text-sm text-muted-foreground">{faq.answer}</p>
                               </div>
-                              <div className="flex items-center gap-2">
+                              <div className="flex items-center gap-1">
                                 {!isEditing && (
-                                  <Button type="button" variant="outline" size="sm" onClick={() => startFaqEdit(index)}>
-                                    Editar
+                                  <Button
+                                    type="button"
+                                    variant="ghost"
+                                    size="icon"
+                                    className="h-8 w-8"
+                                    onClick={() => startFaqEdit(index)}
+                                    aria-label="Editar pergunta"
+                                  >
+                                    <Pencil className="h-4 w-4" />
                                   </Button>
                                 )}
                                 <Button
                                   type="button"
-                                  variant="destructive"
+                                  variant="ghost"
                                   size="icon"
-                                  className="h-8 w-8"
+                                  className="h-8 w-8 text-destructive hover:text-destructive"
                                   onClick={() => removeFaq(index)}
+                                  aria-label="Excluir pergunta"
                                 >
-                                  <X className="w-4 h-4" />
+                                  <Trash2 className="h-4 w-4" />
                                 </Button>
                               </div>
                             </div>
 
                             {isEditing && (
                               <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3">
+                                <div className="flex items-center justify-between gap-2">
+                                  <p className="text-xs font-medium text-muted-foreground">Editar pergunta</p>
+                                  <div className="flex items-center gap-1">
+                                    <Button
+                                      type="button"
+                                      variant="outline"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={saveFaqEdit}
+                                      disabled={!faqDraft.question.trim() || !faqDraft.answer.trim()}
+                                      aria-label="Salvar pergunta"
+                                    >
+                                      <Check className="h-4 w-4" />
+                                    </Button>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="h-8 w-8"
+                                      onClick={cancelFaqEdit}
+                                      aria-label="Cancelar edição"
+                                    >
+                                      <X className="h-4 w-4" />
+                                    </Button>
+                                  </div>
+                                </div>
                                 <Input
                                   value={faqDraft.question}
                                   onChange={(e) => setFaqDraft({ ...faqDraft, question: e.target.value })}
@@ -1634,14 +1840,6 @@ export function ExpeditionGroupDialog({
                                   placeholder="Resposta"
                                   rows={3}
                                 />
-                                <div className="flex items-center gap-2">
-                                  <Button type="button" size="sm" onClick={saveFaqEdit} disabled={!faqDraft.question.trim() || !faqDraft.answer.trim()}>
-                                    Salvar
-                                  </Button>
-                                  <Button type="button" variant="ghost" size="sm" onClick={cancelFaqEdit}>
-                                    Cancelar
-                                  </Button>
-                                </div>
                               </div>
                             )}
                           </CardContent>
