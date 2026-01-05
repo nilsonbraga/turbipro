@@ -66,10 +66,10 @@ import { useProposals, ProposalInput } from '@/hooks/useProposals';
 import { usePipelineStages } from '@/hooks/usePipelineStages';
 
 const STATUS_OPTIONS = [
-  { value: 'entrou_na_lista', label: 'Entrou na lista', color: 'bg-muted text-muted-foreground' },
-  { value: 'em_captacao', label: 'Em captação', color: 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-300' },
-  { value: 'pendente', label: 'Pendente', color: 'bg-yellow-100 text-yellow-800 dark:bg-yellow-900 dark:text-yellow-300' },
-  { value: 'confirmado', label: 'Confirmado', color: 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-300' },
+  { value: 'entrou_na_lista', label: 'Entrou na lista', color: 'bg-slate-200 text-slate-900 dark:bg-slate-800 dark:text-slate-100' },
+  { value: 'em_captacao', label: 'Em captação', color: 'bg-sky-200 text-sky-900 dark:bg-sky-900 dark:text-sky-100' },
+  { value: 'pendente', label: 'Pendente', color: 'bg-amber-200 text-amber-900 dark:bg-amber-900 dark:text-amber-100' },
+  { value: 'confirmado', label: 'Confirmado', color: 'bg-emerald-200 text-emerald-900 dark:bg-emerald-900 dark:text-emerald-100' },
 ];
 
 interface ExpeditionRegistrationsDialogProps {
@@ -190,7 +190,7 @@ export function ExpeditionRegistrationsDialog({
   return (
     <>
       <Dialog open={open} onOpenChange={onOpenChange}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl w-[96vw] max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <Users className="w-5 h-5" />
@@ -441,9 +441,10 @@ function RegistrationTable({
         <TableRow>
           <TableHead>#</TableHead>
           <TableHead>Nome</TableHead>
-          <TableHead>Contato</TableHead>
-          <TableHead>Status</TableHead>
-          <TableHead>Data</TableHead>
+          <TableHead className="w-[190px]">Pacote</TableHead>
+          <TableHead className="w-[220px]">Contato</TableHead>
+          <TableHead className="w-[220px]">Status</TableHead>
+          <TableHead className="w-[140px]">Data</TableHead>
           <TableHead className="w-[100px]">Ações</TableHead>
         </TableRow>
       </TableHeader>
@@ -452,6 +453,13 @@ function RegistrationTable({
           <TableRow key={reg.id}>
             <TableCell className="font-medium">{index + 1}</TableCell>
             <TableCell>{reg.name}</TableCell>
+            <TableCell className="text-sm text-slate-700 w-[160px]">
+              {reg.selected_offer_title ? (
+                reg.selected_offer_title
+              ) : (
+                <span className="text-muted-foreground italic">Não selecionado</span>
+              )}
+            </TableCell>
             <TableCell>
               <div className="space-y-1 text-sm">
                 <div className="flex items-center gap-1">
@@ -473,7 +481,7 @@ function RegistrationTable({
               >
                 <SelectTrigger className="w-[140px] h-8">
                   <SelectValue>
-                    <Badge className={`${getStatusOption(reg.status || 'entrou_na_lista').color} text-xs`}>
+                    <Badge className={`${getStatusOption(reg.status || 'entrou_na_lista').color} text-xs whitespace-nowrap`}>
                       {getStatusOption(reg.status || 'entrou_na_lista').label}
                     </Badge>
                   </SelectValue>
@@ -481,7 +489,7 @@ function RegistrationTable({
                 <SelectContent>
                   {STATUS_OPTIONS.map(opt => (
                     <SelectItem key={opt.value} value={opt.value}>
-                      <Badge className={`${opt.color} text-xs`}>{opt.label}</Badge>
+                      <Badge className={`${opt.color} text-xs whitespace-nowrap`}>{opt.label}</Badge>
                     </SelectItem>
                   ))}
                 </SelectContent>

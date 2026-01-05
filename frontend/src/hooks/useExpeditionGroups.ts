@@ -25,6 +25,19 @@ export interface NotRecommendedItem {
   description: string;
 }
 
+export interface PricingOffer {
+  title: string;
+  description?: string;
+  price_cash?: number | null;
+  price_installment?: number | null;
+  installments_count?: number | null;
+  entry_value?: number | null;
+  is_offer?: boolean;
+  original_price_cash?: number | null;
+  original_price_installment?: number | null;
+  currency?: string;
+}
+
 export interface ExpeditionGroup {
   id: string;
   agency_id: string;
@@ -63,6 +76,7 @@ export interface ExpeditionGroup {
   price_installment?: number | null;
   installments_count?: number | null;
   currency?: string;
+  pricing_offers?: PricingOffer[] | null;
   // Date preference toggle
   show_date_preference?: boolean;
   // Package inclusions/exclusions
@@ -85,6 +99,7 @@ export interface ExpeditionRegistration {
   status: string;
   created_at: string;
   date_preference?: string | null;
+  selected_offer_title?: string | null;
 }
 
 export interface ExpeditionGroupInput {
@@ -118,6 +133,7 @@ export interface ExpeditionGroupInput {
   price_installment?: number | null;
   installments_count?: number | null;
   currency?: string;
+  pricing_offers?: PricingOffer[];
   // Date preference toggle
   show_date_preference?: boolean;
   // Package inclusions/exclusions
@@ -171,6 +187,7 @@ const mapBackendToFront = (g: any): ExpeditionGroup => ({
   price_installment: g.priceInstallment,
   installments_count: g.installmentsCount,
   currency: g.currency,
+  pricing_offers: g.pricingOffers || [],
   show_date_preference: g.showDatePreference,
   included_items: g.includedItems || [],
   excluded_items: g.excludedItems || [],
@@ -211,6 +228,7 @@ const mapFrontToBackendGroup = (input: ExpeditionGroupInput & { agency_id?: stri
   priceInstallment: input.price_installment ?? null,
   installmentsCount: input.installments_count ?? null,
   currency: input.currency ?? 'BRL',
+  pricingOffers: input.pricing_offers ?? [],
   showDatePreference: input.show_date_preference ?? false,
   includedItems: input.included_items ?? [],
   excludedItems: input.excluded_items ?? [],
@@ -424,6 +442,7 @@ export function useExpeditionRegistrations(groupId: string | null) {
         status: r.status,
         created_at: r.createdAt,
         date_preference: r.datePreference,
+        selected_offer_title: r.selectedOfferTitle ?? null,
       })) as ExpeditionRegistration[];
     },
     enabled: !!groupId,
@@ -535,13 +554,14 @@ export function usePublicRegistration() {
   const { toast } = useToast();
 
   return useMutation({
-    mutationFn: async ({ groupId, name, email, phone, isWaitlist, datePreference }: {
+    mutationFn: async ({ groupId, name, email, phone, isWaitlist, datePreference, selectedOfferTitle }: {
       groupId: string;
       name: string;
       email: string;
       phone?: string;
       isWaitlist: boolean;
       datePreference?: string;
+      selectedOfferTitle?: string;
     }) => {
       const created = await apiFetch(`/api/expeditionRegistration`, {
         method: 'POST',
@@ -552,6 +572,7 @@ export function usePublicRegistration() {
           phone: phone || null,
           isWaitlist,
           datePreference: datePreference || null,
+          selectedOfferTitle: selectedOfferTitle || null,
         }),
       });
       return created;

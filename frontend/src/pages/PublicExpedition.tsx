@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { usePublicExpeditionGroup, usePublicRegistration, Testimonial, FAQ } from '@/hooks/useExpeditionGroups';
+import { usePublicExpeditionGroup, usePublicRegistration, Testimonial, FAQ, PricingOffer } from '@/hooks/useExpeditionGroups';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -47,7 +47,8 @@ import {
   Quote,
   ChevronLeft,
   ChevronRight,
-  ZoomIn
+  ZoomIn,
+  Ticket
 } from 'lucide-react';
 
 export default function PublicExpedition() {
@@ -60,6 +61,7 @@ export default function PublicExpedition() {
     email: '',
     phone: '',
     datePreference: '',
+    selectedOfferIndex: '',
   });
   const [submitted, setSubmitted] = useState(false);
   const [isWaitlist, setIsWaitlist] = useState(false);
@@ -125,7 +127,26 @@ export default function PublicExpedition() {
   const introDescription = group.description || null;
   const hasIncludedItems = group.included_items && group.included_items.length > 0;
   const hasExcludedItems = group.excluded_items && group.excluded_items.length > 0;
-  const hasPricing = group.price_cash || group.price_installment;
+  const pricingOffers = (group.pricing_offers as PricingOffer[] | undefined) || [];
+  const legacyOffer: PricingOffer[] =
+    (group.price_cash || group.price_installment || group.installments_count)
+      ? [
+          {
+            title: 'Pacote principal',
+            description: '',
+            price_cash: group.price_cash ?? null,
+            price_installment: group.price_installment ?? null,
+            installments_count: group.installments_count ?? null,
+            entry_value: null,
+            is_offer: false,
+            original_price_cash: null,
+            original_price_installment: null,
+            currency: group.currency || 'BRL',
+          },
+        ]
+      : [];
+  const resolvedOffers = pricingOffers.length > 0 ? pricingOffers : legacyOffer;
+  const hasPricing = resolvedOffers.length > 0;
   const hasYouTube = !!group.youtube_video_url;
   const hasTestimonials = group.testimonials && (group.testimonials as Testimonial[]).length > 0;
   const hasFaqs = group.faqs && (group.faqs as FAQ[]).length > 0;
@@ -146,10 +167,20 @@ export default function PublicExpedition() {
     USD: '$',
   }[group.currency || 'BRL'];
 
+  const getCurrencySymbol = (code?: string | null) =>
+    ({
+      BRL: 'R$',
+      EUR: '€',
+      USD: '$',
+    } as Record<string, string>)[code || group.currency || 'BRL'] || 'R$';
+
   const formatCurrency = (value?: number | null) => {
     if (value === null || value === undefined || Number.isNaN(Number(value))) return '';
     return Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
   };
+
+  const getOfferLabel = (offer: PricingOffer, index: number) =>
+    offer.title?.trim() ? offer.title.trim() : `Pacote ${index + 1}`;
 
   const getYouTubeEmbedUrl = (url: string) => {
     const videoId = url.match(/(?:youtube\.com\/(?:[^\/]+\/.+\/|(?:v|e(?:mbed)?)\/|.*[?&]v=)|youtu\.be\/)([^"&?\/\s]{11})/)?.[1];
@@ -160,7 +191,15 @@ export default function PublicExpedition() {
     e.preventDefault();
     const willBeWaitlist = isFull;
     setIsWaitlist(willBeWaitlist);
-    
+
+    const selectedOffer =
+      formData.selectedOfferIndex !== ''
+        ? resolvedOffers[Number(formData.selectedOfferIndex)]
+        : null;
+    const selectedOfferTitle = selectedOffer
+      ? getOfferLabel(selectedOffer, Number(formData.selectedOfferIndex))
+      : undefined;
+
     await registerMutation.mutateAsync({
       groupId: group.id,
       name: formData.name,
@@ -168,9 +207,14 @@ export default function PublicExpedition() {
       phone: formData.phone,
       isWaitlist: willBeWaitlist,
       datePreference: formData.datePreference || undefined,
+      selectedOfferTitle,
     });
     
     setSubmitted(true);
+  };
+
+  const handleSelectOffer = (offerIndex: number) => {
+    setFormData((prev) => ({ ...prev, selectedOfferIndex: String(offerIndex) }));
   };
 
   const formatDate = (date: string) => {
@@ -214,37 +258,103 @@ export default function PublicExpedition() {
   };
 
   if (submitted) {
+    const selectedOffer =
+      formData.selectedOfferIndex !== ''
+        ? resolvedOffers[Number(formData.selectedOfferIndex)]
+        : null;
+    const selectedOfferLabel = selectedOffer
+      ? getOfferLabel(selectedOffer, Number(formData.selectedOfferIndex))
+      : null;
+    const confirmationImage =
+      descriptionImages[0] ||
+      group.destination_summary_image_url ||
+      group.cover_image_url ||
+      null;
+
     return (
-      <div 
-        className="min-h-screen flex items-center justify-center p-4"
-        style={{
-          backgroundImage: hasCoverImage ? `url(${group.cover_image_url})` : undefined,
-          backgroundSize: 'cover',
-          backgroundPosition: 'center',
-        }}
-      >
-        <div className={hasCoverImage ? 'absolute inset-0 bg-background/80 backdrop-blur-sm' : 'absolute inset-0 bg-gradient-to-br from-primary/5 via-background to-primary/10'} />
-        <Card className="max-w-md w-full relative z-10 shadow-2xl border-0">
-          <CardContent className="pt-8 pb-8 text-center">
-            <div className="w-20 h-20 rounded-full bg-green-100 flex items-center justify-center mx-auto mb-6">
-              <CheckCircle className="w-10 h-10 text-green-600" />
+      <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
+        <div className="p-3 md:p-4">
+          <section className="relative min-h-[calc(100dvh-2rem)] overflow-hidden rounded-3xl flex items-center justify-center">
+            {confirmationImage ? (
+              <div
+                className="absolute inset-0 bg-cover bg-center"
+                style={{ backgroundImage: `url(${confirmationImage})` }}
+              />
+            ) : (
+              <div className="absolute inset-0 bg-gradient-to-br from-primary/15 via-background to-primary/10" />
+            )}
+            <div
+              className={`absolute inset-0 ${
+                confirmationImage
+                  ? 'bg-gradient-to-b from-black/60 via-black/40 to-black/75'
+                  : 'bg-gradient-to-br from-white/70 via-white/90 to-white'
+              }`}
+            />
+
+            <div className="relative z-10 w-full px-4 py-12 md:px-10">
+              <div className="mx-auto w-full max-w-6xl">
+                <div className="flex flex-col items-center gap-8 text-center">
+                  <div className="space-y-6 text-white text-center flex flex-col items-center max-w-4xl">
+                    <div className="space-y-2 text-center">
+                      <h1 className="text-3xl md:text-5xl font-semibold leading-tight inline-flex items-center justify-center gap-3">
+                        <CheckCircle className="h-7 w-7 text-white" />
+                        {isWaitlist ? 'Você está na lista de espera' : 'Inscrição confirmada'}
+                      </h1>
+                      <p className="text-white/80 text-base md:text-lg">
+                        {isWaitlist
+                          ? 'Entraremos em contato assim que uma vaga for liberada.'
+                          : 'Enviaremos as próximas informações para o seu email.'}
+                      </p>
+                    </div>
+
+                    <div className="flex flex-nowrap justify-center gap-3">
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm text-white">
+                        <MapPin className="h-4 w-4" />
+                        {group.destination}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm text-white">
+                        <Calendar className="h-4 w-4" />
+                        {formatHeroRange(group.start_date, endDate)}
+                      </span>
+                      <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm text-white">
+                        <Clock className="h-4 w-4" />
+                        {group.duration_days} dias
+                      </span>
+                      {selectedOfferLabel && (
+                        <span className="inline-flex items-center gap-2 rounded-full bg-white/15 px-4 py-2 text-sm text-white">
+                          <Ticket className="h-4 w-4" />
+                          {selectedOfferLabel}
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <Card className="border-0 bg-white/90 backdrop-blur-sm shadow-2xl w-full max-w-2xl">
+                    <CardContent className="p-6 space-y-4 text-slate-900">
+                      <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
+                        Resumo da expedição
+                      </p>
+                      <h2 className="text-2xl font-semibold">{group.destination}</h2>
+                      <p className="text-sm text-slate-600">
+                        {formatDate(group.start_date)} • {group.duration_days} dias
+                      </p>
+                      {selectedOfferLabel && (
+                        <div className="rounded-2xl bg-primary/10 px-4 py-3 text-sm font-medium text-primary">
+                          Pacote selecionado: {selectedOfferLabel}
+                        </div>
+                      )}
+                      <p className="text-sm text-slate-500 font-light">
+                        {isWaitlist
+                          ? 'Você será avisado por email quando houver disponibilidade.'
+                          : 'Fique atento ao email para os próximos passos da sua viagem.'}
+                      </p>
+                    </CardContent>
+                  </Card>
+                </div>
+              </div>
             </div>
-            <h2 className="text-2xl font-bold mb-2">
-              {isWaitlist ? 'Inscrito na Lista de Espera!' : 'Inscrição Confirmada!'}
-            </h2>
-            <p className="text-muted-foreground mb-6">
-              {isWaitlist 
-                ? 'Você está na lista de espera. Entraremos em contato caso uma vaga seja liberada.'
-                : 'Sua inscrição foi confirmada. Você receberá mais informações por email.'}
-            </p>
-            <div className="bg-gradient-to-r from-primary/10 to-primary/5 rounded-xl p-5 text-left">
-              <p className="font-semibold text-lg">{group.destination}</p>
-              <p className="text-sm text-muted-foreground">
-                {formatDate(group.start_date)} • {group.duration_days} dias
-              </p>
-            </div>
-          </CardContent>
-        </Card>
+          </section>
+        </div>
       </div>
     );
   }
@@ -281,11 +391,11 @@ export default function PublicExpedition() {
                     <Button
                       asChild
                       size="lg"
-                      className="w-fit rounded-full px-8 text-white shadow-lg animate-in fade-in slide-in-from-top-2 duration-800 delay-200"
+                      className="w-fit rounded-full px-8 text-white shadow-lg animate-in fade-in slide-in-from-top-2 duration-800 delay-200 group"
                     >
                       <a href="#inscricao" className="inline-flex items-center gap-3">
                         Garantir minha vaga
-                        <ArrowRight className="w-4 h-4" />
+                        <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
                       </a>
                     </Button>
                   </div>
@@ -834,51 +944,163 @@ export default function PublicExpedition() {
         {/* Pricing Cards - Now after all content */}
         {hasPricing && (
           <section>
-            <h2 className="text-3xl font-bold text-center mb-10">Investimento</h2>
-            <div className="grid md:grid-cols-2 gap-8 max-w-3xl mx-auto">
-              {group.price_cash != null && (
-                <Card className="border-0 shadow-2xl bg-white overflow-hidden hover:shadow-3xl transition-shadow">
-                  <div className="bg-gradient-to-r from-green-500 to-green-600 text-white p-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                        <DollarSign className="w-6 h-6" />
+            <div className="text-center mb-10">
+              <p className="text-xs uppercase tracking-[0.32em] text-primary/60">Valores</p>
+              <h2 className="text-3xl md:text-4xl font-bold mt-3">E quanto vai custar?</h2>
+            </div>
+            <div
+              className={
+                resolvedOffers.length === 1
+                  ? 'grid gap-8 md:grid-cols-1 max-w-3xl mx-auto'
+                  : resolvedOffers.length === 2
+                  ? 'grid gap-8 md:grid-cols-2'
+                  : 'grid gap-8 md:grid-cols-2 lg:grid-cols-3'
+              }
+            >
+              {resolvedOffers.map((offer, index) => {
+                const symbol = getCurrencySymbol(offer.currency);
+                const hasCash = offer.price_cash != null;
+                const hasInstallment = offer.price_installment != null;
+                const hasInstallmentCount =
+                  typeof offer.installments_count === 'number' && offer.installments_count > 0;
+                const installmentPer =
+                  hasInstallment && hasInstallmentCount
+                    ? offer.price_installment! / offer.installments_count!
+                    : null;
+                const showInstallmentPrimary = hasInstallment;
+                const originalValue = hasCash
+                  ? offer.original_price_cash
+                  : offer.original_price_installment;
+                const showOriginalValue = Boolean(offer.is_offer && originalValue != null);
+                const savingsCash =
+                  offer.is_offer && offer.original_price_cash != null && offer.price_cash != null
+                    ? offer.original_price_cash - offer.price_cash
+                    : null;
+                const showSavings = savingsCash != null && savingsCash > 0;
+                const installmentValue = hasInstallment
+                  ? installmentPer ?? offer.price_installment!
+                  : null;
+
+                return (
+                  <Card
+                    key={`${offer.title}-${index}`}
+                    className="w-full border border-slate-100 shadow-sm bg-white overflow-hidden rounded-[24px]"
+                  >
+                    <CardContent className="p-6 flex flex-col gap-4">
+                      <div className="space-y-2">
+                        <div className="flex items-center justify-between gap-3">
+                          <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
+                            {offer.is_offer ? 'Oferta' : 'Pacote'}
+                          </p>
+                          {offer.is_offer && (
+                            showSavings ? (
+                              <Badge className="rounded-full bg-primary/10 text-primary gap-2 text-xs font-semibold whitespace-nowrap">
+                                <Ticket className="w-3.5 h-3.5" />
+                                Economize {symbol} {formatCurrency(savingsCash!)}
+                              </Badge>
+                            ) : (
+                              <Badge className="rounded-full bg-primary/10 text-primary text-xs font-semibold whitespace-nowrap">
+                                Oferta
+                              </Badge>
+                            )
+                          )}
+                        </div>
+                        <h3 className="text-xl font-semibold text-slate-900">
+                          {offer.title || `Pacote ${index + 1}`}
+                        </h3>
+                        {offer.description && (
+                          <p className="text-sm text-muted-foreground">{offer.description}</p>
+                        )}
                       </div>
-                      <span className="font-bold text-xl">À Vista</span>
-                    </div>
-                  </div>
-                  <CardContent className="p-8">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-lg text-muted-foreground">{currencySymbol}</span>
-                      <span className="text-5xl font-bold text-green-600">{formatCurrency(group.price_cash)}</span>
-                    </div>
-                    <p className="text-muted-foreground mt-3">Pagamento único com desconto</p>
-                  </CardContent>
-                </Card>
-              )}
-              {group.price_installment != null && group.installments_count && (
-                <Card className="border-0 shadow-2xl bg-white overflow-hidden hover:shadow-3xl transition-shadow">
-                  <div className="bg-gradient-to-r from-primary to-primary/80 text-white p-6">
-                    <div className="flex items-center gap-3">
-                      <div className="w-12 h-12 rounded-full bg-white/20 flex items-center justify-center">
-                        <CreditCard className="w-6 h-6" />
+
+                      <div className="space-y-2">
+                        {showOriginalValue && (
+                          <div className="text-sm font-medium text-rose-500 line-through">
+                            {symbol} {formatCurrency(originalValue!)}
+                          </div>
+                        )}
+
+                        {showInstallmentPrimary ? (
+                          <div className="space-y-1">
+                            <p className="text-[11px] uppercase tracking-[0.28em] text-slate-500">
+                              Por apenas
+                            </p>
+                            <div className="text-3xl font-semibold text-slate-900">
+                              {hasInstallmentCount ? (
+                                <span className="flex flex-wrap items-baseline gap-3">
+                                  <span className="text-2xl font-semibold text-slate-700">
+                                    {offer.installments_count}x
+                                  </span>
+                                  <span className="text-3xl font-bold text-slate-900">
+                                    {symbol} {formatCurrency(installmentValue!)}
+                                  </span>
+                                  {offer.entry_value != null && (
+                                    <span className="text-sm font-medium text-slate-600">
+                                      Com entrada de {symbol} {formatCurrency(offer.entry_value)}
+                                    </span>
+                                  )}
+                                </span>
+                              ) : (
+                                <span className="flex flex-wrap items-baseline gap-3">
+                                  {symbol} {formatCurrency(installmentValue!)}
+                                  {offer.entry_value != null && (
+                                    <span className="text-sm font-medium text-slate-600">
+                                      Com entrada de {symbol} {formatCurrency(offer.entry_value)}
+                                    </span>
+                                  )}
+                                </span>
+                              )}
+                            </div>
+                          </div>
+                        ) : (
+                          hasCash && (
+                            <div className="space-y-1">
+                              <p className="text-[10px] uppercase tracking-[0.26em] text-slate-500">
+                                Valor por pessoa
+                              </p>
+                              <div className="text-3xl font-semibold text-slate-900">
+                                {symbol} {formatCurrency(offer.price_cash!)}
+                              </div>
+                            </div>
+                          )
+                        )}
+
+                        {showInstallmentPrimary && hasCash && (
+                          <div className="flex items-center gap-2 text-sm text-slate-600">
+                            <span className="text-slate-400 uppercase tracking-wide text-[11px]">OU</span>
+                            <span className="font-semibold text-slate-800">
+                              {symbol} {formatCurrency(offer.price_cash!)}
+                            </span>
+                            <span className="text-slate-500 text-xs uppercase tracking-wide">à vista</span>
+                          </div>
+                        )}
+
+                        {!showInstallmentPrimary && offer.entry_value != null && (
+                          <div className="text-sm font-medium text-slate-600">
+                            Com entrada de {symbol} {formatCurrency(offer.entry_value)}
+                          </div>
+                        )}
                       </div>
-                      <span className="font-bold text-xl">Parcelado</span>
-                    </div>
-                  </div>
-                  <CardContent className="p-8">
-                    <div className="flex items-baseline gap-2">
-                      <span className="text-3xl font-bold text-primary">{group.installments_count}x</span>
-                      <span className="text-lg text-muted-foreground ml-1">de {currencySymbol}</span>
-                      <span className="text-4xl font-bold text-primary">
-                        {formatCurrency(group.price_installment / group.installments_count)}
-                      </span>
-                    </div>
-                    <p className="text-muted-foreground mt-3">
-                      Total: {currencySymbol} {formatCurrency(group.price_installment)}
-                    </p>
-                  </CardContent>
-                </Card>
-              )}
+
+                      <div className="pt-2 mt-auto flex justify-end">
+                        <Button
+                          asChild
+                          className="rounded-full bg-primary text-white hover:bg-primary/90 group px-5"
+                        >
+                          <a
+                            href="#form-inscricao"
+                            onClick={() => handleSelectOffer(index)}
+                            className="inline-flex items-center gap-2"
+                          >
+                            {isFull ? 'Entrar na lista' : 'Garantir minha vaga'}
+                            <ArrowRight className="w-4 h-4 transition-transform duration-300 group-hover:translate-x-1" />
+                          </a>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                );
+              })}
             </div>
           </section>
         )}
@@ -898,7 +1120,7 @@ export default function PublicExpedition() {
               </p>
             </div>
             <CardContent className="p-10">
-              <form onSubmit={handleSubmit} className="space-y-6">
+              <form id="form-inscricao" onSubmit={handleSubmit} className="space-y-6">
                 <div className="space-y-2">
                   <Label htmlFor="name" className="text-base font-medium">Nome Completo *</Label>
                   <Input
@@ -935,6 +1157,31 @@ export default function PublicExpedition() {
                     className="h-14 text-lg"
                   />
                 </div>
+
+                {resolvedOffers.length > 0 && (
+                  <div className="space-y-2">
+                    <Label htmlFor="package" className="text-base font-medium">
+                      Pacote (opcional)
+                    </Label>
+                    <Select
+                      value={formData.selectedOfferIndex || undefined}
+                      onValueChange={(value) =>
+                        setFormData({ ...formData, selectedOfferIndex: value })
+                      }
+                    >
+                      <SelectTrigger className="h-14 text-lg">
+                        <SelectValue placeholder="Selecione um pacote (opcional)" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        {resolvedOffers.map((offer, index) => (
+                          <SelectItem key={`offer-${index}`} value={String(index)}>
+                            {getOfferLabel(offer, index)}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
                 {group.show_date_preference && (
                   <div className="space-y-2">

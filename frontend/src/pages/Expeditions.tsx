@@ -405,13 +405,18 @@ export default function Expeditions() {
           filteredGroups.map((group) => {
             const hasCover = Boolean(group.cover_image_url);
             const currency = group.currency || 'BRL';
-            const cashValue = parseCurrencyValue(group.price_cash);
-            const installmentValue = parseCurrencyValue(group.price_installment);
+            const offers = group.pricing_offers || [];
+            const primaryOffer =
+              offers.find((offer) => offer.price_cash != null || offer.price_installment != null) || null;
+            const cashValue = parseCurrencyValue(primaryOffer?.price_cash ?? group.price_cash);
+            const installmentValue = parseCurrencyValue(primaryOffer?.price_installment ?? group.price_installment);
             const priceCash = cashValue !== null ? formatCurrencyValue(cashValue, currency) : null;
             const priceInstallment =
               installmentValue !== null ? formatCurrencyValue(installmentValue, currency) : null;
             const installmentCount =
-              typeof group.installments_count === 'number' && group.installments_count > 0
+              typeof primaryOffer?.installments_count === 'number' && primaryOffer.installments_count > 0
+                ? primaryOffer.installments_count
+                : typeof group.installments_count === 'number' && group.installments_count > 0
                 ? group.installments_count
                 : null;
             const installmentValuePer =

@@ -603,6 +603,7 @@ model ExpeditionGroup {
   priceInstallment   Decimal? @db.Decimal(12, 2)
   installmentsCount  Int?
   currency           String   @default("BRL")
+  pricingOffers      Json     @default("[]")
   coverImageUrl      String?
   carouselImages     String[]
   landingText        String?
@@ -649,6 +650,7 @@ model ExpeditionRegistration {
   email          String
   phone          String?
   datePreference String?
+  selectedOfferTitle String?
   status         String   @default("confirmed")
   isWaitlist     Boolean  @default(false)
   createdAt      DateTime @default(now()) @db.Timestamptz(6)

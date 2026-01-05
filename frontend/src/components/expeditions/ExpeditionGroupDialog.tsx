@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Upload, X, Image as ImageIcon, Plus, Youtube, Star, HelpCircle, ExternalLink, Calendar as CalendarIcon, Info, DollarSign, Package, MessageSquare, FileText, Pencil, Trash2, Check } from 'lucide-react';
-import { ExpeditionGroup, ExpeditionGroupInput, Testimonial, FAQ, ItinerarySummaryImage, NotRecommendedItem } from '@/hooks/useExpeditionGroups';
+import { ExpeditionGroup, ExpeditionGroupInput, Testimonial, FAQ, ItinerarySummaryImage, NotRecommendedItem, PricingOffer } from '@/hooks/useExpeditionGroups';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,6 +31,14 @@ import { cn } from '@/lib/utils';
 import { formatCurrencyInput, parseCurrencyInput } from '@/utils/currencyFormat';
 
 type CurrencyCode = 'BRL' | 'USD' | 'EUR';
+
+type PricingOfferInputs = {
+  price_cash: string;
+  price_installment: string;
+  entry_value: string;
+  original_price_cash: string;
+  original_price_installment: string;
+};
 
 const DatePickerField = ({
   value,
@@ -137,6 +145,7 @@ export function ExpeditionGroupDialog({
     price_installment: null,
     installments_count: null,
     currency: 'BRL',
+    pricing_offers: [],
     show_date_preference: false,
     included_items: [],
     excluded_items: [],
@@ -159,6 +168,7 @@ export function ExpeditionGroupDialog({
   const [priceCashInput, setPriceCashInput] = useState('');
   const [priceInstallmentInput, setPriceInstallmentInput] = useState('');
   const [newNotRecommendedItem, setNewNotRecommendedItem] = useState<NotRecommendedItem>({ title: '', description: '' });
+  const [pricingOfferInputs, setPricingOfferInputs] = useState<PricingOfferInputs[]>([]);
   const fileToBase64 = (file: Blob): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -211,6 +221,29 @@ export function ExpeditionGroupDialog({
     });
   };
 
+  const emptyOfferInputs: PricingOfferInputs = {
+    price_cash: '',
+    price_installment: '',
+    entry_value: '',
+    original_price_cash: '',
+    original_price_installment: '',
+  };
+
+  const formatOfferValue = (value: number | null | undefined, currency: CurrencyCode) => {
+    if (value === null || value === undefined || Number.isNaN(Number(value))) return '';
+    const numStr = Number(value).toFixed(2).replace('.', currency === 'BRL' ? ',' : '.');
+    return formatCurrencyInput(numStr, currency);
+  };
+
+  const buildOfferInputs = (offers: PricingOffer[], currency: CurrencyCode) =>
+    offers.map((offer) => ({
+      price_cash: formatOfferValue(offer.price_cash, currency),
+      price_installment: formatOfferValue(offer.price_installment, currency),
+      entry_value: formatOfferValue(offer.entry_value, currency),
+      original_price_cash: formatOfferValue(offer.original_price_cash, currency),
+      original_price_installment: formatOfferValue(offer.original_price_installment, currency),
+    }));
+
   useEffect(() => {
     const normalizeDateInput = (val?: string | null) => {
       if (!val) return '';
@@ -221,6 +254,30 @@ export function ExpeditionGroupDialog({
     };
 
     if (group) {
+      const currency = (group.currency || 'BRL') as CurrencyCode;
+      const existingOffers = (group.pricing_offers as PricingOffer[]) || [];
+      const hasLegacyPricing =
+        group.price_cash !== null ||
+        group.price_installment !== null ||
+        group.installments_count !== null;
+      const legacyOffer: PricingOffer[] = !existingOffers.length && hasLegacyPricing
+        ? [
+            {
+              title: 'Pacote principal',
+              description: '',
+              price_cash: group.price_cash ?? null,
+              price_installment: group.price_installment ?? null,
+              installments_count: group.installments_count ?? null,
+              entry_value: null,
+              is_offer: false,
+              original_price_cash: null,
+              original_price_installment: null,
+              currency: currency,
+            },
+          ]
+        : [];
+      const resolvedOffers = existingOffers.length > 0 ? existingOffers : legacyOffer;
+
       setFormData({
         destination: group.destination,
         start_date: normalizeDateInput(group.start_date),
@@ -255,7 +312,8 @@ export function ExpeditionGroupDialog({
         price_cash: group.price_cash ?? null,
         price_installment: group.price_installment ?? null,
         installments_count: group.installments_count ?? null,
-        currency: group.currency || 'BRL',
+        currency: currency,
+        pricing_offers: resolvedOffers,
         show_date_preference: group.show_date_preference ?? false,
         included_items: group.included_items || [],
         excluded_items: group.excluded_items || [],
@@ -264,7 +322,9 @@ export function ExpeditionGroupDialog({
         testimonials: (group.testimonials as Testimonial[]) || [],
         faqs: (group.faqs as FAQ[]) || [],
       });
-      const currency = (group.currency || 'BRL') as CurrencyCode;
+      setPricingOfferInputs(
+        resolvedOffers.length > 0 ? buildOfferInputs(resolvedOffers, currency) : [],
+      );
       const normalizeMoney = (val: any) => {
         if (val === null || val === undefined) return '';
         const num = typeof val === 'number' ? val : Number(val);
@@ -305,6 +365,7 @@ export function ExpeditionGroupDialog({
         price_installment: null,
         installments_count: null,
         currency: 'BRL',
+        pricing_offers: [],
         show_date_preference: false,
         included_items: [],
         excluded_items: [],
@@ -315,6 +376,7 @@ export function ExpeditionGroupDialog({
       });
       setPriceCashInput('');
       setPriceInstallmentInput('');
+      setPricingOfferInputs([]);
     }
     setNewIncludedItem('');
     setNewExcludedItem('');
@@ -361,6 +423,9 @@ export function ExpeditionGroupDialog({
 
     setPriceCashInput(formatFromValue(formData.price_cash));
     setPriceInstallmentInput(formatFromValue(formData.price_installment));
+    if (formData.pricing_offers && formData.pricing_offers.length > 0) {
+      setPricingOfferInputs(buildOfferInputs(formData.pricing_offers, currencyCode));
+    }
   }, [currencyCode]);
 
   const handleCurrencyChange = (
@@ -576,6 +641,67 @@ export function ExpeditionGroupDialog({
     const items = [...(formData.excluded_items || [])];
     items.splice(index, 1);
     setFormData({ ...formData, excluded_items: items });
+  };
+
+  const addPricingOffer = () => {
+    setFormData((prev) => ({
+      ...prev,
+      pricing_offers: [
+        ...(prev.pricing_offers || []),
+        {
+          title: '',
+          description: '',
+          price_cash: null,
+          price_installment: null,
+          installments_count: null,
+          entry_value: null,
+          is_offer: false,
+          original_price_cash: null,
+          original_price_installment: null,
+          currency: prev.currency || 'BRL',
+        },
+      ],
+    }));
+    setPricingOfferInputs((prev) => [...prev, { ...emptyOfferInputs }]);
+  };
+
+  const updatePricingOffer = (index: number, updates: Partial<PricingOffer>) => {
+    const offers = [...(formData.pricing_offers || [])];
+    offers[index] = { ...offers[index], ...updates };
+    setFormData({ ...formData, pricing_offers: offers });
+  };
+
+  const removePricingOffer = (index: number) => {
+    const offers = [...(formData.pricing_offers || [])];
+    offers.splice(index, 1);
+    setFormData({ ...formData, pricing_offers: offers });
+    setPricingOfferInputs((prev) => prev.filter((_, idx) => idx !== index));
+  };
+
+  const handlePricingOfferCurrencyChange = (
+    index: number,
+    field: keyof PricingOfferInputs,
+    rawValue: string,
+  ) => {
+    const formatted = formatCurrencyInput(rawValue, currencyCode);
+    const parsed = parseCurrencyInput(formatted, currencyCode);
+    const numeric = parsed ? parseFloat(parsed) : null;
+
+    setPricingOfferInputs((prev) => {
+      const next = [...prev];
+      next[index] = { ...next[index], [field]: formatted };
+      return next;
+    });
+
+    const mappedField: Record<keyof PricingOfferInputs, keyof PricingOffer> = {
+      price_cash: 'price_cash',
+      price_installment: 'price_installment',
+      entry_value: 'entry_value',
+      original_price_cash: 'original_price_cash',
+      original_price_installment: 'original_price_installment',
+    };
+
+    updatePricingOffer(index, { [mappedField[field]]: formatted === '' ? null : numeric } as Partial<PricingOffer>);
   };
 
   const addNotRecommendedItem = () => {
@@ -910,7 +1036,7 @@ export function ExpeditionGroupDialog({
             </TabsContent>
 
             {/* Pricing Tab */}
-            <TabsContent value="pricing" className="space-y-4 mt-4">
+            <TabsContent value="pricing" className="space-y-6 mt-4">
               <div className="space-y-2">
                 <Label>Moeda</Label>
                 <Select
@@ -928,45 +1054,162 @@ export function ExpeditionGroupDialog({
                 </Select>
               </div>
 
-              <div className="space-y-2">
-                <Label htmlFor="price_cash">Valor à Vista ({currencySymbol})</Label>
-                <Input
-                  id="price_cash"
-                  inputMode="decimal"
-                  value={priceCashInput}
-                  onChange={(e) => handleCurrencyChange('price_cash', e.target.value)}
-                  placeholder={currencyPlaceholder}
-                />
+              <div className="flex items-center justify-between">
+                <Label className="text-base font-semibold">Ofertas</Label>
+                <Button type="button" variant="outline" size="sm" onClick={addPricingOffer}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar oferta
+                </Button>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <Label htmlFor="price_installment">Valor Parcelado ({currencySymbol})</Label>
-                  <Input
-                    id="price_installment"
-                    inputMode="decimal"
-                    value={priceInstallmentInput}
-                    onChange={(e) => handleCurrencyChange('price_installment', e.target.value)}
-                    placeholder={currencyPlaceholder}
-                  />
-                </div>
+              {(formData.pricing_offers || []).length === 0 ? (
+                <Card className="border border-dashed">
+                  <CardContent className="p-6 text-sm text-muted-foreground">
+                    Adicione uma ou mais ofertas para exibir os valores na landing page.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {(formData.pricing_offers || []).map((offer, index) => {
+                    const inputs = pricingOfferInputs[index] || emptyOfferInputs;
+                    return (
+                      <Card key={`pricing-offer-${index}`} className="relative border border-muted/60 shadow-none">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="absolute right-2 top-2 h-8 w-8 text-destructive hover:text-destructive"
+                          onClick={() => removePricingOffer(index)}
+                          aria-label="Remover oferta"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                        <CardContent className="space-y-4 p-4">
+                          <div className="grid gap-4 md:grid-cols-2">
+                            <div className="space-y-2">
+                              <Label>Nome da oferta</Label>
+                              <Input
+                                value={offer.title}
+                                onChange={(e) => updatePricingOffer(index, { title: e.target.value })}
+                                placeholder="Ex: Quarto individual"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Descrição (opcional)</Label>
+                              <Input
+                                value={offer.description || ''}
+                                onChange={(e) => updatePricingOffer(index, { description: e.target.value })}
+                                placeholder="Ex: Valor por pessoa"
+                              />
+                            </div>
+                          </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="installments_count">Quantidade de Parcelas</Label>
-                  <Input
-                    id="installments_count"
-                    type="number"
-                    min="1"
-                    max="24"
-                    value={formData.installments_count ?? ''}
-                    onChange={(e) => setFormData({ 
-                      ...formData, 
-                      installments_count: e.target.value ? parseInt(e.target.value) : null 
-                    })}
-                    placeholder="Ex: 12"
-                  />
+                          <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
+                            <div className="space-y-2">
+                              <Label>Valor à vista ({currencySymbol})</Label>
+                              <Input
+                                inputMode="decimal"
+                                value={inputs.price_cash}
+                                onChange={(e) => handlePricingOfferCurrencyChange(index, 'price_cash', e.target.value)}
+                                placeholder={currencyPlaceholder}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Valor parcelado ({currencySymbol})</Label>
+                              <Input
+                                inputMode="decimal"
+                                value={inputs.price_installment}
+                                onChange={(e) => handlePricingOfferCurrencyChange(index, 'price_installment', e.target.value)}
+                                placeholder={currencyPlaceholder}
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Parcelas</Label>
+                              <Input
+                                type="number"
+                                min="1"
+                                max="24"
+                                value={offer.installments_count ?? ''}
+                                onChange={(e) =>
+                                  updatePricingOffer(index, {
+                                    installments_count: e.target.value ? parseInt(e.target.value) : null,
+                                  })
+                                }
+                                placeholder="Ex: 12"
+                              />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Entrada (opcional)</Label>
+                              <Input
+                                inputMode="decimal"
+                                value={inputs.entry_value}
+                                onChange={(e) => handlePricingOfferCurrencyChange(index, 'entry_value', e.target.value)}
+                                placeholder={currencyPlaceholder}
+                              />
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-3">
+                            <Switch
+                              checked={Boolean(offer.is_offer)}
+                              onCheckedChange={(checked) => {
+                                updatePricingOffer(index, {
+                                  is_offer: checked,
+                                  ...(checked
+                                    ? {}
+                                    : {
+                                        original_price_cash: null,
+                                        original_price_installment: null,
+                                      }),
+                                });
+                                if (!checked) {
+                                  setPricingOfferInputs((prev) => {
+                                    const next = [...prev];
+                                    next[index] = {
+                                      ...next[index],
+                                      original_price_cash: '',
+                                      original_price_installment: '',
+                                    };
+                                    return next;
+                                  });
+                                }
+                              }}
+                            />
+                            <Label className="mb-0">Está em oferta</Label>
+                          </div>
+
+                          {offer.is_offer && (
+                            <div className="grid gap-4 md:grid-cols-2">
+                              <div className="space-y-2">
+                                <Label>Valor original à vista ({currencySymbol})</Label>
+                                <Input
+                                  inputMode="decimal"
+                                  value={inputs.original_price_cash}
+                                  onChange={(e) =>
+                                    handlePricingOfferCurrencyChange(index, 'original_price_cash', e.target.value)
+                                  }
+                                  placeholder={currencyPlaceholder}
+                                />
+                              </div>
+                              <div className="space-y-2">
+                                <Label>Valor original parcelado ({currencySymbol})</Label>
+                                <Input
+                                  inputMode="decimal"
+                                  value={inputs.original_price_installment}
+                                  onChange={(e) =>
+                                    handlePricingOfferCurrencyChange(index, 'original_price_installment', e.target.value)
+                                  }
+                                  placeholder={currencyPlaceholder}
+                                />
+                              </div>
+                            </div>
+                          )}
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
                 </div>
-              </div>
+              )}
             </TabsContent>
 
             {/* Package Tab */}
