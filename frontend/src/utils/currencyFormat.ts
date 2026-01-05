@@ -8,35 +8,24 @@ import type { CurrencyType } from '@/components/studio/StudioEditor';
 export function formatCurrencyInput(value: string, currency: CurrencyType = 'BRL'): string {
   const decimalSep = currency === 'BRL' ? ',' : '.';
   const thousandSep = currency === 'BRL' ? '.' : ',';
-  
-  // Allow only digits and the correct decimal separator
-  let cleaned = value.replace(new RegExp(`[^0-9${decimalSep === ',' ? ',' : '\\.'}]`, 'g'), '');
-  
-  // Ensure only one decimal separator
-  const parts = cleaned.split(decimalSep);
-  if (parts.length > 2) {
-    cleaned = parts[0] + decimalSep + parts.slice(1).join('');
-  }
-  
-  // Split into integer and decimal parts
-  const [intPart, decPart] = cleaned.split(decimalSep);
-  
-  if (!intPart && !decPart) return '';
-  
-  // Remove leading zeros from integer part (but keep at least one zero)
-  let intCleaned = (intPart || '').replace(/^0+/, '') || '';
-  
-  // Add thousand separators to integer part
+
+  const cleaned = value.replace(/[^\d.,]/g, '');
+  if (!cleaned) return '';
+
+  const normalized = decimalSep === ',' ? cleaned.replace(/\./g, '') : cleaned.replace(/,/g, '');
+  const hasDecimal = normalized.includes(decimalSep);
+  const parts = normalized.split(decimalSep);
+  const intPartRaw = parts[0].replace(/\D/g, '');
+  const decPartRaw = parts.slice(1).join('').replace(/\D/g, '');
+
+  const intCleaned = intPartRaw.replace(/^0+/, '') || '0';
   const intFormatted = intCleaned.replace(/\B(?=(\d{3})+(?!\d))/g, thousandSep);
-  
-  // Limit decimal to 2 places
-  const decLimited = decPart !== undefined ? decPart.slice(0, 2) : undefined;
-  
-  // Combine parts
-  if (decLimited !== undefined) {
-    return intFormatted + decimalSep + decLimited;
+
+  if (hasDecimal) {
+    if (!decPartRaw) return intFormatted + decimalSep;
+    return intFormatted + decimalSep + decPartRaw.slice(0, 2);
   }
-  
+
   return intFormatted;
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useExpeditionGroups, ExpeditionGroup, ExpeditionGroupWithAgency } from '@/hooks/useExpeditionGroups';
 import { useAgencies } from '@/hooks/useAgencies';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,24 +12,10 @@ import { ExpeditionRegistrationsDialog } from '@/components/expeditions/Expediti
 import { TaskDialog } from '@/components/tasks/TaskDialog';
 import { ProposalDialog } from '@/components/proposals/ProposalDialog';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -57,6 +43,11 @@ import {
   MapPin, 
   Calendar, 
   Clock,
+  Compass,
+  CalendarDays,
+  CreditCard,
+  DollarSign,
+  Hourglass,
   Loader2,
   Copy,
   Check,
@@ -66,6 +57,24 @@ import {
   ExternalLink
 } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
+
+const formatCurrencyValue = (value: number, currency = 'BRL') =>
+  new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(value);
+
+const parseCurrencyValue = (value: unknown) => {
+  if (value === null || value === undefined) return null;
+  if (typeof value === 'number' && Number.isFinite(value)) return value;
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (!trimmed) return null;
+    const normalized = trimmed.includes(',')
+      ? trimmed.replace(/\./g, '').replace(',', '.')
+      : trimmed;
+    const parsed = Number(normalized);
+    return Number.isFinite(parsed) ? parsed : null;
+  }
+  return null;
+};
 
 export default function Expeditions() {
   const { isSuperAdmin, isAdmin, agency } = useAuth();
@@ -87,6 +96,8 @@ export default function Expeditions() {
   const [registrationsDialogOpen, setRegistrationsDialogOpen] = useState(false);
   const [selectedGroup, setSelectedGroup] = useState<ExpeditionGroup | null>(null);
   const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('active');
+  const [periodFilter, setPeriodFilter] = useState<'all' | 'month' | 'year'>('all');
 
   // Task and Lead dialog state
   const [taskDialogOpen, setTaskDialogOpen] = useState(false);
@@ -94,12 +105,27 @@ export default function Expeditions() {
   const [leadDialogOpen, setLeadDialogOpen] = useState(false);
   const [leadPrefill, setLeadPrefill] = useState<{ title: string; notes: string } | null>(null);
 
-  const filteredGroups = groups.filter(group => {
+  const now = new Date();
+  const filteredGroups = groups.filter((group) => {
     const searchLower = searchTerm.toLowerCase();
-    return (
+    const matchesSearch =
       group.destination.toLowerCase().includes(searchLower) ||
-      (group.description?.toLowerCase().includes(searchLower))
-    );
+      (group.description?.toLowerCase().includes(searchLower));
+
+    const matchesStatus =
+      statusFilter === 'all' ||
+      (statusFilter === 'active' && group.is_active) ||
+      (statusFilter === 'inactive' && !group.is_active);
+
+    const startDate = new Date(group.start_date);
+    const matchesPeriod =
+      periodFilter === 'all' ||
+      (periodFilter === 'year' && startDate.getFullYear() === now.getFullYear()) ||
+      (periodFilter === 'month' &&
+        startDate.getFullYear() === now.getFullYear() &&
+        startDate.getMonth() === now.getMonth());
+
+    return matchesSearch && matchesStatus && matchesPeriod;
   });
 
   const handleEdit = (group: ExpeditionGroup) => {
@@ -204,250 +230,352 @@ export default function Expeditions() {
   const upcomingGroups = groups.filter(g => new Date(g.start_date) >= new Date() && g.is_active);
   const totalParticipants = groups.reduce((acc, g) => acc + (g.registrations_count || 0), 0);
   const totalWaitlist = groups.reduce((acc, g) => acc + (g.waitlist_count || 0), 0);
+  const agencyOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todas as agências' },
+      ...(agencies ?? []).map((ag) => ({ value: ag.id, label: ag.name })),
+    ],
+    [agencies],
+  );
 
   return (
-    <div className="p-6 space-y-6">
-      {/* Header */}
-      <div className="flex items-center justify-between">
+    <div className="p-6 space-y-8">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Grupos de Expedição</h1>
-          <p className="text-muted-foreground">Gerencie seus grupos e inscrições</p>
+          <h1 className="text-2xl font-semibold text-foreground">Grupos de Expedição</h1>
+          <p className="text-sm text-muted-foreground">Gerencie seus grupos e inscrições</p>
         </div>
-        <Button onClick={() => { setEditingGroup(null); setDialogOpen(true); }}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Grupo
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por destino..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-9 bg-white"
+            />
+          </div>
+          <Button size="sm" onClick={() => { setEditingGroup(null); setDialogOpen(true); }}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Grupo
+          </Button>
+        </div>
       </div>
 
-      {/* Super Admin Agency Filter */}
-      {isSuperAdmin && (
-        <div className="flex items-center gap-4">
-          <div className="flex items-center gap-2">
-            <Building2 className="w-4 h-4 text-muted-foreground" />
-            <span className="text-sm text-muted-foreground">Filtrar por agência:</span>
-          </div>
-          <Select
-            value={agencyFilter || 'all'}
-            onValueChange={(value) => setAgencyFilter(value === 'all' ? null : value)}
-          >
-            <SelectTrigger className="w-[250px]">
-              <SelectValue placeholder="Todas as agências" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as agências</SelectItem>
-              {agencies?.map((ag) => (
-                <SelectItem key={ag.id} value={ag.id}>
-                  {ag.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { label: 'Ativo', value: 'active' },
+            { label: 'Inativo', value: 'inactive' },
+            { label: 'Todos', value: 'all' },
+          ].map((option) => {
+            const isActive = statusFilter === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setStatusFilter(option.value as typeof statusFilter)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  isActive
+                    ? 'bg-[#f06a12] text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
         </div>
+        <div className="hidden sm:block h-5 w-px bg-border" />
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { label: 'Este ano', value: 'year' },
+            { label: 'Este mês', value: 'month' },
+            { label: 'Todos', value: 'all' },
+          ].map((option) => {
+            const isActive = periodFilter === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPeriodFilter(option.value as typeof periodFilter)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  isActive
+                    ? 'bg-[#f06a12] text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {isSuperAdmin && (
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Building2 className="h-4 w-4" />
+              <span>Filtrar por agência</span>
+            </div>
+            <Combobox
+              options={agencyOptions}
+              value={agencyFilter || 'all'}
+              onValueChange={(value) => setAgencyFilter(value === 'all' ? null : value)}
+              placeholder="Todas as agências"
+              searchPlaceholder="Buscar agência..."
+              emptyText="Nenhuma agência encontrada"
+              buttonClassName="w-64 h-9"
+              contentClassName="w-72"
+            />
+          </CardContent>
+        </Card>
       )}
 
-      {/* Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <MapPin className="w-6 h-6 text-primary" />
-              </div>
+      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold">{groups.length}</p>
-                <p className="text-sm text-muted-foreground">Total de Grupos</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Total de grupos</p>
+                <p className="text-2xl font-semibold">{groups.length}</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                <Compass className="w-6 h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
-                <Calendar className="w-6 h-6 text-green-500" />
-              </div>
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold">{upcomingGroups.length}</p>
-                <p className="text-sm text-muted-foreground">Próximos Grupos</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Próximos grupos</p>
+                <p className="text-2xl font-semibold">{upcomingGroups.length}</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-amber-100 text-amber-600 flex items-center justify-center">
+                <CalendarDays className="w-6 h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <Users className="w-6 h-6 text-blue-500" />
-              </div>
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold">{totalParticipants}</p>
-                <p className="text-sm text-muted-foreground">Inscritos</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Inscritos</p>
+                <p className="text-2xl font-semibold">{totalParticipants}</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-sky-100 text-sky-600 flex items-center justify-center">
+                <Users className="w-6 h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-amber-500/10 flex items-center justify-center">
-                <Clock className="w-6 h-6 text-amber-500" />
-              </div>
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold">{totalWaitlist}</p>
-                <p className="text-sm text-muted-foreground">Na Lista de Espera</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Lista de espera</p>
+                <p className="text-2xl font-semibold">{totalWaitlist}</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-rose-100 text-rose-600 flex items-center justify-center">
+                <Hourglass className="w-6 h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
       </div>
 
-      {/* Search */}
-      <div className="relative max-w-md">
-        <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
-        <Input
-          placeholder="Buscar por destino..."
-          value={searchTerm}
-          onChange={(e) => setSearchTerm(e.target.value)}
-          className="pl-9"
-        />
-      </div>
-
-      {/* Table */}
-      <Card>
+      <div className="space-y-4">
         {isLoading ? (
-          <div className="p-8 flex items-center justify-center">
-            <Loader2 className="w-6 h-6 animate-spin text-primary" />
-          </div>
+          <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+            <CardContent className="p-10 flex items-center justify-center">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </CardContent>
+          </Card>
+        ) : filteredGroups.length === 0 ? (
+          <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+            <CardContent className="p-10 text-center text-muted-foreground">
+              Nenhum grupo encontrado
+            </CardContent>
+          </Card>
         ) : (
-          <Table>
-            <TableHeader>
-              <TableRow>
-                <TableHead>Destino</TableHead>
-                {isSuperAdmin && <TableHead>Agência</TableHead>}
-                <TableHead>Data</TableHead>
-                <TableHead>Duração</TableHead>
-                <TableHead>Vagas</TableHead>
-                <TableHead>Status</TableHead>
-                <TableHead className="w-[100px]">Ações</TableHead>
-              </TableRow>
-            </TableHeader>
-            <TableBody>
-              {filteredGroups.length === 0 ? (
-                <TableRow>
-                  <TableCell colSpan={isSuperAdmin ? 7 : 6} className="text-center text-muted-foreground py-8">
-                    Nenhum grupo encontrado
-                  </TableCell>
-                </TableRow>
-              ) : (
-                filteredGroups.map((group) => (
-                  <TableRow key={group.id}>
-                    <TableCell>
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                          <MapPin className="w-5 h-5 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{group.destination}</p>
-                          {group.description && (
-                            <p className="text-sm text-muted-foreground truncate max-w-[200px]">
-                              {group.description}
-                            </p>
-                          )}
-                        </div>
+          filteredGroups.map((group) => {
+            const hasCover = Boolean(group.cover_image_url);
+            const currency = group.currency || 'BRL';
+            const cashValue = parseCurrencyValue(group.price_cash);
+            const installmentValue = parseCurrencyValue(group.price_installment);
+            const priceCash = cashValue !== null ? formatCurrencyValue(cashValue, currency) : null;
+            const priceInstallment =
+              installmentValue !== null ? formatCurrencyValue(installmentValue, currency) : null;
+            const installmentCount =
+              typeof group.installments_count === 'number' && group.installments_count > 0
+                ? group.installments_count
+                : null;
+            const installmentValuePer =
+              installmentValue !== null && installmentCount ? installmentValue / installmentCount : null;
+            const installmentPerLabel =
+              installmentValuePer !== null ? formatCurrencyValue(installmentValuePer, currency) : null;
+
+            return (
+              <Card
+                key={group.id}
+                className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg overflow-hidden cursor-pointer"
+                onClick={(event) => {
+                  const target = event.target as HTMLElement;
+                  if (target.closest('button') || target.closest('a') || target.closest('input') || target.closest('[data-card-action]')) {
+                    return;
+                  }
+                  handleEdit(group);
+                }}
+              >
+                <CardContent className="p-0">
+                  <div className="flex flex-col gap-1 lg:flex-row lg:items-stretch">
+                    {hasCover && (
+                      <div className="w-full lg:w-1/6">
+                        <img
+                          src={group.cover_image_url}
+                          alt={`Capa ${group.destination}`}
+                          className="h-36 w-full object-cover lg:h-full"
+                          loading="lazy"
+                        />
                       </div>
-                    </TableCell>
-                    {isSuperAdmin && (
-                      <TableCell>
-                        <Badge variant="outline">
-                          {(group as ExpeditionGroupWithAgency).agency_name || 'N/A'}
-                        </Badge>
-                      </TableCell>
                     )}
-                    <TableCell>
-                      <div className="flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-muted-foreground" />
-                        {formatDate(group.start_date)}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      {group.duration_days} {group.duration_days === 1 ? 'dia' : 'dias'}
-                    </TableCell>
-                    <TableCell>
-                      <div 
-                        className="flex items-center gap-2 cursor-pointer hover:text-primary transition-colors"
-                        onClick={() => handleViewRegistrations(group)}
-                      >
-                        <Users className="w-4 h-4" />
-                        <span className="font-medium">
-                          {group.registrations_count}/{group.max_participants}
-                        </span>
-                        {(group.waitlist_count || 0) > 0 && (
-                          <Badge variant="secondary" className="text-xs">
-                            +{group.waitlist_count} espera
-                          </Badge>
-                        )}
-                      </div>
-                    </TableCell>
-                    <TableCell>
-                      <Badge variant={group.is_active ? 'default' : 'secondary'}>
-                        {group.is_active ? 'Ativo' : 'Inativo'}
-                      </Badge>
-                    </TableCell>
-                    <TableCell>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="icon">
-                            <MoreHorizontal className="w-4 h-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleViewRegistrations(group)}>
-                            <Users className="w-4 h-4 mr-2" />
-                            Ver Inscritos
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleViewPublicPage(group)}>
-                            <ExternalLink className="w-4 h-4 mr-2" />
-                            Landing page
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleCopyUrl(group)}>
-                            {copiedId === group.id ? (
-                              <Check className="w-4 h-4 mr-2" />
-                            ) : (
-                              <Copy className="w-4 h-4 mr-2" />
+                    <div className="flex flex-1 flex-col gap-4 p-5">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="flex items-start gap-3">
+                          {!hasCover && (
+                            <div className="h-10 w-10 shrink-0 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                              <MapPin className="h-5 w-5" />
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-base font-semibold">{group.destination}</p>
+                              {isSuperAdmin && (
+                                <Badge variant="outline" className="rounded-full px-2 py-0.5 text-[11px]">
+                                  {(group as ExpeditionGroupWithAgency).agency_name || 'N/A'}
+                                </Badge>
+                              )}
+                            </div>
+                            {group.description && (
+                              <p className="text-sm text-muted-foreground line-clamp-2">
+                                {group.description}
+                              </p>
                             )}
-                            Copiar Link
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleCreateTask(group)}>
-                            <ClipboardList className="w-4 h-4 mr-2" />
-                            Criar Tarefa
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => handleCreateLead(group)}>
-                            <FileText className="w-4 h-4 mr-2" />
-                            Criar Lead
-                          </DropdownMenuItem>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem onClick={() => handleEdit(group)}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Editar
-                          </DropdownMenuItem>
-                          <DropdownMenuItem 
-                            className="text-destructive"
-                            onClick={() => handleDelete(group)}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          <Badge
+                            className={`rounded-full px-3 py-1 text-xs font-semibold ${
+                              group.is_active ? 'bg-orange-100 text-orange-700' : 'bg-slate-200 text-slate-600'
+                            }`}
                           >
-                            <Trash2 className="w-4 h-4 mr-2" />
-                            Excluir
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </TableCell>
-                  </TableRow>
-                ))
-              )}
-            </TableBody>
-          </Table>
+                            {group.is_active ? 'Ativo' : 'Inativo'}
+                          </Badge>
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end" data-card-action>
+                            <DropdownMenuItem onClick={() => handleViewRegistrations(group)}>
+                              <Users className="w-4 h-4 mr-2" />
+                              Ver Inscritos
+                            </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleViewPublicPage(group)}>
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                Landing page
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleCopyUrl(group)}>
+                                {copiedId === group.id ? (
+                                  <Check className="w-4 h-4 mr-2" />
+                                ) : (
+                                  <Copy className="w-4 h-4 mr-2" />
+                                )}
+                                Copiar Link
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleCreateTask(group)}>
+                                <ClipboardList className="w-4 h-4 mr-2" />
+                                Criar Tarefa
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleCreateLead(group)}>
+                                <FileText className="w-4 h-4 mr-2" />
+                                Criar Lead
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleEdit(group)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => handleDelete(group)}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
+                      </div>
+                    <div className="mt-auto flex flex-wrap items-center gap-5 text-sm text-muted-foreground sm:justify-end">
+                      {priceCash && (
+                        <div className="flex items-center gap-2">
+                          <DollarSign className="w-4 h-4 text-orange-500" />
+                          <span>{priceCash}</span>
+                          <span className="text-xs text-muted-foreground">à vista</span>
+                        </div>
+                      )}
+                      {(installmentPerLabel || priceInstallment) && (
+                        <div className="flex items-center gap-2">
+                          <CreditCard className="w-4 h-4 text-orange-500" />
+                          {installmentCount && (
+                            <span className="rounded-full bg-orange-100 px-2 py-0.5 text-[11px] font-semibold text-orange-700">
+                              {installmentCount}x
+                            </span>
+                          )}
+                          <span>{installmentPerLabel || priceInstallment}</span>
+                        </div>
+                      )}
+                      <div className="flex items-center gap-2">
+                        <Calendar className="w-4 h-4" />
+                        <span>{formatDate(group.start_date)}</span>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <Clock className="w-4 h-4" />
+                        <span>
+                          {group.duration_days} {group.duration_days === 1 ? 'dia' : 'dias'}
+                        </span>
+                      </div>
+                      <button
+                        type="button"
+                        className="flex items-center gap-2 text-sm font-medium text-foreground hover:text-primary transition-colors"
+                          onClick={() => handleViewRegistrations(group)}
+                        >
+                          <Users className="w-4 h-4 text-muted-foreground" />
+                          <span>
+                            {group.registrations_count}/{group.max_participants} vagas
+                          </span>
+                          {(group.waitlist_count || 0) > 0 && (
+                            <Badge variant="secondary" className="text-xs">
+                              +{group.waitlist_count} espera
+                            </Badge>
+                          )}
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
         )}
-      </Card>
+      </div>
 
       {/* Dialogs */}
       <ExpeditionGroupDialog

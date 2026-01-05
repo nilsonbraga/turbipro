@@ -20,7 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Upload, X, Image as ImageIcon, Plus, Youtube, Star, HelpCircle, ExternalLink, Calendar as CalendarIcon } from 'lucide-react';
+import { Loader2, Upload, X, Image as ImageIcon, Plus, Youtube, Star, HelpCircle, ExternalLink, Calendar as CalendarIcon, Info, DollarSign, Package, MessageSquare } from 'lucide-react';
 import { ExpeditionGroup, ExpeditionGroupInput, Testimonial, FAQ } from '@/hooks/useExpeditionGroups';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
@@ -128,6 +128,8 @@ export function ExpeditionGroupDialog({
   const [newExcludedItem, setNewExcludedItem] = useState('');
   const [newTestimonial, setNewTestimonial] = useState<Testimonial>({ name: '', text: '', photo: '' });
   const [newFaq, setNewFaq] = useState<FAQ>({ question: '', answer: '' });
+  const [editingFaqIndex, setEditingFaqIndex] = useState<number | null>(null);
+  const [faqDraft, setFaqDraft] = useState<FAQ>({ question: '', answer: '' });
   const [uploadingTestimonialPhoto, setUploadingTestimonialPhoto] = useState(false);
   const [priceCashInput, setPriceCashInput] = useState('');
   const [priceInstallmentInput, setPriceInstallmentInput] = useState('');
@@ -224,6 +226,32 @@ export function ExpeditionGroupDialog({
   };
 
   const currencyCode = (formData.currency || 'BRL') as CurrencyCode;
+  const currencyPlaceholder = currencyCode === 'BRL' ? '0,00' : '0.00';
+
+  useEffect(() => {
+    const toNumeric = (value: unknown) => {
+      if (value === null || value === undefined) return null;
+      if (typeof value === 'number' && Number.isFinite(value)) return value;
+      if (typeof value === 'string') {
+        const direct = Number(value);
+        if (Number.isFinite(direct)) return direct;
+        const parsed = parseCurrencyInput(value, currencyCode);
+        const fallback = Number(parsed);
+        return Number.isFinite(fallback) ? fallback : null;
+      }
+      return null;
+    };
+
+    const formatFromValue = (value: unknown) => {
+      const numeric = toNumeric(value);
+      if (numeric === null) return '';
+      const numStr = numeric.toFixed(2).replace('.', currencyCode === 'BRL' ? ',' : '.');
+      return formatCurrencyInput(numStr, currencyCode);
+    };
+
+    setPriceCashInput(formatFromValue(formData.price_cash));
+    setPriceInstallmentInput(formatFromValue(formData.price_installment));
+  }, [currencyCode]);
 
   const handleCurrencyChange = (
     field: 'price_cash' | 'price_installment',
@@ -367,6 +395,26 @@ export function ExpeditionGroupDialog({
     faqs.splice(index, 1);
     setFormData({ ...formData, faqs });
   };
+  const startFaqEdit = (index: number) => {
+    const current = (formData.faqs || [])[index];
+    if (!current) return;
+    setFaqDraft({ ...current });
+    setEditingFaqIndex(index);
+  };
+
+  const cancelFaqEdit = () => {
+    setEditingFaqIndex(null);
+    setFaqDraft({ question: '', answer: '' });
+  };
+
+  const saveFaqEdit = () => {
+    if (editingFaqIndex === null) return;
+    const faqs = [...(formData.faqs || [])];
+    faqs[editingFaqIndex] = { ...faqDraft };
+    setFormData({ ...formData, faqs });
+    setEditingFaqIndex(null);
+    setFaqDraft({ question: '', answer: '' });
+  };
 
   const currencySymbol = {
     BRL: 'R$',
@@ -377,7 +425,7 @@ export function ExpeditionGroupDialog({
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
-        className="max-w-3xl max-h-[90vh] overflow-y-auto focus-visible:outline-none focus-visible:ring-0"
+        className="max-w-5xl max-h-[90vh] overflow-y-auto focus-visible:outline-none focus-visible:ring-0"
         onOpenAutoFocus={(e) => e.preventDefault()}
       >
         <DialogHeader>
@@ -385,13 +433,31 @@ export function ExpeditionGroupDialog({
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-6 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
-            <TabsTrigger value="basic" className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">Básico</TabsTrigger>
-            <TabsTrigger value="pricing" className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">Preços</TabsTrigger>
-            <TabsTrigger value="package" className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">Pacote</TabsTrigger>
-            <TabsTrigger value="media" className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">Mídia</TabsTrigger>
-            <TabsTrigger value="social" className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">Social</TabsTrigger>
-            <TabsTrigger value="faq" className="focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">FAQ</TabsTrigger>
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-2 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+            <TabsTrigger value="basic" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+              <Info className="h-4 w-4" />
+              Geral
+            </TabsTrigger>
+            <TabsTrigger value="pricing" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+              <DollarSign className="h-4 w-4" />
+              Valores
+            </TabsTrigger>
+            <TabsTrigger value="package" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+              <Package className="h-4 w-4" />
+              Itens
+            </TabsTrigger>
+            <TabsTrigger value="media" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+              <ImageIcon className="h-4 w-4" />
+              Mídia
+            </TabsTrigger>
+            <TabsTrigger value="social" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+              <MessageSquare className="h-4 w-4" />
+              Comentários
+            </TabsTrigger>
+            <TabsTrigger value="faq" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+              <HelpCircle className="h-4 w-4" />
+              FAQ
+            </TabsTrigger>
           </TabsList>
 
           <form onSubmit={handleSubmit}>
@@ -504,7 +570,7 @@ export function ExpeditionGroupDialog({
                   inputMode="decimal"
                   value={priceCashInput}
                   onChange={(e) => handleCurrencyChange('price_cash', e.target.value)}
-                  placeholder="0,00"
+                  placeholder={currencyPlaceholder}
                 />
               </div>
 
@@ -516,7 +582,7 @@ export function ExpeditionGroupDialog({
                     inputMode="decimal"
                     value={priceInstallmentInput}
                     onChange={(e) => handleCurrencyChange('price_installment', e.target.value)}
-                    placeholder="0,00"
+                    placeholder={currencyPlaceholder}
                   />
                 </div>
 
@@ -872,23 +938,61 @@ export function ExpeditionGroupDialog({
                 {/* Existing FAQs */}
                 {(formData.faqs || []).length > 0 && (
                   <div className="space-y-3">
-                    {(formData.faqs || []).map((faq, index) => (
-                      <Card key={index} className="relative">
-                        <Button
-                          type="button"
-                          variant="destructive"
-                          size="icon"
-                          className="absolute top-2 right-2 h-6 w-6"
-                          onClick={() => removeFaq(index)}
-                        >
-                          <X className="w-3 h-3" />
-                        </Button>
-                        <CardContent className="p-4">
-                          <p className="font-semibold text-primary">{faq.question}</p>
-                          <p className="text-sm text-muted-foreground mt-1">{faq.answer}</p>
-                        </CardContent>
-                      </Card>
-                    ))}
+                    {(formData.faqs || []).map((faq, index) => {
+                      const isEditing = editingFaqIndex === index;
+                      return (
+                        <Card key={index}>
+                          <CardContent className="space-y-3 p-4">
+                            <div className="flex items-start justify-between gap-3">
+                              <div className="space-y-1">
+                                <p className="font-semibold text-primary">{faq.question}</p>
+                                <p className="text-sm text-muted-foreground">{faq.answer}</p>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                {!isEditing && (
+                                  <Button type="button" variant="outline" size="sm" onClick={() => startFaqEdit(index)}>
+                                    Editar
+                                  </Button>
+                                )}
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="h-8 w-8"
+                                  onClick={() => removeFaq(index)}
+                                >
+                                  <X className="w-4 h-4" />
+                                </Button>
+                              </div>
+                            </div>
+
+                            {isEditing && (
+                              <div className="space-y-2 rounded-lg border border-border bg-muted/40 p-3">
+                                <Input
+                                  value={faqDraft.question}
+                                  onChange={(e) => setFaqDraft({ ...faqDraft, question: e.target.value })}
+                                  placeholder="Pergunta"
+                                />
+                                <Textarea
+                                  value={faqDraft.answer}
+                                  onChange={(e) => setFaqDraft({ ...faqDraft, answer: e.target.value })}
+                                  placeholder="Resposta"
+                                  rows={3}
+                                />
+                                <div className="flex items-center gap-2">
+                                  <Button type="button" size="sm" onClick={saveFaqEdit} disabled={!faqDraft.question.trim() || !faqDraft.answer.trim()}>
+                                    Salvar
+                                  </Button>
+                                  <Button type="button" variant="ghost" size="sm" onClick={cancelFaqEdit}>
+                                    Cancelar
+                                  </Button>
+                                </div>
+                              </div>
+                            )}
+                          </CardContent>
+                        </Card>
+                      );
+                    })}
                   </div>
                 )}
 
