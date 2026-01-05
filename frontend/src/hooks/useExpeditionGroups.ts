@@ -14,6 +14,17 @@ export interface FAQ {
   answer: string;
 }
 
+export interface ItinerarySummaryImage {
+  url: string;
+  title?: string;
+  description?: string;
+}
+
+export interface NotRecommendedItem {
+  title: string;
+  description: string;
+}
+
 export interface ExpeditionGroup {
   id: string;
   agency_id: string;
@@ -29,6 +40,22 @@ export interface ExpeditionGroup {
   cover_image_url?: string | null;
   carousel_images?: string[] | null;
   landing_text?: string | null;
+  impact_phrase?: string | null;
+  description_image_url?: string | null;
+  description_gallery_images?: string[] | null;
+  about_title?: string | null;
+  about_description?: string | null;
+  about_image_url?: string | null;
+  destination_summary_title?: string | null;
+  destination_summary_description?: string | null;
+  destination_summary_image_url?: string | null;
+  itinerary_summary_title?: string | null;
+  itinerary_summary_description?: string | null;
+  itinerary_summary_images?: ItinerarySummaryImage[] | null;
+  transport_title?: string | null;
+  transport_text?: string | null;
+  transport_images?: string[] | null;
+  not_recommended_items?: NotRecommendedItem[] | null;
   registrations_count?: number;
   waitlist_count?: number;
   // Pricing fields
@@ -70,6 +97,22 @@ export interface ExpeditionGroupInput {
   cover_image_url?: string;
   carousel_images?: string[];
   landing_text?: string;
+  impact_phrase?: string;
+  description_image_url?: string;
+  description_gallery_images?: string[];
+  about_title?: string;
+  about_description?: string;
+  about_image_url?: string;
+  destination_summary_title?: string;
+  destination_summary_description?: string;
+  destination_summary_image_url?: string;
+  itinerary_summary_title?: string;
+  itinerary_summary_description?: string;
+  itinerary_summary_images?: ItinerarySummaryImage[];
+  transport_title?: string;
+  transport_text?: string;
+  transport_images?: string[];
+  not_recommended_items?: NotRecommendedItem[];
   // Pricing fields
   price_cash?: number | null;
   price_installment?: number | null;
@@ -106,6 +149,22 @@ const mapBackendToFront = (g: any): ExpeditionGroup => ({
   cover_image_url: g.coverImageUrl,
   carousel_images: g.carouselImages || [],
   landing_text: g.landingText,
+  impact_phrase: g.impactPhrase,
+  description_image_url: g.descriptionImageUrl,
+  description_gallery_images: g.descriptionGalleryImages || [],
+  about_title: g.aboutTitle,
+  about_description: g.aboutDescription,
+  about_image_url: g.aboutImageUrl,
+  destination_summary_title: g.destinationSummaryTitle,
+  destination_summary_description: g.destinationSummaryDescription,
+  destination_summary_image_url: g.destinationSummaryImageUrl,
+  itinerary_summary_title: g.itinerarySummaryTitle,
+  itinerary_summary_description: g.itinerarySummaryDescription,
+  itinerary_summary_images: g.itinerarySummaryImages || [],
+  transport_title: g.transportTitle,
+  transport_text: g.transportText,
+  transport_images: g.transportImages || [],
+  not_recommended_items: g.notRecommendedItems || [],
   registrations_count: g.registrations_count,
   waitlist_count: g.waitlist_count,
   price_cash: g.priceCash,
@@ -132,6 +191,22 @@ const mapFrontToBackendGroup = (input: ExpeditionGroupInput & { agency_id?: stri
   coverImageUrl: input.cover_image_url ?? null,
   carouselImages: input.carousel_images ?? [],
   landingText: input.landing_text ?? null,
+  impactPhrase: input.impact_phrase ?? null,
+  descriptionImageUrl: input.description_image_url ?? null,
+  descriptionGalleryImages: input.description_gallery_images ?? [],
+  aboutTitle: input.about_title ?? null,
+  aboutDescription: input.about_description ?? null,
+  aboutImageUrl: input.about_image_url ?? null,
+  destinationSummaryTitle: input.destination_summary_title ?? null,
+  destinationSummaryDescription: input.destination_summary_description ?? null,
+  destinationSummaryImageUrl: input.destination_summary_image_url ?? null,
+  itinerarySummaryTitle: input.itinerary_summary_title ?? null,
+  itinerarySummaryDescription: input.itinerary_summary_description ?? null,
+  itinerarySummaryImages: input.itinerary_summary_images ?? [],
+  transportTitle: input.transport_title ?? null,
+  transportText: input.transport_text ?? null,
+  transportImages: input.transport_images ?? [],
+  notRecommendedItems: input.not_recommended_items ?? [],
   priceCash: input.price_cash ?? null,
   priceInstallment: input.price_installment ?? null,
   installmentsCount: input.installments_count ?? null,

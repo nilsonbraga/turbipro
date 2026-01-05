@@ -20,8 +20,8 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
-import { Loader2, Upload, X, Image as ImageIcon, Plus, Youtube, Star, HelpCircle, ExternalLink, Calendar as CalendarIcon, Info, DollarSign, Package, MessageSquare } from 'lucide-react';
-import { ExpeditionGroup, ExpeditionGroupInput, Testimonial, FAQ } from '@/hooks/useExpeditionGroups';
+import { Loader2, Upload, X, Image as ImageIcon, Plus, Youtube, Star, HelpCircle, ExternalLink, Calendar as CalendarIcon, Info, DollarSign, Package, MessageSquare, FileText } from 'lucide-react';
+import { ExpeditionGroup, ExpeditionGroupInput, Testimonial, FAQ, ItinerarySummaryImage, NotRecommendedItem } from '@/hooks/useExpeditionGroups';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -100,6 +100,11 @@ export function ExpeditionGroupDialog({
   const fileInputRef = useRef<HTMLInputElement>(null);
   const carouselInputRef = useRef<HTMLInputElement>(null);
   const testimonialPhotoRef = useRef<HTMLInputElement>(null);
+  const descriptionGalleryInputRef = useRef<HTMLInputElement>(null);
+  const aboutImageInputRef = useRef<HTMLInputElement>(null);
+  const destinationSummaryImageInputRef = useRef<HTMLInputElement>(null);
+  const itinerarySummaryImagesInputRef = useRef<HTMLInputElement>(null);
+  const transportImagesInputRef = useRef<HTMLInputElement>(null);
   
   const [formData, setFormData] = useState<ExpeditionGroupInput>({
     destination: '',
@@ -111,6 +116,22 @@ export function ExpeditionGroupDialog({
     cover_image_url: '',
     carousel_images: [],
     landing_text: '',
+    impact_phrase: '',
+    description_image_url: '',
+    description_gallery_images: [],
+    about_title: '',
+    about_description: '',
+    about_image_url: '',
+    destination_summary_title: '',
+    destination_summary_description: '',
+    destination_summary_image_url: '',
+    itinerary_summary_title: '',
+    itinerary_summary_description: '',
+    itinerary_summary_images: [],
+    transport_title: '',
+    transport_text: '',
+    transport_images: [],
+    not_recommended_items: [],
     price_cash: null,
     price_installment: null,
     installments_count: null,
@@ -133,13 +154,58 @@ export function ExpeditionGroupDialog({
   const [uploadingTestimonialPhoto, setUploadingTestimonialPhoto] = useState(false);
   const [priceCashInput, setPriceCashInput] = useState('');
   const [priceInstallmentInput, setPriceInstallmentInput] = useState('');
-  const fileToBase64 = (file: File): Promise<string> =>
+  const [newNotRecommendedItem, setNewNotRecommendedItem] = useState<NotRecommendedItem>({ title: '', description: '' });
+  const fileToBase64 = (file: Blob): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
       reader.onload = () => resolve(reader.result as string);
       reader.onerror = (error) => reject(error);
       reader.readAsDataURL(file);
     });
+
+  const MAX_IMAGE_DIMENSION = 2000;
+  const MAX_IMAGE_BYTES = 12 * 1024 * 1024;
+
+  const loadImage = (file: File): Promise<HTMLImageElement> =>
+    new Promise((resolve, reject) => {
+      const img = new Image();
+      const url = URL.createObjectURL(file);
+      img.onload = () => {
+        URL.revokeObjectURL(url);
+        resolve(img);
+      };
+      img.onerror = () => {
+        URL.revokeObjectURL(url);
+        reject(new Error('Falha ao carregar a imagem'));
+      };
+      img.src = url;
+    });
+
+  const optimizeImage = async (file: File): Promise<Blob> => {
+    const img = await loadImage(file);
+    const maxDimension = Math.max(img.naturalWidth, img.naturalHeight);
+    const scale = Math.min(1, MAX_IMAGE_DIMENSION / maxDimension);
+
+    if (scale === 1 && file.size <= MAX_IMAGE_BYTES) {
+      return file;
+    }
+
+    const canvas = document.createElement('canvas');
+    canvas.width = Math.max(1, Math.round(img.naturalWidth * scale));
+    canvas.height = Math.max(1, Math.round(img.naturalHeight * scale));
+
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return file;
+
+    ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+
+    const outputType = file.type === 'image/png' ? 'image/png' : 'image/jpeg';
+    const quality = outputType === 'image/jpeg' ? 0.85 : 0.92;
+
+    return new Promise((resolve) => {
+      canvas.toBlob((blob) => resolve(blob || file), outputType, quality);
+    });
+  };
 
   useEffect(() => {
     const normalizeDateInput = (val?: string | null) => {
@@ -161,6 +227,27 @@ export function ExpeditionGroupDialog({
         cover_image_url: group.cover_image_url || '',
         carousel_images: group.carousel_images || [],
         landing_text: group.landing_text || '',
+        impact_phrase: group.impact_phrase || '',
+        description_image_url: group.description_image_url || '',
+        description_gallery_images:
+          (group.description_gallery_images && group.description_gallery_images.length > 0
+            ? group.description_gallery_images
+            : group.description_image_url
+            ? [group.description_image_url]
+            : []) || [],
+        about_title: group.about_title || '',
+        about_description: group.about_description || '',
+        about_image_url: group.about_image_url || '',
+        destination_summary_title: group.destination_summary_title || '',
+        destination_summary_description: group.destination_summary_description || '',
+        destination_summary_image_url: group.destination_summary_image_url || '',
+        itinerary_summary_title: group.itinerary_summary_title || '',
+        itinerary_summary_description: group.itinerary_summary_description || '',
+        itinerary_summary_images: (group.itinerary_summary_images as ItinerarySummaryImage[]) || [],
+        transport_title: group.transport_title || '',
+        transport_text: group.transport_text || '',
+        transport_images: group.transport_images || [],
+        not_recommended_items: (group.not_recommended_items as NotRecommendedItem[]) || [],
         price_cash: group.price_cash ?? null,
         price_installment: group.price_installment ?? null,
         installments_count: group.installments_count ?? null,
@@ -194,6 +281,22 @@ export function ExpeditionGroupDialog({
         cover_image_url: '',
         carousel_images: [],
         landing_text: '',
+        impact_phrase: '',
+        description_image_url: '',
+        description_gallery_images: [],
+        about_title: '',
+        about_description: '',
+        about_image_url: '',
+        destination_summary_title: '',
+        destination_summary_description: '',
+        destination_summary_image_url: '',
+        itinerary_summary_title: '',
+        itinerary_summary_description: '',
+        itinerary_summary_images: [],
+        transport_title: '',
+        transport_text: '',
+        transport_images: [],
+        not_recommended_items: [],
         price_cash: null,
         price_installment: null,
         installments_count: null,
@@ -213,6 +316,7 @@ export function ExpeditionGroupDialog({
     setNewExcludedItem('');
     setNewTestimonial({ name: '', text: '', photo: '' });
     setNewFaq({ question: '', answer: '' });
+    setNewNotRecommendedItem({ title: '', description: '' });
   }, [group, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -271,7 +375,16 @@ export function ExpeditionGroupDialog({
 
   const uploadImage = async (file: File): Promise<string | null> => {
     try {
-      const base64 = await fileToBase64(file);
+      const processed = await optimizeImage(file);
+      if (processed.size > MAX_IMAGE_BYTES) {
+        toast({
+          title: 'Imagem muito grande',
+          description: 'Reduza o tamanho da imagem antes de enviar.',
+          variant: 'destructive',
+        });
+        return null;
+      }
+      const base64 = await fileToBase64(processed);
       return base64;
     } catch (error: any) {
       toast({
@@ -314,6 +427,113 @@ export function ExpeditionGroupDialog({
     setIsUploading(false);
   };
 
+  type SingleImageField = 'about_image_url' | 'destination_summary_image_url';
+
+  const handleSingleImageUpload = async (
+    e: React.ChangeEvent<HTMLInputElement>,
+    field: SingleImageField,
+  ) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const url = await uploadImage(file);
+    if (url) {
+      setFormData((prev) => ({
+        ...prev,
+        [field]: url,
+      }));
+    }
+    setIsUploading(false);
+    e.target.value = '';
+  };
+
+  const handleDescriptionGalleryUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    const existing = formData.description_gallery_images || [];
+    const remainingSlots = Math.max(0, 2 - existing.length);
+    if (remainingSlots === 0) return;
+
+    setIsUploading(true);
+    const newUrls: string[] = [];
+
+    for (const file of Array.from(files).slice(0, remainingSlots)) {
+      const url = await uploadImage(file);
+      if (url) newUrls.push(url);
+    }
+
+    setFormData((prev) => ({
+      ...prev,
+      description_gallery_images: [...(prev.description_gallery_images || []), ...newUrls],
+    }));
+    setIsUploading(false);
+    e.target.value = '';
+  };
+
+  const removeDescriptionGalleryImage = (index: number) => {
+    const images = [...(formData.description_gallery_images || [])];
+    images.splice(index, 1);
+    setFormData({ ...formData, description_gallery_images: images });
+  };
+
+  const handleItineraryImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const newImages: ItinerarySummaryImage[] = [];
+    for (const file of Array.from(files)) {
+      const url = await uploadImage(file);
+      if (url) {
+        newImages.push({ url, title: '', description: '' });
+      }
+    }
+    setFormData((prev) => ({
+      ...prev,
+      itinerary_summary_images: [...(prev.itinerary_summary_images || []), ...newImages],
+    }));
+    setIsUploading(false);
+    e.target.value = '';
+  };
+
+  const updateItineraryImage = (index: number, updates: Partial<ItinerarySummaryImage>) => {
+    const images = [...(formData.itinerary_summary_images || [])];
+    images[index] = { ...images[index], ...updates };
+    setFormData({ ...formData, itinerary_summary_images: images });
+  };
+
+  const removeItineraryImage = (index: number) => {
+    const images = [...(formData.itinerary_summary_images || [])];
+    images.splice(index, 1);
+    setFormData({ ...formData, itinerary_summary_images: images });
+  };
+
+  const handleTransportImagesUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    setIsUploading(true);
+    const newUrls: string[] = [];
+    for (const file of Array.from(files)) {
+      const url = await uploadImage(file);
+      if (url) newUrls.push(url);
+    }
+    setFormData((prev) => ({
+      ...prev,
+      transport_images: [...(prev.transport_images || []), ...newUrls],
+    }));
+    setIsUploading(false);
+    e.target.value = '';
+  };
+
+  const removeTransportImage = (index: number) => {
+    const images = [...(formData.transport_images || [])];
+    images.splice(index, 1);
+    setFormData({ ...formData, transport_images: images });
+  };
+
   const removeCarouselImage = (index: number) => {
     const images = [...(formData.carousel_images || [])];
     images.splice(index, 1);
@@ -350,6 +570,27 @@ export function ExpeditionGroupDialog({
     const items = [...(formData.excluded_items || [])];
     items.splice(index, 1);
     setFormData({ ...formData, excluded_items: items });
+  };
+
+  const addNotRecommendedItem = () => {
+    if (!newNotRecommendedItem.title.trim() || !newNotRecommendedItem.description.trim()) return;
+    setFormData((prev) => ({
+      ...prev,
+      not_recommended_items: [...(prev.not_recommended_items || []), newNotRecommendedItem],
+    }));
+    setNewNotRecommendedItem({ title: '', description: '' });
+  };
+
+  const updateNotRecommendedItem = (index: number, updates: Partial<NotRecommendedItem>) => {
+    const items = [...(formData.not_recommended_items || [])];
+    items[index] = { ...items[index], ...updates };
+    setFormData({ ...formData, not_recommended_items: items });
+  };
+
+  const removeNotRecommendedItem = (index: number) => {
+    const items = [...(formData.not_recommended_items || [])];
+    items.splice(index, 1);
+    setFormData({ ...formData, not_recommended_items: items });
   };
 
   const handleTestimonialPhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -433,7 +674,7 @@ export function ExpeditionGroupDialog({
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-6 gap-2 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
             <TabsTrigger value="basic" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
               <Info className="h-4 w-4" />
               Geral
@@ -449,6 +690,10 @@ export function ExpeditionGroupDialog({
             <TabsTrigger value="media" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
               <ImageIcon className="h-4 w-4" />
               Mídia
+            </TabsTrigger>
+            <TabsTrigger value="content" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+              <FileText className="h-4 w-4" />
+              Conteúdo
             </TabsTrigger>
             <TabsTrigger value="social" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
               <MessageSquare className="h-4 w-4" />
@@ -517,6 +762,75 @@ export function ExpeditionGroupDialog({
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Descrição do grupo de expedição..."
                   rows={3}
+                />
+              </div>
+
+              <div className="space-y-4 rounded-2xl border border-muted/60 p-4">
+                <h3 className="text-sm font-semibold text-foreground">Chamada para a expedição</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="impact_phrase">Frase de efeito</Label>
+                  <Input
+                    id="impact_phrase"
+                    value={formData.impact_phrase || ''}
+                    onChange={(e) => setFormData({ ...formData, impact_phrase: e.target.value })}
+                    placeholder="Ex: Uma experiência que transforma a sua forma de viajar"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fotos da seção (1 a 2)</Label>
+                  <div className="grid grid-cols-2 gap-3">
+                    {(formData.description_gallery_images || []).map((url, index) => (
+                      <div key={`${url}-${index}`} className="relative">
+                        <img
+                          src={url}
+                          alt={`Descrição ${index + 1}`}
+                          className="w-full h-32 object-cover rounded-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-7 w-7"
+                          onClick={() => removeDescriptionGalleryImage(index)}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    {(formData.description_gallery_images || []).length < 2 && (
+                      <div
+                        className="border-2 border-dashed rounded-lg h-32 flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+                        onClick={() => descriptionGalleryInputRef.current?.click()}
+                      >
+                        {isUploading ? (
+                          <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                        ) : (
+                          <div className="flex flex-col items-center gap-2 text-muted-foreground text-xs">
+                            <Upload className="w-5 h-5" />
+                            Adicionar foto
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={descriptionGalleryInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleDescriptionGalleryUpload}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <Label htmlFor="landing_text">Texto geral</Label>
+                <Textarea
+                  id="landing_text"
+                  value={formData.landing_text || ''}
+                  onChange={(e) => setFormData({ ...formData, landing_text: e.target.value })}
+                  placeholder="Texto geral para a landing da expedição..."
+                  rows={4}
                 />
               </div>
 
@@ -784,17 +1098,358 @@ export function ExpeditionGroupDialog({
                   onChange={handleCarouselUpload}
                 />
               </div>
+            </TabsContent>
 
-              {/* Landing Text */}
-              <div className="space-y-2">
-                <Label htmlFor="landing_text">Texto da Landing Page</Label>
-                <Textarea
-                  id="landing_text"
-                  value={formData.landing_text || ''}
-                  onChange={(e) => setFormData({ ...formData, landing_text: e.target.value })}
-                  placeholder="Texto descritivo para a página de inscrição pública..."
-                  rows={5}
-                />
+            {/* Content Tab */}
+            <TabsContent value="content" className="space-y-4 mt-4">
+              <div className="space-y-4 rounded-2xl border border-muted/60 p-4">
+                <h3 className="text-sm font-semibold text-foreground">Quem somos</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="about_title">Título da seção</Label>
+                  <Input
+                    id="about_title"
+                    value={formData.about_title || ''}
+                    onChange={(e) => setFormData({ ...formData, about_title: e.target.value })}
+                    placeholder="Ex: Quem somos"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="about_description">Descrição</Label>
+                  <Textarea
+                    id="about_description"
+                    value={formData.about_description || ''}
+                    onChange={(e) => setFormData({ ...formData, about_description: e.target.value })}
+                    placeholder="Conte a história e a proposta da agência"
+                    rows={4}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Foto da seção</Label>
+                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                    {formData.about_image_url ? (
+                      <div className="relative">
+                        <img
+                          src={formData.about_image_url}
+                          alt="Quem somos"
+                          className="w-full h-40 object-cover rounded-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2"
+                          onClick={() => setFormData({ ...formData, about_image_url: '' })}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div
+                        className="cursor-pointer py-8"
+                        onClick={() => aboutImageInputRef.current?.click()}
+                      >
+                        {isUploading ? (
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+                        ) : (
+                          <>
+                            <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">Clique para fazer upload</p>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <input
+                      ref={aboutImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleSingleImageUpload(e, 'about_image_url')}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-2xl border border-muted/60 p-4">
+                <h3 className="text-sm font-semibold text-foreground">Resumo do destino</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="destination_summary_title">Título</Label>
+                  <Input
+                    id="destination_summary_title"
+                    value={formData.destination_summary_title || ''}
+                    onChange={(e) => setFormData({ ...formData, destination_summary_title: e.target.value })}
+                    placeholder="Ex: O que esperar do destino"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="destination_summary_description">Descrição</Label>
+                  <Textarea
+                    id="destination_summary_description"
+                    value={formData.destination_summary_description || ''}
+                    onChange={(e) => setFormData({ ...formData, destination_summary_description: e.target.value })}
+                    placeholder="Resumo do destino e principais destaques"
+                    rows={4}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Foto do resumo do destino</Label>
+                  <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                    {formData.destination_summary_image_url ? (
+                      <div className="relative">
+                        <img
+                          src={formData.destination_summary_image_url}
+                          alt="Resumo do destino"
+                          className="w-full h-40 object-cover rounded-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2"
+                          onClick={() => setFormData({ ...formData, destination_summary_image_url: '' })}
+                        >
+                          <X className="w-4 h-4" />
+                        </Button>
+                      </div>
+                    ) : (
+                      <div
+                        className="cursor-pointer py-8"
+                        onClick={() => destinationSummaryImageInputRef.current?.click()}
+                      >
+                        {isUploading ? (
+                          <Loader2 className="w-8 h-8 animate-spin mx-auto text-muted-foreground" />
+                        ) : (
+                          <>
+                            <Upload className="w-8 h-8 mx-auto text-muted-foreground mb-2" />
+                            <p className="text-sm text-muted-foreground">Clique para fazer upload</p>
+                          </>
+                        )}
+                      </div>
+                    )}
+                    <input
+                      ref={destinationSummaryImageInputRef}
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleSingleImageUpload(e, 'destination_summary_image_url')}
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-2xl border border-muted/60 p-4">
+                <h3 className="text-sm font-semibold text-foreground">Resumo do roteiro</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="itinerary_summary_title">Título</Label>
+                  <Input
+                    id="itinerary_summary_title"
+                    value={formData.itinerary_summary_title || ''}
+                    onChange={(e) => setFormData({ ...formData, itinerary_summary_title: e.target.value })}
+                    placeholder="Ex: Roteiro pensado dia a dia"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="itinerary_summary_description">Descrição</Label>
+                  <Textarea
+                    id="itinerary_summary_description"
+                    value={formData.itinerary_summary_description || ''}
+                    onChange={(e) => setFormData({ ...formData, itinerary_summary_description: e.target.value })}
+                    placeholder="Conte o que o roteiro entrega de especial"
+                    rows={4}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fotos do resumo do roteiro</Label>
+                  {(formData.itinerary_summary_images || []).length > 0 && (
+                    <div className="grid gap-4 md:grid-cols-2">
+                      {(formData.itinerary_summary_images || []).map((image, index) => (
+                        <Card key={`${image.url}-${index}`} className="relative">
+                          <Button
+                            type="button"
+                            variant="destructive"
+                            size="icon"
+                            className="absolute top-2 right-2 h-7 w-7"
+                            onClick={() => removeItineraryImage(index)}
+                          >
+                            <X className="w-3 h-3" />
+                          </Button>
+                          <CardContent className="p-3 space-y-3">
+                            <img
+                              src={image.url}
+                              alt={image.title || `Roteiro ${index + 1}`}
+                              className="w-full h-32 object-cover rounded-lg"
+                            />
+                            <Input
+                              value={image.title || ''}
+                              onChange={(e) => updateItineraryImage(index, { title: e.target.value })}
+                              placeholder="Título da foto"
+                            />
+                            <Textarea
+                              value={image.description || ''}
+                              onChange={(e) => updateItineraryImage(index, { description: e.target.value })}
+                              placeholder="Descrição da foto"
+                              rows={2}
+                            />
+                          </CardContent>
+                        </Card>
+                      ))}
+                    </div>
+                  )}
+                  <div
+                    className="border-2 border-dashed rounded-lg h-24 flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+                    onClick={() => itinerarySummaryImagesInputRef.current?.click()}
+                  >
+                    {isUploading ? (
+                      <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                    ) : (
+                      <div className="flex items-center gap-2 text-muted-foreground text-sm">
+                        <ImageIcon className="w-5 h-5" />
+                        Adicionar fotos
+                      </div>
+                    )}
+                  </div>
+                  <input
+                    ref={itinerarySummaryImagesInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleItineraryImagesUpload}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-2xl border border-muted/60 p-4">
+                <h3 className="text-sm font-semibold text-foreground">Transportes</h3>
+                <div className="space-y-2">
+                  <Label htmlFor="transport_title">Título</Label>
+                  <Input
+                    id="transport_title"
+                    value={formData.transport_title || ''}
+                    onChange={(e) => setFormData({ ...formData, transport_title: e.target.value })}
+                    placeholder="Ex: Como iremos nos deslocar"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="transport_text">Texto</Label>
+                  <Textarea
+                    id="transport_text"
+                    value={formData.transport_text || ''}
+                    onChange={(e) => setFormData({ ...formData, transport_text: e.target.value })}
+                    placeholder="Descreva o transporte, conforto e logística"
+                    rows={3}
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Fotos dos transportes</Label>
+                  <div className="grid grid-cols-3 gap-2">
+                    {(formData.transport_images || []).map((url, index) => (
+                      <div key={`${url}-${index}`} className="relative">
+                        <img
+                          src={url}
+                          alt={`Transporte ${index + 1}`}
+                          className="w-full h-24 object-cover rounded-lg"
+                        />
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-1 right-1 h-6 w-6"
+                          onClick={() => removeTransportImage(index)}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                      </div>
+                    ))}
+                    <div
+                      className="border-2 border-dashed rounded-lg h-24 flex items-center justify-center cursor-pointer hover:bg-muted/50 transition-colors"
+                      onClick={() => transportImagesInputRef.current?.click()}
+                    >
+                      {isUploading ? (
+                        <Loader2 className="w-6 h-6 animate-spin text-muted-foreground" />
+                      ) : (
+                        <ImageIcon className="w-6 h-6 text-muted-foreground" />
+                      )}
+                    </div>
+                  </div>
+                  <input
+                    ref={transportImagesInputRef}
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    className="hidden"
+                    onChange={handleTransportImagesUpload}
+                  />
+                </div>
+              </div>
+
+              <div className="space-y-4 rounded-2xl border border-muted/60 p-4">
+                <h3 className="text-sm font-semibold text-foreground">Para quem não é indicado</h3>
+                <p className="text-xs text-muted-foreground">
+                  Adicione itens para orientar melhor o público ideal da expedição.
+                </p>
+                <Card className="border border-muted/60 shadow-none">
+                  <CardContent className="p-4 space-y-4">
+                    <div className="grid gap-4 md:grid-cols-[1fr,1.2fr]">
+                      <div className="space-y-2">
+                        <Label>Título</Label>
+                        <Input
+                          value={newNotRecommendedItem.title}
+                          onChange={(e) =>
+                            setNewNotRecommendedItem({ ...newNotRecommendedItem, title: e.target.value })
+                          }
+                          placeholder="Ex: Busca viagens muito rápidas"
+                        />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Descrição</Label>
+                        <Textarea
+                          value={newNotRecommendedItem.description}
+                          onChange={(e) =>
+                            setNewNotRecommendedItem({ ...newNotRecommendedItem, description: e.target.value })
+                          }
+                          placeholder="Explique por que não é indicado"
+                          rows={2}
+                        />
+                      </div>
+                    </div>
+                    <div className="flex justify-end">
+                      <Button type="button" variant="outline" onClick={addNotRecommendedItem}>
+                        <Plus className="w-4 h-4 mr-2" />
+                        Adicionar item
+                      </Button>
+                    </div>
+                  </CardContent>
+                </Card>
+                {(formData.not_recommended_items || []).length > 0 && (
+                  <div className="grid gap-4 md:grid-cols-2">
+                    {(formData.not_recommended_items || []).map((item, index) => (
+                      <Card key={`${item.title}-${index}`} className="relative border border-muted/60 shadow-none">
+                        <Button
+                          type="button"
+                          variant="destructive"
+                          size="icon"
+                          className="absolute top-2 right-2 h-7 w-7"
+                          onClick={() => removeNotRecommendedItem(index)}
+                        >
+                          <X className="w-3 h-3" />
+                        </Button>
+                        <CardContent className="p-4 space-y-3">
+                          <Input
+                            value={item.title}
+                            onChange={(e) => updateNotRecommendedItem(index, { title: e.target.value })}
+                            placeholder="Título"
+                          />
+                          <Textarea
+                            value={item.description}
+                            onChange={(e) => updateNotRecommendedItem(index, { description: e.target.value })}
+                            placeholder="Descrição"
+                            rows={2}
+                          />
+                        </CardContent>
+                      </Card>
+                    ))}
+                  </div>
+                )}
               </div>
             </TabsContent>
 

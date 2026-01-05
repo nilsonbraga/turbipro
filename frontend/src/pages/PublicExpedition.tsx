@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
   Select,
   SelectContent,
@@ -34,6 +35,7 @@ import {
   Users, 
   CheckCircle, 
   AlertCircle,
+  ArrowRight,
   Check,
   X,
   DollarSign,
@@ -42,7 +44,10 @@ import {
   ExternalLink,
   Play,
   HelpCircle,
-  Quote
+  Quote,
+  ChevronLeft,
+  ChevronRight,
+  ZoomIn
 } from 'lucide-react';
 
 export default function PublicExpedition() {
@@ -58,6 +63,7 @@ export default function PublicExpedition() {
   });
   const [submitted, setSubmitted] = useState(false);
   const [isWaitlist, setIsWaitlist] = useState(false);
+  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
 
   if (isLoading) {
     return (
@@ -91,6 +97,32 @@ export default function PublicExpedition() {
   const hasCoverImage = !!group.cover_image_url;
   const hasCarousel = group.carousel_images && group.carousel_images.length > 0;
   const hasLandingText = !!group.landing_text;
+  const hasImpactPhrase = !!group.impact_phrase;
+  const descriptionGallery = (group.description_gallery_images || []).filter(Boolean);
+  const descriptionImages =
+    descriptionGallery.length > 0
+      ? descriptionGallery
+      : group.description_image_url
+      ? [group.description_image_url]
+      : [];
+  const hasDescriptionImages = descriptionImages.length > 0;
+  const showIntroSideImage = descriptionImages.length > 0;
+  const introSideImage = descriptionImages.length > 1 ? descriptionImages[1] : descriptionImages[0];
+  const hasAboutSection = !!group.about_title || !!group.about_description || !!group.about_image_url;
+  const hasDestinationSummary =
+    !!group.destination_summary_title ||
+    !!group.destination_summary_description ||
+    !!group.destination_summary_image_url;
+  const hasItinerarySummary =
+    !!group.itinerary_summary_title ||
+    !!group.itinerary_summary_description ||
+    (group.itinerary_summary_images && group.itinerary_summary_images.length > 0);
+  const hasTransportSection =
+    !!group.transport_title || !!group.transport_text || (group.transport_images && group.transport_images.length > 0);
+  const hasNotRecommended =
+    group.not_recommended_items && group.not_recommended_items.length > 0;
+  const introHeading = group.impact_phrase || group.destination;
+  const introDescription = group.description || null;
   const hasIncludedItems = group.included_items && group.included_items.length > 0;
   const hasExcludedItems = group.excluded_items && group.excluded_items.length > 0;
   const hasPricing = group.price_cash || group.price_installment;
@@ -98,6 +130,12 @@ export default function PublicExpedition() {
   const hasTestimonials = group.testimonials && (group.testimonials as Testimonial[]).length > 0;
   const hasFaqs = group.faqs && (group.faqs as FAQ[]).length > 0;
   const hasGoogleReviews = !!group.google_reviews_url;
+  const itineraryImages = (group.itinerary_summary_images || []) as Array<{
+    url: string;
+    title?: string;
+    description?: string;
+  }>;
+  const transportImages = (group.transport_images || []) as string[];
 
   const testimonials = (group.testimonials as Testimonial[]) || [];
   const faqs = (group.faqs as FAQ[]) || [];
@@ -143,6 +181,38 @@ export default function PublicExpedition() {
     });
   };
 
+  const formatHeroRange = (start: string, end: Date) => {
+    const startDate = new Date(start);
+    const startDay = startDate.getDate();
+    const endDay = end.getDate();
+    const startMonth = startDate.toLocaleDateString('pt-BR', { month: 'long' });
+    const endMonth = end.toLocaleDateString('pt-BR', { month: 'long' });
+    const startYear = startDate.getFullYear();
+    const endYear = end.getFullYear();
+
+    if (startYear === endYear && startDate.getMonth() === end.getMonth()) {
+      return `${startDay} a ${endDay} de ${startMonth} / ${startYear}`;
+    }
+
+    return `${startDay} ${startMonth} / ${startYear} a ${endDay} ${endMonth} / ${endYear}`;
+  };
+
+  const renderParagraphs = (text?: string | null, className = '') => {
+    if (!text) return null;
+    const paragraphs = text
+      .split(/\n+/)
+      .map((paragraph) => paragraph.trim())
+      .filter(Boolean);
+
+    return (
+      <div className={`space-y-4 text-justify ${className}`.trim()}>
+        {paragraphs.map((paragraph, index) => (
+          <p key={`${index}-${paragraph.slice(0, 16)}`}>{paragraph}</p>
+        ))}
+      </div>
+    );
+  };
+
   if (submitted) {
     return (
       <div 
@@ -183,48 +253,75 @@ export default function PublicExpedition() {
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-white to-slate-100">
       {/* Hero Section */}
       {hasCoverImage ? (
-        <div 
-          className="relative h-[70vh] min-h-[600px] bg-cover bg-center"
-          style={{ backgroundImage: `url(${group.cover_image_url})` }}
-        >
-          <div className="absolute inset-0 bg-gradient-to-b from-black/40 via-black/30 to-background" />
-          <div className="absolute inset-0 flex flex-col items-center justify-center text-center p-4">
-            {group.agency && (group.agency as any).logo_url && (
-              <img 
-                src={(group.agency as any).logo_url} 
-                alt={(group.agency as any).name}
-                className="h-16 mb-8 object-contain drop-shadow-2xl"
-              />
-            )}
-            <Badge className="mb-6 bg-white/20 backdrop-blur-md text-white border-white/30 px-5 py-2 text-sm shadow-lg">
-              <MapPin className="w-4 h-4 mr-2" />
-              Expedição Exclusiva
-            </Badge>
-            <h1 className="text-5xl md:text-7xl font-bold text-white drop-shadow-2xl mb-6 max-w-4xl leading-tight">
-              {group.destination}
-            </h1>
-            <div className="flex flex-wrap items-center justify-center gap-4 text-white/95">
-              <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md px-5 py-2.5 rounded-full">
-                <Calendar className="w-5 h-5" />
-                <span className="font-medium">{formatDate(group.start_date)}</span>
+        <div className="p-3 md:p-4">
+          <section className="relative h-[calc(100dvh-1.5rem)] md:h-[calc(100dvh-2rem)] min-h-[640px] overflow-hidden rounded-3xl">
+            <div
+              className="absolute inset-0 bg-cover bg-center"
+              style={{ backgroundImage: `url(${group.cover_image_url})` }}
+            />
+            <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/70" />
+            <div className="relative z-10 flex h-full flex-col px-4 pb-10 pt-16 md:pb-14 md:pt-24">
+              <div className="flex-1 flex items-center">
+                <div className="max-w-6xl w-full mx-auto lg:mx-0 lg:pl-20">
+                  <div className="max-w-3xl space-y-6 text-left text-white">
+                    {group.agency && (group.agency as any).logo_url && (
+                      <img
+                        src={(group.agency as any).logo_url}
+                        alt={(group.agency as any).name}
+                        className="h-14 object-contain drop-shadow-2xl animate-in fade-in slide-in-from-top-2 duration-800"
+                      />
+                    )}
+                    <Badge className="w-fit bg-white/15 text-white border-white/30 px-5 py-2 text-sm animate-in fade-in slide-in-from-top-2 duration-800 delay-100">
+                      <MapPin className="w-4 h-4 mr-2" />
+                      Expedição Exclusiva
+                    </Badge>
+                    <h1 className="text-6xl md:text-7xl lg:text-8xl font-bold drop-shadow-2xl leading-tight animate-in fade-in slide-in-from-top-2 duration-800 delay-150">
+                      {group.destination}
+                    </h1>
+                    <Button
+                      asChild
+                      size="lg"
+                      className="w-fit rounded-full px-8 text-white shadow-lg animate-in fade-in slide-in-from-top-2 duration-800 delay-200"
+                    >
+                      <a href="#inscricao" className="inline-flex items-center gap-3">
+                        Garantir minha vaga
+                        <ArrowRight className="w-4 h-4" />
+                      </a>
+                    </Button>
+                  </div>
+                </div>
               </div>
-              <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md px-5 py-2.5 rounded-full">
-                <Clock className="w-5 h-5" />
-                <span className="font-medium">{group.duration_days} dias</span>
-              </div>
-              <div className="flex items-center gap-2 bg-black/30 backdrop-blur-md px-5 py-2.5 rounded-full">
-                <Users className="w-5 h-5" />
-                <span className="font-medium">{isFull ? 'Lotado' : `${spotsLeft} vagas`}</span>
+              <div className="max-w-6xl w-full mx-auto lg:mx-0 lg:pl-20">
+                <div className="flex flex-wrap gap-10 text-white/95 animate-in fade-in slide-in-from-bottom-2 duration-800 delay-300">
+                  <div className="flex items-center gap-2 text-base font-medium">
+                    <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/20">
+                      <Calendar className="w-5 h-5" />
+                    </span>
+                    {formatHeroRange(group.start_date, endDate)}
+                  </div>
+                  <div className="flex items-center gap-2 text-base font-medium">
+                    <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/20">
+                      <Clock className="w-5 h-5" />
+                    </span>
+                    {group.duration_days} dias
+                  </div>
+                  <div className="flex items-center gap-2 text-base font-medium">
+                    <span className="inline-flex h-11 w-11 items-center justify-center rounded-full bg-white/20">
+                      <Users className="w-5 h-5" />
+                    </span>
+                    {isFull ? 'Lotado' : `${spotsLeft} vagas`}
+                  </div>
+                </div>
               </div>
             </div>
-          </div>
+          </section>
         </div>
       ) : (
-        <div className="bg-gradient-to-br from-primary via-primary/90 to-primary/80 py-24">
-          <div className="max-w-4xl mx-auto px-4 text-center">
+        <section className="relative overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-primary/80 py-24">
+          <div className="relative max-w-5xl mx-auto px-4 text-center text-white">
             {group.agency && (group.agency as any).logo_url && (
-              <img 
-                src={(group.agency as any).logo_url} 
+              <img
+                src={(group.agency as any).logo_url}
                 alt={(group.agency as any).name}
                 className="h-14 mx-auto mb-8 object-contain brightness-0 invert"
               />
@@ -233,39 +330,300 @@ export default function PublicExpedition() {
               <MapPin className="w-4 h-4 mr-2" />
               Expedição Exclusiva
             </Badge>
-            <h1 className="text-5xl md:text-6xl font-bold text-white mb-6">
-              {group.destination}
-            </h1>
-            <div className="flex items-center justify-center gap-6 text-white/90">
+            <h1 className="text-5xl md:text-6xl font-bold mb-6">{group.destination}</h1>
+            <div className="flex flex-wrap items-center justify-center gap-6 text-white/90">
               <div className="flex items-center gap-2">
                 <Calendar className="w-5 h-5" />
-                <span>{formatDate(group.start_date)}</span>
+                <span>{formatHeroRange(group.start_date, endDate)}</span>
               </div>
               <div className="flex items-center gap-2">
                 <Clock className="w-5 h-5" />
                 <span>{group.duration_days} dias</span>
               </div>
             </div>
+            <div className="mt-8 flex flex-wrap justify-center gap-3">
+              <Button asChild size="lg" className="rounded-full px-8">
+                <a href="#inscricao">Quero garantir minha vaga</a>
+              </Button>
+              <Button asChild variant="outline" size="lg" className="rounded-full px-8 bg-white/10 text-white border-white/30 hover:bg-white/20">
+                <a href="#detalhes">Ver detalhes</a>
+              </Button>
+            </div>
           </div>
-        </div>
+        </section>
       )}
 
-      <div className="max-w-6xl mx-auto px-4 py-16 space-y-20">
+      <div className="mx-auto max-w-7xl px-6 md:px-8 lg:px-12 pt-16 md:pt-20 pb-20 md:pb-24 space-y-24" id="detalhes">
         {/* Description & Landing Text */}
-        {(group.description || hasLandingText) && (
-          <section className="text-center max-w-4xl mx-auto">
-            {group.description && (
-              <p className="text-2xl text-muted-foreground leading-relaxed mb-8">
-                {group.description}
+        {(group.description || hasLandingText || hasImpactPhrase || hasDescriptionImages) && (
+          <section className="relative bg-white">
+            <div
+              className={`grid gap-12 lg:gap-10 ${
+                showIntroSideImage ? 'lg:grid-cols-5' : ''
+              }`}
+            >
+              <div
+                className={
+                  showIntroSideImage
+                    ? 'lg:col-span-3 space-y-6'
+                    : 'space-y-6'
+                }
+              >
+                <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
+                  Expedição
+                </p>
+                <h2 className="text-3xl md:text-5xl font-bold text-slate-900 leading-tight">
+                  {introHeading}
+                </h2>
+                {introDescription && (
+                  renderParagraphs(
+                    introDescription,
+                    'text-base md:text-lg text-slate-600 leading-relaxed',
+                  )
+                )}
+                {hasLandingText && (
+                  renderParagraphs(
+                    group.landing_text,
+                    'text-base md:text-lg text-slate-600 leading-relaxed pb-4',
+                  )
+                )}
+                {hasDescriptionImages && (
+                  <div className="relative mt-16 overflow-hidden rounded-[32px] rounded-l-none shadow-xl lg:-ml-[calc((100vw-1280px)/2+3rem)] lg:w-[calc(100%+((100vw-1280px)/2+3rem))]">
+                    <img
+                      src={descriptionImages[0]}
+                      alt="Descrição da expedição"
+                      className="w-full h-72 md:h-[30rem] object-cover"
+                    />
+                  </div>
+                )}
+              </div>
+              {showIntroSideImage && (
+                <div className="lg:col-span-2 lg:pt-6">
+                  <div className="relative h-80 rounded-[28px] overflow-hidden shadow-xl">
+                    <img
+                      src={introSideImage}
+                      alt="Expedição em destaque"
+                      className="absolute inset-0 h-full w-full object-cover"
+                    />
+                    <div className="absolute inset-0 bg-black/35" />
+                  </div>
+                </div>
+              )}
+            </div>
+          </section>
+        )}
+
+        {hasAboutSection && (
+          <section className="grid gap-8 lg:grid-cols-12 items-start">
+            <div className="lg:col-span-5 space-y-5">
+              <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
+                Quem somos
               </p>
-            )}
-            {hasLandingText && (
-              <div className="prose prose-lg max-w-none text-foreground">
-                <div className="whitespace-pre-wrap text-left bg-white rounded-3xl p-10 shadow-xl border">
-                  {group.landing_text}
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 leading-tight">
+                {group.about_title || 'Quem somos'}
+              </h2>
+              {group.about_description &&
+                renderParagraphs(
+                  group.about_description,
+                  'text-lg text-slate-600 leading-relaxed',
+                )}
+            </div>
+            {group.about_image_url && (
+              <div className="lg:col-span-7">
+                <div className="relative overflow-hidden rounded-[32px] shadow-xl">
+                  <img
+                    src={group.about_image_url}
+                    alt={group.about_title || 'Quem somos'}
+                    className="w-full h-[20rem] md:h-[26rem] lg:h-[30rem] object-cover"
+                  />
                 </div>
               </div>
             )}
+          </section>
+        )}
+
+        {hasDestinationSummary && (
+          <section className="grid gap-12 lg:grid-cols-5 items-center">
+            {group.destination_summary_image_url && (
+              <div className="lg:col-span-3">
+                <div className="relative overflow-hidden rounded-[32px] rounded-l-none shadow-xl lg:-ml-[calc((100vw-1280px)/2+3rem)] lg:w-[calc(100%+((100vw-1280px)/2+3rem))]">
+                  <img
+                    src={group.destination_summary_image_url}
+                    alt={group.destination_summary_title || 'Resumo do destino'}
+                    className="w-full h-80 md:h-[32rem] object-cover"
+                  />
+                </div>
+              </div>
+            )}
+            <div className="lg:col-span-2 space-y-5">
+              <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
+                Resumo do destino
+              </p>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900 leading-tight">
+                {group.destination_summary_title || 'Resumo do destino'}
+              </h2>
+              {group.destination_summary_description &&
+                renderParagraphs(
+                  group.destination_summary_description,
+                  'text-lg text-slate-600 leading-relaxed',
+                )}
+            </div>
+          </section>
+        )}
+
+        {hasItinerarySummary && (
+          <section className="space-y-8">
+            <div className="space-y-4 max-w-3xl">
+              <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
+                Resumo do roteiro
+              </p>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900">
+                {group.itinerary_summary_title || 'Resumo do roteiro'}
+              </h2>
+              {group.itinerary_summary_description &&
+                renderParagraphs(
+                  group.itinerary_summary_description,
+                  'text-lg text-slate-600 leading-relaxed',
+                )}
+            </div>
+            {(group.itinerary_summary_images || []).length > 0 && (
+              <div className="grid gap-6 md:grid-cols-3">
+                {itineraryImages.map((image, index) => (
+                  <button
+                    type="button"
+                    key={`${image.url}-${index}`}
+                    onClick={() => setLightboxIndex(index)}
+                    className={
+                      index === 0
+                        ? 'group bg-transparent text-left focus:outline-none md:col-span-2 md:row-span-2 overflow-hidden rounded-[28px] shadow-xl'
+                        : 'group bg-transparent text-left focus:outline-none overflow-hidden rounded-[28px] shadow-lg'
+                    }
+                    aria-label={`Abrir foto do roteiro ${index + 1}`}
+                  >
+                    <div className="relative h-full">
+                      <img
+                        src={image.url}
+                        alt={image.title || `Roteiro ${index + 1}`}
+                        className={
+                          index === 0
+                            ? 'h-72 md:h-full w-full object-cover'
+                            : 'h-56 w-full object-cover'
+                        }
+                      />
+                      <span className="absolute top-4 right-4 inline-flex h-10 w-10 items-center justify-center rounded-full bg-black/45 text-white opacity-0 transition-opacity group-hover:opacity-100">
+                        <ZoomIn className="h-5 w-5" />
+                      </span>
+                      {(image.title || image.description) && (
+                        <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-5 text-white">
+                          {image.title && (
+                            <h3 className="text-lg font-semibold">{image.title}</h3>
+                          )}
+                          {image.description &&
+                            renderParagraphs(
+                              image.description,
+                              'space-y-2 text-sm text-white/80 leading-relaxed',
+                            )}
+                        </div>
+                      )}
+                    </div>
+                  </button>
+                ))}
+              </div>
+            )}
+          </section>
+        )}
+
+        {hasTransportSection && (
+          <section className="grid gap-10 lg:grid-cols-5 items-start">
+            <div className="lg:col-span-2 space-y-4">
+              <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
+                Transportes
+              </p>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900">
+                {group.transport_title || 'Transportes'}
+              </h2>
+              {group.transport_text &&
+                renderParagraphs(
+                  group.transport_text,
+                  'text-lg text-slate-600 leading-relaxed',
+                )}
+            </div>
+            {transportImages.length > 0 && (
+              <div className="lg:col-span-3">
+                {transportImages.length === 1 && (
+                  <div className="overflow-hidden rounded-[32px] shadow-xl">
+                    <img
+                      src={transportImages[0]}
+                      alt="Transporte"
+                      className="w-full h-80 md:h-[30rem] object-cover"
+                    />
+                  </div>
+                )}
+                {transportImages.length === 2 && (
+                  <div className="grid gap-6 md:grid-cols-2">
+                    {transportImages.map((imageUrl, index) => (
+                      <div key={`${imageUrl}-${index}`} className="overflow-hidden rounded-[28px] shadow-lg">
+                        <img
+                          src={imageUrl}
+                          alt={`Transporte ${index + 1}`}
+                          className="w-full h-72 md:h-[24rem] object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+                {transportImages.length > 2 && (
+                  <div className="grid gap-6 md:grid-cols-3">
+                    {transportImages.map((imageUrl, index) => (
+                      <div key={`${imageUrl}-${index}`} className="overflow-hidden rounded-[28px] shadow-lg">
+                        <img
+                          src={imageUrl}
+                          alt={`Transporte ${index + 1}`}
+                          className="w-full h-56 object-cover"
+                        />
+                      </div>
+                    ))}
+                  </div>
+                )}
+              </div>
+            )}
+          </section>
+        )}
+
+        {hasNotRecommended && (
+          <section className="rounded-[32px] bg-slate-50 p-8 md:p-12 space-y-10">
+            <div className="space-y-4 max-w-3xl">
+              <p className="text-xs uppercase tracking-[0.32em] text-destructive/70">
+                Para quem não é indicado
+              </p>
+              <h2 className="text-3xl md:text-4xl font-bold text-slate-900">
+                Para quem não é indicado esta viagem?
+              </h2>
+              <p className="text-lg text-slate-600 leading-relaxed">
+                Avalie se essa expedição combina com o seu estilo antes de garantir a vaga.
+              </p>
+            </div>
+            <div className="grid gap-6 md:grid-cols-2">
+              {(group.not_recommended_items || []).map((item, index) => (
+                <div
+                  key={`${item.title}-${index}`}
+                  className="flex items-start gap-4 rounded-[24px] border border-slate-200 bg-white p-6 shadow-sm"
+                >
+                  <div className="flex h-12 w-12 items-center justify-center rounded-full bg-red-50 text-red-500 font-semibold">
+                    {index + 1}
+                  </div>
+                  <div className="space-y-2">
+                    <h3 className="text-lg font-semibold text-slate-900">
+                      {item.title}
+                    </h3>
+                    {renderParagraphs(
+                      item.description,
+                      'space-y-2 text-sm text-slate-600 leading-relaxed',
+                    )}
+                  </div>
+                </div>
+              ))}
+            </div>
           </section>
         )}
 
@@ -291,18 +649,19 @@ export default function PublicExpedition() {
               <CarouselContent>
                 {group.carousel_images?.map((imageUrl, index) => (
                   <CarouselItem key={index} className="md:basis-1/2 lg:basis-1/3">
-                    <div className="aspect-[4/3] rounded-2xl overflow-hidden shadow-xl">
-                      <img 
-                        src={imageUrl} 
+                    <div className="group relative aspect-[4/5] overflow-hidden rounded-[28px] bg-white shadow-lg">
+                      <img
+                        src={imageUrl}
                         alt={`${group.destination} - Imagem ${index + 1}`}
-                        className="w-full h-full object-cover hover:scale-105 transition-transform duration-500"
+                        className="h-full w-full object-cover transition-transform duration-700 group-hover:scale-105"
                       />
+                      <div className="pointer-events-none absolute inset-0 bg-gradient-to-t from-black/35 via-black/0 to-transparent opacity-0 transition-opacity duration-500 group-hover:opacity-100" />
                     </div>
                   </CarouselItem>
                 ))}
               </CarouselContent>
-              <CarouselPrevious className="left-4 bg-white/90 hover:bg-white shadow-lg h-12 w-12" />
-              <CarouselNext className="right-4 bg-white/90 hover:bg-white shadow-lg h-12 w-12" />
+              <CarouselPrevious className="left-4 h-12 w-12 rounded-full border border-slate-200 bg-white/90 shadow-lg backdrop-blur hover:bg-white" />
+              <CarouselNext className="right-4 h-12 w-12 rounded-full border border-slate-200 bg-white/90 shadow-lg backdrop-blur hover:bg-white" />
             </Carousel>
           </section>
         )}
@@ -366,9 +725,12 @@ export default function PublicExpedition() {
 
         {/* Testimonials Section */}
         {hasTestimonials && (
-          <section className="bg-gradient-to-br from-primary/5 via-primary/10 to-primary/5 -mx-4 px-4 py-16 rounded-3xl">
+          <section className="rounded-[32px] bg-white border border-slate-200/60 p-10 md:p-12">
             <div className="text-center mb-12">
-              <h2 className="text-3xl font-bold mb-4">O que dizem nossos viajantes</h2>
+              <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
+                Depoimentos
+              </p>
+              <h2 className="text-3xl md:text-4xl font-bold mt-3 mb-4">O que dizem nossos viajantes</h2>
               {hasGoogleReviews && (
                 <a 
                   href={group.google_reviews_url!} 
@@ -384,7 +746,7 @@ export default function PublicExpedition() {
             </div>
             <div className="grid md:grid-cols-2 lg:grid-cols-3 gap-8">
               {testimonials.map((testimonial, index) => (
-                <Card key={index} className="border-0 shadow-lg bg-white overflow-hidden">
+                <Card key={index} className="border border-slate-100 shadow-sm bg-white overflow-hidden rounded-[24px]">
                   <CardContent className="p-6">
                     <Quote className="w-10 h-10 text-primary/20 mb-4" />
                     <p className="text-muted-foreground mb-6 italic leading-relaxed">
@@ -422,17 +784,22 @@ export default function PublicExpedition() {
 
         {/* FAQ Section */}
         {hasFaqs && (
-          <section className="max-w-3xl mx-auto">
-            <h2 className="text-3xl font-bold text-center mb-10 flex items-center justify-center gap-3">
-              <HelpCircle className="w-8 h-8 text-primary" />
-              Perguntas Frequentes
-            </h2>
+          <section className="max-w-4xl mx-auto">
+            <div className="text-center mb-10">
+              <p className="text-xs uppercase tracking-[0.32em] text-primary/60">
+                Dúvidas
+              </p>
+              <h2 className="text-3xl md:text-4xl font-bold mt-3 flex items-center justify-center gap-3">
+                <HelpCircle className="w-7 h-7 text-primary" />
+                Perguntas Frequentes
+              </h2>
+            </div>
             <Accordion type="single" collapsible className="space-y-4">
               {faqs.map((faq, index) => (
                 <AccordionItem 
                   key={index} 
                   value={`faq-${index}`}
-                  className="border rounded-2xl px-6 shadow-md bg-white overflow-hidden"
+                  className="border border-slate-200 rounded-[24px] px-6 shadow-sm bg-white overflow-hidden"
                 >
                   <AccordionTrigger className="text-left text-lg font-semibold hover:no-underline py-5">
                     {faq.question}
@@ -590,6 +957,73 @@ export default function PublicExpedition() {
           </footer>
         )}
       </div>
+
+      {itineraryImages.length > 0 && (
+        <Dialog
+          open={lightboxIndex !== null}
+          onOpenChange={(open) => {
+            if (!open) setLightboxIndex(null);
+          }}
+        >
+          <DialogContent className="max-w-5xl w-[95vw] bg-transparent border-0 shadow-none p-0">
+            {lightboxIndex !== null && (
+              <div className="relative overflow-hidden rounded-[28px] bg-black">
+                <img
+                  src={itineraryImages[lightboxIndex].url}
+                  alt={itineraryImages[lightboxIndex].title || 'Imagem do roteiro'}
+                  className="w-full max-h-[82vh] object-contain bg-black"
+                />
+                {itineraryImages.length > 1 && (
+                  <>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white"
+                      onClick={() =>
+                        setLightboxIndex((prev) =>
+                          prev === null ? 0 : (prev - 1 + itineraryImages.length) % itineraryImages.length,
+                        )
+                      }
+                      aria-label="Imagem anterior"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </Button>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="icon"
+                      className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white"
+                      onClick={() =>
+                        setLightboxIndex((prev) =>
+                          prev === null ? 0 : (prev + 1) % itineraryImages.length,
+                        )
+                      }
+                      aria-label="Próxima imagem"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </Button>
+                  </>
+                )}
+                {(itineraryImages[lightboxIndex].title || itineraryImages[lightboxIndex].description) && (
+                  <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-6 text-white">
+                    {itineraryImages[lightboxIndex].title && (
+                      <h3 className="text-lg font-semibold">
+                        {itineraryImages[lightboxIndex].title}
+                      </h3>
+                    )}
+                    {itineraryImages[lightboxIndex].description &&
+                      renderParagraphs(
+                        itineraryImages[lightboxIndex].description,
+                        'space-y-2 text-sm text-white/80 leading-relaxed',
+                      )}
+                  </div>
+                )}
+              </div>
+            )}
+          </DialogContent>
+        </Dialog>
+      )}
     </div>
   );
 }

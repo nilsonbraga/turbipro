@@ -12,8 +12,8 @@ const app = express();
 app.use(helmet());
 app.use(cors());
 // Increase body size limits to handle base64 images (Studio, uploads, etc.)
-app.use(express.json({ limit: '50mb' }));
-app.use(express.urlencoded({ extended: true, limit: '50mb' }));
+app.use(express.json({ limit: '100mb' }));
+app.use(express.urlencoded({ extended: true, limit: '100mb' }));
 
 if (env.nodeEnv !== 'test') {
   app.use(morgan('dev'));

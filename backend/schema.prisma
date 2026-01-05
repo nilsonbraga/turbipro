@@ -606,6 +606,22 @@ model ExpeditionGroup {
   coverImageUrl      String?
   carouselImages     String[]
   landingText        String?
+  impactPhrase       String?
+  descriptionImageUrl String?
+  descriptionGalleryImages String[]
+  aboutTitle         String?
+  aboutDescription   String?
+  aboutImageUrl      String?
+  destinationSummaryTitle       String?
+  destinationSummaryDescription String?
+  destinationSummaryImageUrl    String?
+  itinerarySummaryTitle         String?
+  itinerarySummaryDescription   String?
+  itinerarySummaryImages        Json     @default("[]")
+  transportTitle     String?
+  transportText      String?
+  transportImages    String[]
+  notRecommendedItems Json    @default("[]")
   includedItems      String[]
   excludedItems      String[]
   testimonials       Json     @default("[]")
