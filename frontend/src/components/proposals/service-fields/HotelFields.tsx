@@ -12,12 +12,13 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
-import { Calendar as CalendarIcon, Building2, MapPin, Users, BedDouble, UtensilsCrossed, KeyRound } from "lucide-react";
+import { Calendar as CalendarIcon, Building2, MapPin, Users, BedDouble, UtensilsCrossed, KeyRound, Image as ImageIcon } from "lucide-react";
 import { Calendar } from "@/components/ui/calendar";
 import { cn } from "@/lib/utils";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Separator } from "@/components/ui/separator";
 import { Badge } from "@/components/ui/badge";
+import { MultiImageUploader } from "@/components/itineraries/MultiImageUploader";
 
 interface HotelGuests {
   adults: number;
@@ -40,6 +41,7 @@ interface HotelDetails {
   ratePlan?: string;
   amenities?: string;
   confirmationNumber?: string;
+  photos?: string[];
 }
 
 interface HotelFieldsProps {
@@ -220,6 +222,7 @@ export function HotelFields({
     ratePlan: details?.ratePlan || "",
     amenities: details?.amenities || "",
     confirmationNumber: details?.confirmationNumber || "",
+    photos: details?.photos || [],
   };
 
   const updateField = <K extends keyof HotelDetails>(key: K, value: HotelDetails[K]) => {
@@ -486,6 +489,24 @@ export function HotelFields({
               placeholder="Wi-Fi, Piscina, Spa, Academia"
               className="mt-2 h-9"
             />
+          </div>
+
+          <div className="rounded-lg border bg-muted/10 p-3 space-y-3">
+            <div className="flex items-center gap-2">
+              <ImageIcon className="h-4 w-4 text-muted-foreground" />
+              <div className="text-sm font-medium">Fotos do hotel</div>
+            </div>
+            <MultiImageUploader
+              value={data.photos || []}
+              onChange={(urls) => updateField("photos", urls)}
+              label=""
+              bucket="proposal-files"
+              folder="hotel"
+              aspectRatio="wide"
+              maxImages={4}
+              maxFileSizeMB={3}
+            />
+            <p className="text-[11px] text-muted-foreground">Até 4 imagens de 3MB.</p>
           </div>
         </CardContent>
       </Card>

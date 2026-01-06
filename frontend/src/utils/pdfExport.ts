@@ -783,6 +783,9 @@ function renderHotelDetails(details: any): string {
   used.add("board");
   used.add("guests");
   used.add("confirmationNumber");
+  used.add("photos");
+  used.add("quantity");
+  used.add("unit_value");
 
   const guestsParts: string[] = [];
   if (details?.guests?.adults)
@@ -798,6 +801,23 @@ function renderHotelDetails(details: any): string {
   const checkOutTime = details.checkOutTime ? ` ${details.checkOutTime}` : "";
 
   const title = !isBlank(details.hotelName) ? `${details.hotelName}` : "";
+
+  const photos = Array.isArray(details.photos)
+    ? details.photos.filter((photo: any) => typeof photo === "string" && photo.trim().length > 0).slice(0, 4)
+    : [];
+
+  const photoBlock = photos.length
+    ? `
+      <div class="subsection">
+        <div class="subsection-title">Fotos do hotel</div>
+        <div class="photo-grid">
+          ${photos
+            .map((photo: string) => `<div class="photo-cell"><img src="${escapeHtml(photo)}" alt="Hotel"/></div>`)
+            .join("")}
+        </div>
+      </div>
+    `
+    : "";
 
   const base = `
     ${title ? `<div class="service-main">${escapeHtml(title)}</div>` : ""}
@@ -828,6 +848,7 @@ function renderHotelDetails(details: any): string {
         value: details.confirmationNumber || "",
       },
     ])}
+    ${photoBlock}
   `;
 
   const remaining = renderAllRemainingDetails(
@@ -1688,6 +1709,23 @@ export function generateProposalPDF(
         color:var(--muted2);
         font-weight:600;
         margin-bottom:10px;
+      }
+      .photo-grid{
+        display:grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap:8px;
+      }
+      .photo-cell{
+        border-radius:10px;
+        overflow:hidden;
+        border:1px solid #eef2f7;
+        background:#f3f4f6;
+      }
+      .photo-cell img{
+        display:block;
+        width:100%;
+        height:170px;
+        object-fit:cover;
       }
 
       .segments{

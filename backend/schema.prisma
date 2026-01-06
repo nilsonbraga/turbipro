@@ -621,6 +621,7 @@ model ExpeditionGroup {
   itinerarySummaryTitle         String?
   itinerarySummaryDescription   String?
   itinerarySummaryImages        Json     @default("[]")
+  itineraryDays                 Json     @default("[]")
   transportTitle     String?
   transportText      String?
   transportImages    String[]

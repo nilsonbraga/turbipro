@@ -21,7 +21,7 @@ import {
   SelectValue,
 } from '@/components/ui/select';
 import { Loader2, Upload, X, Image as ImageIcon, Plus, Youtube, Star, HelpCircle, ExternalLink, Calendar as CalendarIcon, Info, DollarSign, Package, MessageSquare, FileText, Pencil, Trash2, Check } from 'lucide-react';
-import { ExpeditionGroup, ExpeditionGroupInput, Testimonial, FAQ, ItinerarySummaryImage, NotRecommendedItem, PricingOffer } from '@/hooks/useExpeditionGroups';
+import { ExpeditionGroup, ExpeditionGroupInput, Testimonial, FAQ, ItinerarySummaryImage, NotRecommendedItem, PricingOffer, ExpeditionItineraryDay, ExpeditionItineraryItem } from '@/hooks/useExpeditionGroups';
 import { useToast } from '@/hooks/use-toast';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
@@ -141,6 +141,7 @@ export function ExpeditionGroupDialog({
     itinerary_summary_title: '',
     itinerary_summary_description: '',
     itinerary_summary_images: [],
+    itinerary_days: [],
     transport_title: '',
     transport_text: '',
     transport_images: [],
@@ -175,6 +176,7 @@ export function ExpeditionGroupDialog({
   const [priceInstallmentInput, setPriceInstallmentInput] = useState('');
   const [newNotRecommendedItem, setNewNotRecommendedItem] = useState<NotRecommendedItem>({ title: '', description: '' });
   const [pricingOfferInputs, setPricingOfferInputs] = useState<PricingOfferInputs[]>([]);
+  const [dayLocationDrafts, setDayLocationDrafts] = useState<Record<string, string>>({});
   const fileToBase64 = (file: Blob): Promise<string> =>
     new Promise((resolve, reject) => {
       const reader = new FileReader();
@@ -313,6 +315,7 @@ export function ExpeditionGroupDialog({
         itinerary_summary_title: group.itinerary_summary_title || '',
         itinerary_summary_description: group.itinerary_summary_description || '',
         itinerary_summary_images: (group.itinerary_summary_images as ItinerarySummaryImage[]) || [],
+        itinerary_days: (group.itinerary_days as ExpeditionItineraryDay[]) || [],
         transport_title: group.transport_title || '',
         transport_text: group.transport_text || '',
         transport_images: group.transport_images || [],
@@ -369,6 +372,7 @@ export function ExpeditionGroupDialog({
         itinerary_summary_title: '',
         itinerary_summary_description: '',
         itinerary_summary_images: [],
+        itinerary_days: [],
         transport_title: '',
         transport_text: '',
         transport_images: [],
@@ -399,6 +403,7 @@ export function ExpeditionGroupDialog({
     setTestimonialDraft({ name: '', text: '', photo: '' });
     setNewFaq({ question: '', answer: '' });
     setNewNotRecommendedItem({ title: '', description: '' });
+    setDayLocationDrafts({});
   }, [group, open]);
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -491,6 +496,164 @@ export function ExpeditionGroupDialog({
       });
       return null;
     }
+  };
+
+  const createLocalId = () => {
+    if (typeof crypto !== 'undefined' && 'randomUUID' in crypto) {
+      return (crypto as Crypto).randomUUID();
+    }
+    return `${Date.now()}-${Math.random().toString(16).slice(2)}`;
+  };
+
+  const updateItineraryDay = (
+    dayId: string,
+    updates: Partial<ExpeditionItineraryDay>,
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      itinerary_days: (prev.itinerary_days || []).map((day) =>
+        day.id === dayId ? { ...day, ...updates } : day,
+      ),
+    }));
+  };
+
+  const addItineraryDay = () => {
+    const newDay: ExpeditionItineraryDay = {
+      id: createLocalId(),
+      title: '',
+      locations: [],
+      description: '',
+      photos: [],
+      items: [],
+    };
+    setFormData((prev) => ({
+      ...prev,
+      itinerary_days: [...(prev.itinerary_days || []), newDay],
+    }));
+  };
+
+  const removeItineraryDay = (dayId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      itinerary_days: (prev.itinerary_days || []).filter((day) => day.id !== dayId),
+    }));
+    setDayLocationDrafts((prev) => {
+      const next = { ...prev };
+      delete next[dayId];
+      return next;
+    });
+  };
+
+  const addDayLocation = (dayId: string) => {
+    const value = (dayLocationDrafts[dayId] || '').trim();
+    if (!value) return;
+    updateItineraryDay(dayId, {
+      locations: [
+        ...(((formData.itinerary_days || []).find((d) => d.id === dayId)?.locations) || []),
+        value,
+      ],
+    });
+    setDayLocationDrafts((prev) => ({ ...prev, [dayId]: '' }));
+  };
+
+  const removeDayLocation = (dayId: string, index: number) => {
+    const day = (formData.itinerary_days || []).find((d) => d.id === dayId);
+    if (!day?.locations) return;
+    const nextLocations = [...day.locations];
+    nextLocations.splice(index, 1);
+    updateItineraryDay(dayId, { locations: nextLocations });
+  };
+
+  const updateItineraryItem = (
+    dayId: string,
+    itemId: string,
+    updates: Partial<ExpeditionItineraryItem>,
+  ) => {
+    setFormData((prev) => ({
+      ...prev,
+      itinerary_days: (prev.itinerary_days || []).map((day) => {
+        if (day.id !== dayId) return day;
+        const items = (day.items || []).map((item) =>
+          item.id === itemId ? { ...item, ...updates } : item,
+        );
+        return { ...day, items };
+      }),
+    }));
+  };
+
+  const addItineraryItem = (dayId: string) => {
+    const newItem: ExpeditionItineraryItem = {
+      id: createLocalId(),
+      start_time: '',
+      end_time: '',
+      location: '',
+      description: '',
+      photos: [],
+    };
+    setFormData((prev) => ({
+      ...prev,
+      itinerary_days: (prev.itinerary_days || []).map((day) =>
+        day.id === dayId
+          ? { ...day, items: [...(day.items || []), newItem] }
+          : day,
+      ),
+    }));
+  };
+
+  const removeItineraryItem = (dayId: string, itemId: string) => {
+    setFormData((prev) => ({
+      ...prev,
+      itinerary_days: (prev.itinerary_days || []).map((day) =>
+        day.id === dayId
+          ? { ...day, items: (day.items || []).filter((item) => item.id !== itemId) }
+          : day,
+      ),
+    }));
+  };
+
+  const handleDayPhotosUpload = async (dayId: string, files: FileList | null) => {
+    if (!files || files.length === 0) return;
+    const day = (formData.itinerary_days || []).find((d) => d.id === dayId);
+    const currentPhotos = day?.photos || [];
+    const remaining = 3 - currentPhotos.length;
+    if (remaining <= 0) {
+      toast({ title: 'Limite de fotos', description: 'Máximo de 3 fotos por dia.', variant: 'destructive' });
+      return;
+    }
+
+    setIsUploading(true);
+    const newPhotos: string[] = [];
+    for (const file of Array.from(files).slice(0, remaining)) {
+      const url = await uploadImage(file);
+      if (url) newPhotos.push(url);
+    }
+    updateItineraryDay(dayId, { photos: [...currentPhotos, ...newPhotos] });
+    setIsUploading(false);
+  };
+
+  const handleItemPhotosUpload = async (
+    dayId: string,
+    itemId: string,
+    files: FileList | null,
+  ) => {
+    if (!files || files.length === 0) return;
+    const day = (formData.itinerary_days || []).find((d) => d.id === dayId);
+    const item = day?.items?.find((i) => i.id === itemId);
+    const currentPhotos = item?.photos || [];
+    const remaining = 3 - currentPhotos.length;
+    if (remaining <= 0) {
+      toast({ title: 'Limite de fotos', description: 'Máximo de 3 fotos por item.', variant: 'destructive' });
+      return;
+    }
+
+    setIsUploading(true);
+    const newPhotos: string[] = [];
+    for (const file of Array.from(files).slice(0, remaining)) {
+      const url = await uploadImage(file);
+      if (url) newPhotos.push(url);
+    }
+    updateItineraryItem(dayId, itemId, { photos: [...currentPhotos, ...newPhotos] });
+    setIsUploading(false);
   };
 
   const handleCoverUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -901,7 +1064,7 @@ export function ExpeditionGroupDialog({
         </DialogHeader>
 
         <Tabs defaultValue="basic" className="w-full">
-          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 lg:grid-cols-7 gap-2 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+          <TabsList className="grid w-full grid-cols-3 sm:grid-cols-4 lg:grid-cols-8 gap-2 focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
             <TabsTrigger value="basic" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
               <Info className="h-4 w-4" />
               Geral
@@ -913,6 +1076,10 @@ export function ExpeditionGroupDialog({
             <TabsTrigger value="package" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
               <Package className="h-4 w-4" />
               Itens
+            </TabsTrigger>
+            <TabsTrigger value="itinerary" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
+              <CalendarIcon className="h-4 w-4" />
+              Roteiro
             </TabsTrigger>
             <TabsTrigger value="media" className="flex items-center justify-center gap-2 text-xs sm:text-sm focus-visible:ring-0 focus-visible:ring-offset-0 focus-visible:outline-none">
               <ImageIcon className="h-4 w-4" />
@@ -1279,76 +1446,421 @@ export function ExpeditionGroupDialog({
             </TabsContent>
 
             {/* Package Tab */}
-            <TabsContent value="package" className="space-y-6 mt-4">
+            <TabsContent value="package" className="space-y-4 mt-4">
               {/* Included Items */}
-              <div className="space-y-3">
-                <Label className="text-base font-semibold text-green-600">O que está incluso</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={newIncludedItem}
-                    onChange={(e) => setNewIncludedItem(e.target.value)}
-                    placeholder="Ex: Passagem aérea, Hospedagem..."
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addIncludedItem();
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" size="icon" onClick={addIncludedItem}>
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(formData.included_items || []).map((item, index) => (
-                    <Badge key={index} variant="secondary" className="bg-green-100 text-green-800 px-3 py-1">
-                      {item}
-                      <button
-                        type="button"
-                        onClick={() => removeIncludedItem(index)}
-                        className="ml-2 hover:text-destructive"
+              <Card className="border border-muted/60 shadow-none">
+                <CardContent className="space-y-4 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-emerald-700 flex items-center gap-2">
+                        <Check className="h-4 w-4" />
+                        O que está incluso
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Adicione os itens que fazem parte do pacote.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-muted/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Input
+                        value={newIncludedItem}
+                        onChange={(e) => setNewIncludedItem(e.target.value)}
+                        placeholder="Ex: Passagem aérea, Hospedagem..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addIncludedItem();
+                          }
+                        }}
+                      />
+                      <Button type="button" variant="outline" className="gap-2" onClick={addIncludedItem}>
+                        <Plus className="w-4 h-4" />
+                        Adicionar
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(formData.included_items || []).map((item, index) => (
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="border border-emerald-200 bg-emerald-50 px-3 py-1 text-emerald-700"
                       >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </Badge>
-                  ))}
-                </div>
-              </div>
+                        {item}
+                        <button
+                          type="button"
+                          onClick={() => removeIncludedItem(index)}
+                          className="ml-2 hover:text-destructive"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
 
               {/* Excluded Items */}
-              <div className="space-y-3">
-                <Label className="text-base font-semibold text-red-600">O que não está incluso</Label>
-                <div className="flex gap-2">
-                  <Input
-                    value={newExcludedItem}
-                    onChange={(e) => setNewExcludedItem(e.target.value)}
-                    placeholder="Ex: Refeições, Seguro viagem..."
-                    onKeyDown={(e) => {
-                      if (e.key === 'Enter') {
-                        e.preventDefault();
-                        addExcludedItem();
-                      }
-                    }}
-                  />
-                  <Button type="button" variant="outline" size="icon" onClick={addExcludedItem}>
-                    <Plus className="w-4 h-4" />
-                  </Button>
-                </div>
-                <div className="flex flex-wrap gap-2">
-                  {(formData.excluded_items || []).map((item, index) => (
-                    <Badge key={index} variant="secondary" className="bg-red-100 text-red-800 px-3 py-1">
-                      {item}
-                      <button
-                        type="button"
-                        onClick={() => removeExcludedItem(index)}
-                        className="ml-2 hover:text-destructive"
+              <Card className="border border-muted/60 shadow-none">
+                <CardContent className="space-y-4 p-5">
+                  <div className="flex items-start justify-between gap-4">
+                    <div className="space-y-1">
+                      <Label className="text-sm font-semibold text-rose-700 flex items-center gap-2">
+                        <X className="h-4 w-4" />
+                        O que não está incluso
+                      </Label>
+                      <p className="text-xs text-muted-foreground">
+                        Liste o que nao faz parte do pacote.
+                      </p>
+                    </div>
+                  </div>
+                  <div className="rounded-xl border border-muted/60 bg-muted/20 p-3">
+                    <div className="flex flex-col gap-3 sm:flex-row">
+                      <Input
+                        value={newExcludedItem}
+                        onChange={(e) => setNewExcludedItem(e.target.value)}
+                        placeholder="Ex: Refeições, Seguro viagem..."
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter') {
+                            e.preventDefault();
+                            addExcludedItem();
+                          }
+                        }}
+                      />
+                      <Button type="button" variant="outline" className="gap-2" onClick={addExcludedItem}>
+                        <Plus className="w-4 h-4" />
+                        Adicionar
+                      </Button>
+                    </div>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {(formData.excluded_items || []).map((item, index) => (
+                      <Badge
+                        key={index}
+                        variant="secondary"
+                        className="border border-rose-200 bg-rose-50 px-3 py-1 text-rose-700"
                       >
-                        <X className="w-3 h-3" />
-                      </button>
-                    </Badge>
+                        {item}
+                        <button
+                          type="button"
+                          onClick={() => removeExcludedItem(index)}
+                          className="ml-2 hover:text-destructive"
+                        >
+                          <X className="w-3 h-3" />
+                        </button>
+                      </Badge>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </TabsContent>
+
+            {/* Itinerary Tab */}
+            <TabsContent value="itinerary" className="space-y-6 mt-4">
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <div>
+                  <h3 className="text-sm font-semibold text-foreground">Roteiro completo</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Adicione dias e programação detalhada para exibir no drawer da landing page.
+                  </p>
+                </div>
+                <Button type="button" size="sm" className="gap-2" onClick={addItineraryDay}>
+                  <Plus className="w-4 h-4" />
+                  Adicionar dia
+                </Button>
+              </div>
+
+              {(formData.itinerary_days || []).length === 0 ? (
+                <Card className="border border-dashed">
+                  <CardContent className="p-6 text-sm text-muted-foreground">
+                    Nenhum dia adicionado ainda. Clique em “Adicionar dia” para começar o roteiro.
+                  </CardContent>
+                </Card>
+              ) : (
+                <div className="space-y-4">
+                  {(formData.itinerary_days || []).map((day, dayIndex) => (
+                    <Card key={day.id} className="border border-muted/60 shadow-none">
+                      <CardContent className="space-y-6 p-5">
+                        <div className="flex flex-wrap items-start justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="h-10 w-10 rounded-xl bg-primary/10 text-primary font-semibold text-sm flex items-center justify-center">
+                              {dayIndex + 1}
+                            </div>
+                            <p className="text-xs uppercase tracking-wider text-muted-foreground">Dia</p>
+                          </div>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => removeItineraryDay(day.id)}
+                            aria-label="Remover dia"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+
+                        <div className="grid gap-4 md:grid-cols-[1fr,1.6fr]">
+                          <div className="space-y-2">
+                            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Título do dia</Label>
+                            <Input
+                              value={day.title || ''}
+                              onChange={(e) => updateItineraryDay(day.id, { title: e.target.value })}
+                              placeholder={`Dia ${dayIndex + 1}`}
+                            />
+                          </div>
+                          <div className="space-y-2">
+                            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Locais</Label>
+                            <div className="flex gap-2">
+                              <Input
+                                value={dayLocationDrafts[day.id] || ''}
+                                onChange={(e) =>
+                                  setDayLocationDrafts((prev) => ({ ...prev, [day.id]: e.target.value }))
+                                }
+                                placeholder="Ex: Centro histórico, Lago..."
+                                onKeyDown={(e) => {
+                                  if (e.key === 'Enter') {
+                                    e.preventDefault();
+                                    addDayLocation(day.id);
+                                  }
+                                }}
+                              />
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="icon"
+                                onClick={() => addDayLocation(day.id)}
+                              >
+                                <Plus className="w-4 h-4" />
+                              </Button>
+                            </div>
+                            <div className="flex flex-wrap gap-2">
+                              {(day.locations || []).map((location, index) => (
+                                <Badge key={`${day.id}-loc-${index}`} variant="secondary" className="px-3 py-1">
+                                  {location}
+                                  <button
+                                    type="button"
+                                    onClick={() => removeDayLocation(day.id, index)}
+                                    className="ml-2 hover:text-destructive"
+                                  >
+                                    <X className="w-3 h-3" />
+                                  </button>
+                                </Badge>
+                              ))}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="space-y-2">
+                          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Descrição</Label>
+                          <Textarea
+                            value={day.description || ''}
+                            onChange={(e) => updateItineraryDay(day.id, { description: e.target.value })}
+                            placeholder="Descreva o que acontece neste dia..."
+                            rows={4}
+                          />
+                        </div>
+
+                        <div className="space-y-3">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Fotos do dia</Label>
+                            {(day.photos || []).length < 3 && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                size="sm"
+                                className="gap-2"
+                                onClick={() => document.getElementById(`day-photos-${day.id}`)?.click()}
+                              >
+                                <Upload className="w-4 h-4" />
+                                Adicionar foto
+                              </Button>
+                            )}
+                          </div>
+                          <div className="grid gap-3 sm:grid-cols-3">
+                            {(day.photos || []).map((photo, index) => (
+                              <div key={`${day.id}-photo-${index}`} className="relative">
+                                <img
+                                  src={photo}
+                                  alt="Foto do dia"
+                                  className="h-24 w-full rounded-xl object-cover"
+                                />
+                                <Button
+                                  type="button"
+                                  variant="destructive"
+                                  size="icon"
+                                  className="absolute -top-2 -right-2 h-6 w-6"
+                                  onClick={() =>
+                                    updateItineraryDay(day.id, {
+                                      photos: (day.photos || []).filter((_, i) => i !== index),
+                                    })
+                                  }
+                                >
+                                  <X className="w-3 h-3" />
+                                </Button>
+                              </div>
+                            ))}
+                          </div>
+                          <input
+                            id={`day-photos-${day.id}`}
+                            type="file"
+                            accept="image/*"
+                            multiple
+                            className="hidden"
+                            onChange={(e) => handleDayPhotosUpload(day.id, e.target.files)}
+                          />
+                        </div>
+
+                        <div className="space-y-4 rounded-2xl border border-muted/60 bg-muted/20 p-4">
+                          <div className="flex flex-wrap items-center justify-between gap-3">
+                            <h4 className="text-sm font-semibold text-foreground">Programação</h4>
+                            <Button
+                              type="button"
+                              variant="outline"
+                              size="sm"
+                              className="gap-2"
+                              onClick={() => addItineraryItem(day.id)}
+                            >
+                              <Plus className="w-4 h-4" />
+                              Adicionar programação
+                            </Button>
+                          </div>
+
+                          {(day.items || []).length === 0 ? (
+                            <p className="text-xs text-muted-foreground">
+                              Nenhuma programação adicionada para este dia.
+                            </p>
+                          ) : (
+                            <div className="space-y-4">
+                              {(day.items || []).map((item, itemIndex) => (
+                                <div
+                                  key={item.id}
+                                  className="rounded-xl border border-muted/60 bg-white p-4 space-y-4"
+                                >
+                                  <div className="flex items-start justify-between gap-4">
+                                    <div className="flex-1 space-y-4">
+                                      <div className="grid gap-4 md:grid-cols-[140px,140px,1fr]">
+                                        <div className="space-y-2">
+                                          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Início</Label>
+                                          <Input
+                                            type="time"
+                                            value={item.start_time || ''}
+                                            onChange={(e) =>
+                                              updateItineraryItem(day.id, item.id, { start_time: e.target.value })
+                                            }
+                                          />
+                                        </div>
+                                        <div className="space-y-2">
+                                          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Fim</Label>
+                                          <Input
+                                            type="time"
+                                            value={item.end_time || ''}
+                                            onChange={(e) =>
+                                              updateItineraryItem(day.id, item.id, { end_time: e.target.value })
+                                            }
+                                          />
+                                        </div>
+                                        <div className="space-y-2">
+                                          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Local</Label>
+                                          <Input
+                                            value={item.location || ''}
+                                            onChange={(e) =>
+                                              updateItineraryItem(day.id, item.id, { location: e.target.value })
+                                            }
+                                            placeholder="Local da programação"
+                                          />
+                                        </div>
+                                      </div>
+
+                                      <div className="grid gap-4 md:grid-cols-[1.3fr,1fr]">
+                                        <div className="space-y-2">
+                                          <Label className="text-xs uppercase tracking-wider text-muted-foreground">Descrição</Label>
+                                          <Textarea
+                                            value={item.description || ''}
+                                            onChange={(e) =>
+                                              updateItineraryItem(day.id, item.id, { description: e.target.value })
+                                            }
+                                            placeholder="Detalhes da programação..."
+                                            rows={3}
+                                          />
+                                        </div>
+                                        <div className="space-y-2">
+                                          <div className="flex items-center justify-between">
+                                            <Label className="text-xs uppercase tracking-wider text-muted-foreground">Fotos</Label>
+                                            {(item.photos || []).length < 3 && (
+                                              <Button
+                                                type="button"
+                                                variant="outline"
+                                                size="sm"
+                                                className="gap-2"
+                                                onClick={() =>
+                                                  document.getElementById(`item-photos-${item.id}`)?.click()
+                                                }
+                                              >
+                                                <Upload className="w-4 h-4" />
+                                                Adicionar
+                                              </Button>
+                                            )}
+                                          </div>
+                                          <div className="grid gap-3 sm:grid-cols-3">
+                                            {(item.photos || []).map((photo, index) => (
+                                              <div key={`${item.id}-photo-${index}`} className="relative">
+                                                <img
+                                                  src={photo}
+                                                  alt="Foto da programação"
+                                                  className="h-20 w-full rounded-xl object-cover"
+                                                />
+                                                <Button
+                                                  type="button"
+                                                  variant="destructive"
+                                                  size="icon"
+                                                  className="absolute -top-2 -right-2 h-6 w-6"
+                                                  onClick={() =>
+                                                    updateItineraryItem(day.id, item.id, {
+                                                      photos: (item.photos || []).filter((_, i) => i !== index),
+                                                    })
+                                                  }
+                                                >
+                                                  <X className="w-3 h-3" />
+                                                </Button>
+                                              </div>
+                                            ))}
+                                          </div>
+                                          <input
+                                            id={`item-photos-${item.id}`}
+                                            type="file"
+                                            accept="image/*"
+                                            multiple
+                                            className="hidden"
+                                            onChange={(e) =>
+                                              handleItemPhotosUpload(day.id, item.id, e.target.files)
+                                            }
+                                          />
+                                        </div>
+                                      </div>
+                                    </div>
+                                    <Button
+                                      type="button"
+                                      variant="ghost"
+                                      size="icon"
+                                      className="text-destructive hover:text-destructive mt-2"
+                                      onClick={() => removeItineraryItem(day.id, item.id)}
+                                      aria-label="Remover programação"
+                                    >
+                                      <Trash2 className="w-4 h-4" />
+                                    </Button>
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      </CardContent>
+                    </Card>
                   ))}
                 </div>
-              </div>
+              )}
             </TabsContent>
 
             {/* Media Tab (Landing Page) */}

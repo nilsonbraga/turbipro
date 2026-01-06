@@ -21,6 +21,7 @@ interface MultiImageUploaderProps {
   folder?: string;
   aspectRatio?: 'video' | 'square' | 'wide';
   maxImages?: number;
+  maxFileSizeMB?: number;
 }
 
 export function MultiImageUploader({
@@ -31,6 +32,7 @@ export function MultiImageUploader({
   folder = 'days',
   aspectRatio = 'video',
   maxImages = 10,
+  maxFileSizeMB = 5,
 }: MultiImageUploaderProps) {
   const [isUploading, setIsUploading] = useState(false);
   const [urlInput, setUrlInput] = useState('');
@@ -88,8 +90,9 @@ export function MultiImageUploader({
           continue;
         }
 
-        if (file.size > 5 * 1024 * 1024) {
-          toast({ title: `${file.name}: Máximo 5MB`, variant: 'destructive' });
+        const maxBytes = maxFileSizeMB * 1024 * 1024;
+        if (file.size > maxBytes) {
+          toast({ title: `${file.name}: Máximo ${maxFileSizeMB}MB`, variant: 'destructive' });
           continue;
         }
 

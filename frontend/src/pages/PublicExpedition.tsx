@@ -1,12 +1,15 @@
 import { useState } from 'react';
 import { useParams } from 'react-router-dom';
-import { usePublicExpeditionGroup, usePublicRegistration, Testimonial, FAQ, PricingOffer } from '@/hooks/useExpeditionGroups';
+import { usePublicExpeditionGroup, usePublicRegistration, Testimonial, FAQ, PricingOffer, ExpeditionItineraryDay } from '@/hooks/useExpeditionGroups';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Dialog, DialogContent } from '@/components/ui/dialog';
+import { HoverCard, HoverCardContent, HoverCardTrigger } from '@/components/ui/hover-card';
+import { Drawer, DrawerClose, DrawerContent, DrawerHeader, DrawerTitle } from '@/components/ui/drawer';
+import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Select,
   SelectContent,
@@ -71,6 +74,7 @@ export default function PublicExpedition() {
     images: Array<{ url: string; title?: string; description?: string }>;
     index: number;
   } | null>(null);
+  const [itineraryDrawerOpen, setItineraryDrawerOpen] = useState(false);
 
   if (isLoading) {
     return (
@@ -121,10 +125,13 @@ export default function PublicExpedition() {
     !!group.destination_summary_title ||
     !!group.destination_summary_description ||
     !!group.destination_summary_image_url;
+  const itineraryDays = (group.itinerary_days || []) as ExpeditionItineraryDay[];
+  const hasItineraryDays = itineraryDays.length > 0;
   const hasItinerarySummary =
     !!group.itinerary_summary_title ||
     !!group.itinerary_summary_description ||
-    (group.itinerary_summary_images && group.itinerary_summary_images.length > 0);
+    (group.itinerary_summary_images && group.itinerary_summary_images.length > 0) ||
+    hasItineraryDays;
   const hasTransportSection =
     !!group.transport_title || !!group.transport_text || (group.transport_images && group.transport_images.length > 0);
   const hasNotRecommended =
@@ -201,6 +208,23 @@ export default function PublicExpedition() {
   const formatCurrency = (value?: number | null) => {
     if (value === null || value === undefined || Number.isNaN(Number(value))) return '';
     return Number(value).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+  };
+
+  const getPhotoGridCols = (count: number) => {
+    if (count <= 1) return 'grid-cols-1';
+    if (count === 2) return 'grid-cols-2';
+    return 'grid-cols-3';
+  };
+
+  const getPhotoHeight = (count: number, variant: 'day' | 'item') => {
+    if (variant === 'day') {
+      if (count <= 1) return 'h-24';
+      if (count === 2) return 'h-20';
+      return 'h-16';
+    }
+    if (count <= 1) return 'h-20';
+    if (count === 2) return 'h-16';
+    return 'h-14';
   };
 
   const getOfferLabel = (offer: PricingOffer, index: number) =>
@@ -621,6 +645,17 @@ export default function PublicExpedition() {
                   group.itinerary_summary_description,
                   'text-lg text-slate-600 leading-relaxed',
                 )}
+              {hasItineraryDays && (
+                <Button
+                  type="button"
+                  variant="default"
+                  className="mt-2 w-fit rounded-full bg-slate-900 px-5 py-2.5 text-sm font-semibold text-white shadow-sm transition hover:bg-slate-800 hover:shadow-md focus-visible:ring-2 focus-visible:ring-slate-300 group"
+                  onClick={() => setItineraryDrawerOpen(true)}
+                >
+                  Veja o roteiro completo
+                  <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-300 group-hover:translate-x-1" />
+                </Button>
+              )}
             </div>
             {(group.itinerary_summary_images || []).length > 0 && (
               <div className="grid gap-6 md:grid-cols-3">
@@ -1269,6 +1304,164 @@ export default function PublicExpedition() {
           </div>
         </section>
       </div>
+
+      {hasItineraryDays && (
+        <Drawer
+          open={itineraryDrawerOpen}
+          onOpenChange={setItineraryDrawerOpen}
+          direction="right"
+        >
+          <DrawerContent className="left-auto right-0 inset-y-0 mt-0 h-full w-full max-w-[520px] rounded-none rounded-l-3xl border-l border-border/50">
+            <DrawerHeader className="flex flex-row items-center justify-between gap-4 border-b px-6 py-5">
+              <div>
+                <DrawerTitle className="text-xl font-semibold text-slate-900">
+                  Roteiro completo
+                </DrawerTitle>
+                <p className="text-sm text-slate-500">Dia a dia da expedição</p>
+              </div>
+              <DrawerClose asChild>
+                <Button variant="ghost" size="icon" className="rounded-full">
+                  <X className="h-5 w-5" />
+                </Button>
+              </DrawerClose>
+            </DrawerHeader>
+            <ScrollArea className="flex-1">
+              <div className="space-y-6 px-6 py-6">
+                {itineraryDays.map((day, dayIndex) => (
+                  <div
+                    key={day.id || `day-${dayIndex}`}
+                    className="rounded-2xl bg-slate-50/90 p-5"
+                  >
+                    {(() => {
+                      const dayPhotos = day.photos || [];
+                      const dayPhotoCount = dayPhotos.length;
+                      const dayPhotoGrid = getPhotoGridCols(dayPhotoCount);
+                      const dayPhotoHeight = getPhotoHeight(dayPhotoCount, 'day');
+                      return (
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="space-y-2">
+                        <div className="inline-flex items-center gap-2 text-xs uppercase tracking-[0.3em] text-slate-400">
+                          <Calendar className="h-4 w-4" />
+                          <span>Dia {dayIndex + 1}</span>
+                        </div>
+                        <h3 className="text-lg font-semibold text-slate-900">
+                          {day.title?.trim() || `Dia ${dayIndex + 1}`}
+                        </h3>
+                        {day.locations && day.locations.length > 0 && (
+                          <div className="flex flex-wrap gap-2 text-sm text-slate-600">
+                            {day.locations.map((location, idx) => (
+                              <span
+                                key={`${day.id}-loc-${idx}`}
+                                className="inline-flex items-center rounded-full bg-slate-100 px-3 py-1 text-xs font-medium text-slate-600"
+                              >
+                                {location}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                      {dayPhotoCount > 0 && (
+                        <div className={`grid ${dayPhotoGrid} gap-2`}>
+                          {dayPhotos.slice(0, 3).map((photo, idx) => (
+                                    <HoverCard key={`${day.id}-photo-${idx}`} openDelay={0}>
+                              <HoverCardTrigger asChild>
+                                <div className="cursor-pointer">
+                                  <img
+                                    src={photo}
+                                    alt={`Dia ${dayIndex + 1} foto ${idx + 1}`}
+                                    className={`w-full ${dayPhotoHeight} rounded-xl object-cover`}
+                                  />
+                                </div>
+                              </HoverCardTrigger>
+                              <HoverCardContent side="left" align="end" className="w-64 p-2">
+                                <img
+                                  src={photo}
+                                  alt={`Dia ${dayIndex + 1} foto ${idx + 1}`}
+                                  className="max-h-64 w-full rounded-lg bg-slate-100 object-contain"
+                                />
+                              </HoverCardContent>
+                                    </HoverCard>
+                          ))}
+                        </div>
+                      )}
+                    </div>
+                      );
+                    })()}
+                    {day.description &&
+                      renderParagraphs(
+                        day.description,
+                        'mt-3 text-sm text-slate-600 leading-relaxed',
+                      )}
+                    {day.items && day.items.length > 0 && (
+                      <div className="mt-5 space-y-3">
+                        {day.items.map((item, itemIndex) => {
+                          const itemPhotos = item.photos || [];
+                          const itemPhotoCount = itemPhotos.length;
+                          const itemPhotoGrid = getPhotoGridCols(itemPhotoCount);
+                          const itemPhotoHeight = getPhotoHeight(itemPhotoCount, 'item');
+                          return (
+                            <div
+                              key={item.id || `${day.id}-item-${itemIndex}`}
+                              className="rounded-xl bg-white/90 p-4"
+                            >
+                              <div className="flex flex-wrap items-center gap-3 text-sm text-slate-900">
+                                {(item.start_time || item.end_time) && (
+                                  <span className="inline-flex items-center gap-2 font-medium">
+                                    <Clock className="h-4 w-4 text-slate-500" />
+                                    <span>
+                                      {item.start_time || ''}
+                                      {item.end_time ? ` – ${item.end_time}` : ''}
+                                    </span>
+                                  </span>
+                                )}
+                                {item.location && (
+                                  <span className="inline-flex h-4 items-center gap-2 text-xs font-medium text-slate-600 leading-none">
+                                    <MapPin className="h-3.5 w-3.5 shrink-0 text-slate-500" />
+                                    <span>{item.location}</span>
+                                  </span>
+                                )}
+                              </div>
+                              {item.description &&
+                                renderParagraphs(
+                                  item.description,
+                                  'mt-2 text-sm text-slate-600 leading-relaxed',
+                                )}
+                              {itemPhotoCount > 0 && (
+                                <div className={`mt-3 grid ${itemPhotoGrid} gap-2`}>
+                                  {itemPhotos.slice(0, 3).map((photo, idx) => (
+                                    <HoverCard key={`${item.id}-photo-${idx}`} openDelay={0}>
+                                      <HoverCardTrigger asChild>
+                                        <div className="cursor-pointer">
+                                          <img
+                                            src={photo}
+                                            alt="Programação"
+                                            className={`w-full ${itemPhotoHeight} rounded-lg object-cover`}
+                                          />
+                                        </div>
+                                      </HoverCardTrigger>
+                                      <HoverCardContent side="left" align="end" className="w-60 p-2">
+                                        <img
+                                          src={photo}
+                                          alt="Programação"
+                                          className="max-h-60 w-full rounded-lg bg-slate-100 object-contain"
+                                        />
+                                      </HoverCardContent>
+                                    </HoverCard>
+                                  ))}
+                                </div>
+                              )}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </ScrollArea>
+          </DrawerContent>
+        </Drawer>
+      )}
 
       {/* Agency Footer */}
       {group.agency && (

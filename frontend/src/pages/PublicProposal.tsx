@@ -425,6 +425,9 @@ function HotelDetail({ service }: { service: any }) {
   const provider = service?.partners?.name || service?.provider;
   const guests = details?.guests || {};
   const totalGuests = Number(guests.adults || 0) + Number(guests.children || 0);
+  const photos = Array.isArray(details?.photos)
+    ? details.photos.filter((photo: string) => Boolean(photo))
+    : [];
 
   const nights = (() => {
     const a = details?.checkIn ? new Date(details.checkIn) : null;
@@ -463,7 +466,20 @@ function HotelDetail({ service }: { service: any }) {
         {nights != null && <div className="col-span-full text-foreground text-sm">Estadia: {nights} noite{nights === 1 ? '' : 's'}</div>}
       </div>
 
-      {renderExtraDetails(details, ['guests', 'checkIn', 'checkOut', 'checkInTime', 'checkOutTime', 'hotelName', 'city', 'country', 'address', 'roomType', 'board', 'ratePlan'])}
+      {photos.length > 0 && (
+        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+          {photos.map((photo: string, index: number) => (
+            <div key={`${photo}-${index}`} className="overflow-hidden rounded-xl bg-muted">
+              <img
+                src={photo}
+                alt={`Hotel ${details?.hotelName || ''}`.trim() || `Hotel ${index + 1}`}
+                className="h-40 md:h-44 w-full object-cover"
+              />
+            </div>
+          ))}
+        </div>
+      )}
+
     </div>
   );
 }

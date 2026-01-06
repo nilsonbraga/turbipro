@@ -38,6 +38,24 @@ export interface PricingOffer {
   currency?: string;
 }
 
+export interface ExpeditionItineraryItem {
+  id: string;
+  start_time?: string | null;
+  end_time?: string | null;
+  location?: string | null;
+  description?: string | null;
+  photos?: string[] | null;
+}
+
+export interface ExpeditionItineraryDay {
+  id: string;
+  title?: string | null;
+  locations?: string[] | null;
+  description?: string | null;
+  photos?: string[] | null;
+  items?: ExpeditionItineraryItem[] | null;
+}
+
 export interface ExpeditionGroup {
   id: string;
   agency_id: string;
@@ -66,6 +84,7 @@ export interface ExpeditionGroup {
   itinerary_summary_title?: string | null;
   itinerary_summary_description?: string | null;
   itinerary_summary_images?: ItinerarySummaryImage[] | null;
+  itinerary_days?: ExpeditionItineraryDay[] | null;
   transport_title?: string | null;
   transport_text?: string | null;
   transport_images?: string[] | null;
@@ -127,6 +146,7 @@ export interface ExpeditionGroupInput {
   itinerary_summary_title?: string;
   itinerary_summary_description?: string;
   itinerary_summary_images?: ItinerarySummaryImage[];
+  itinerary_days?: ExpeditionItineraryDay[];
   transport_title?: string;
   transport_text?: string;
   transport_images?: string[];
@@ -182,6 +202,7 @@ const mapBackendToFront = (g: any): ExpeditionGroup => ({
   itinerary_summary_title: g.itinerarySummaryTitle,
   itinerary_summary_description: g.itinerarySummaryDescription,
   itinerary_summary_images: g.itinerarySummaryImages || [],
+  itinerary_days: g.itineraryDays || [],
   transport_title: g.transportTitle,
   transport_text: g.transportText,
   transport_images: g.transportImages || [],
@@ -227,6 +248,7 @@ const mapFrontToBackendGroup = (input: ExpeditionGroupInput & { agency_id?: stri
   itinerarySummaryTitle: input.itinerary_summary_title ?? null,
   itinerarySummaryDescription: input.itinerary_summary_description ?? null,
   itinerarySummaryImages: input.itinerary_summary_images ?? [],
+  itineraryDays: input.itinerary_days ?? [],
   transportTitle: input.transport_title ?? null,
   transportText: input.transport_text ?? null,
   transportImages: input.transport_images ?? [],
