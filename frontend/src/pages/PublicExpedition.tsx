@@ -44,6 +44,8 @@ import {
   ExternalLink,
   Play,
   HelpCircle,
+  Mail,
+  Instagram,
   Quote,
   ChevronLeft,
   ChevronRight,
@@ -65,7 +67,10 @@ export default function PublicExpedition() {
   });
   const [submitted, setSubmitted] = useState(false);
   const [isWaitlist, setIsWaitlist] = useState(false);
-  const [lightboxIndex, setLightboxIndex] = useState<number | null>(null);
+  const [lightboxState, setLightboxState] = useState<{
+    images: Array<{ url: string; title?: string; description?: string }>;
+    index: number;
+  } | null>(null);
 
   if (isLoading) {
     return (
@@ -97,7 +102,8 @@ export default function PublicExpedition() {
   endDate.setDate(endDate.getDate() + group.duration_days - 1);
 
   const hasCoverImage = !!group.cover_image_url;
-  const hasCarousel = group.carousel_images && group.carousel_images.length > 0;
+  const carouselImages = (group.carousel_images || []).filter(Boolean) as string[];
+  const hasCarousel = carouselImages.length > 0;
   const hasLandingText = !!group.landing_text;
   const hasImpactPhrase = !!group.impact_phrase;
   const descriptionGallery = (group.description_gallery_images || []).filter(Boolean);
@@ -157,6 +163,24 @@ export default function PublicExpedition() {
     description?: string;
   }>;
   const transportImages = (group.transport_images || []) as string[];
+  const agency = group.agency as any | undefined;
+  const agencyLogoUrl =
+    agency?.logo_url ||
+    agency?.logoUrl ||
+    agency?.logo_minimal_url ||
+    agency?.logoMinimalUrl ||
+    '';
+  const expeditionLogoUrl = group.logo_url || '';
+  const heroLogoUrl = expeditionLogoUrl || agencyLogoUrl;
+  const instagramHandle =
+    (agency?.instagram_handle || agency?.instagramHandle || '').trim();
+  const instagramSlug = instagramHandle.replace(/^@+/, '').trim();
+  const instagramUrl = instagramSlug ? `https://instagram.com/${instagramSlug}` : '';
+  const whatsappRaw = (agency?.phone || '').replace(/\D/g, '');
+  const whatsappNumber =
+    whatsappRaw && !whatsappRaw.startsWith('55') ? `55${whatsappRaw}` : whatsappRaw;
+  const whatsappUrl = whatsappNumber ? `https://wa.me/${whatsappNumber}` : '';
+  const footerImageUrl = group.footer_image_url || group.cover_image_url || '';
 
   const testimonials = (group.testimonials as Testimonial[]) || [];
   const faqs = (group.faqs as FAQ[]) || [];
@@ -371,17 +395,19 @@ export default function PublicExpedition() {
             />
             <div className="absolute inset-0 bg-gradient-to-b from-black/60 via-black/30 to-black/70" />
             <div className="relative z-10 flex h-full flex-col px-4 pb-10 pt-16 md:pb-14 md:pt-24">
+              {heroLogoUrl && (
+                <div className="max-w-6xl w-full mx-auto lg:mx-0 lg:pl-20">
+                  <img
+                    src={heroLogoUrl}
+                    alt={agency?.name}
+                    className="h-9 md:h-11 object-contain drop-shadow-2xl animate-in fade-in slide-in-from-top-2 duration-800"
+                  />
+                </div>
+              )}
               <div className="flex-1 flex items-center">
                 <div className="max-w-6xl w-full mx-auto lg:mx-0 lg:pl-20">
                   <div className="max-w-3xl space-y-6 text-left text-white">
-                    {group.agency && (group.agency as any).logo_url && (
-                      <img
-                        src={(group.agency as any).logo_url}
-                        alt={(group.agency as any).name}
-                        className="h-14 object-contain drop-shadow-2xl animate-in fade-in slide-in-from-top-2 duration-800"
-                      />
-                    )}
-                    <Badge className="w-fit bg-white/15 text-white border-white/30 px-5 py-2 text-sm animate-in fade-in slide-in-from-top-2 duration-800 delay-100">
+                    <Badge className="w-fit bg-white/15 text-white border-white/30 px-5 py-2 text-sm animate-in fade-in slide-in-from-top-2 duration-800 delay-100 hover:bg-white/15 hover:text-white hover:border-white/30">
                       <MapPin className="w-4 h-4 mr-2" />
                       Expedição Exclusiva
                     </Badge>
@@ -429,11 +455,11 @@ export default function PublicExpedition() {
       ) : (
         <section className="relative overflow-hidden bg-gradient-to-br from-primary via-primary/90 to-primary/80 py-24">
           <div className="relative max-w-5xl mx-auto px-4 text-center text-white">
-            {group.agency && (group.agency as any).logo_url && (
+            {heroLogoUrl && (
               <img
-                src={(group.agency as any).logo_url}
-                alt={(group.agency as any).name}
-                className="h-14 mx-auto mb-8 object-contain brightness-0 invert"
+                src={heroLogoUrl}
+                alt={agency?.name}
+                className="h-10 mx-auto mb-8 object-contain brightness-0 invert"
               />
             )}
             <Badge className="mb-6 bg-white/20 text-white border-white/30 px-5 py-2">
@@ -599,11 +625,11 @@ export default function PublicExpedition() {
             {(group.itinerary_summary_images || []).length > 0 && (
               <div className="grid gap-6 md:grid-cols-3">
                 {itineraryImages.map((image, index) => (
-                  <button
-                    type="button"
-                    key={`${image.url}-${index}`}
-                    onClick={() => setLightboxIndex(index)}
-                    className={
+                    <button
+                      type="button"
+                      key={`${image.url}-${index}`}
+                    onClick={() => setLightboxState({ images: itineraryImages, index })}
+                      className={
                       index === 0
                         ? 'group bg-transparent text-left focus:outline-none md:col-span-2 md:row-span-2 overflow-hidden rounded-[28px] shadow-xl transition-transform duration-500 ease-out hover:-translate-y-1'
                         : 'group bg-transparent text-left focus:outline-none overflow-hidden rounded-[28px] shadow-lg transition-transform duration-500 ease-out hover:-translate-y-1'
@@ -757,7 +783,7 @@ export default function PublicExpedition() {
           <section className="relative">
             <Carousel className="w-full">
               <CarouselContent>
-                {group.carousel_images?.map((imageUrl, index) => (
+                {carouselImages.map((imageUrl, index) => (
                   <CarouselItem key={index} className="md:basis-1/2 lg:basis-1/3">
                     <div className="group relative aspect-[4/5] overflow-hidden rounded-[28px] bg-white shadow-lg">
                       <img
@@ -1085,7 +1111,8 @@ export default function PublicExpedition() {
                       <div className="pt-2 mt-auto flex justify-end">
                         <Button
                           asChild
-                          className="rounded-full bg-primary text-white hover:bg-primary/90 group px-5"
+                          variant="outline"
+                          className="rounded-full border-primary/40 text-primary hover:bg-primary/10 group px-5"
                         >
                           <a
                             href="#form-inscricao"
@@ -1106,91 +1133,107 @@ export default function PublicExpedition() {
         )}
 
         {/* Registration Form - Last */}
-        <section id="inscricao">
-          <Card className="border-0 shadow-2xl overflow-hidden max-w-2xl mx-auto">
-            <div className="bg-gradient-to-r from-primary to-primary/80 text-white p-8 text-center">
-              <h2 className="text-3xl font-bold mb-2">
-                {isFull ? 'Entrar na Lista de Espera' : 'Garanta sua Vaga Agora'}
-              </h2>
-              <p className="text-white/80 text-lg">
-                {isFull 
-                  ? 'O grupo está lotado, mas você pode entrar na lista de espera.'
-                  : `Apenas ${spotsLeft} ${spotsLeft === 1 ? 'vaga restante' : 'vagas restantes'}!`
-                }
-              </p>
-            </div>
-            <CardContent className="p-10">
-              <form id="form-inscricao" onSubmit={handleSubmit} className="space-y-6">
-                <div className="space-y-2">
-                  <Label htmlFor="name" className="text-base font-medium">Nome Completo *</Label>
-                  <Input
-                    id="name"
-                    value={formData.name}
-                    onChange={(e) => setFormData({ ...formData, name: e.target.value })}
-                    placeholder="Seu nome completo"
-                    required
-                    className="h-14 text-lg"
-                  />
+        <section
+          id="inscricao"
+          className={hasCarousel ? 'relative lg:-mr-[calc((100vw-1280px)/2+3rem)]' : 'relative'}
+        >
+          <div
+            className={
+              hasCarousel
+                ? 'relative mx-auto w-full max-w-none rounded-[32px] bg-gradient-to-r from-white via-slate-50 to-transparent px-6 py-12 md:px-10 lg:pl-2 lg:pr-0'
+                : 'relative max-w-3xl mx-auto rounded-[32px] bg-gradient-to-r from-white via-slate-50 to-transparent px-6 py-12 md:px-10'
+            }
+          >
+            <div className={hasCarousel ? 'grid gap-8 lg:grid-cols-[0.85fr_1.15fr] items-stretch' : 'space-y-8'}>
+              <div className="space-y-8 lg:pr-6">
+                <div className="space-y-3">
+                  <p className="text-xs uppercase tracking-[0.32em] text-primary/60">Inscrição</p>
+                  <h2 className="text-3xl md:text-4xl font-bold text-slate-900">
+                    {isFull ? 'Lista de Espera' : 'Garanta sua vaga'}
+                  </h2>
+                  <p className="text-slate-600 text-base">
+                    {isFull
+                      ? 'O grupo está lotado, mas você pode entrar na lista de espera.'
+                      : `Apenas ${spotsLeft} ${spotsLeft === 1 ? 'vaga restante' : 'vagas restantes'}!`}
+                  </p>
                 </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="email" className="text-base font-medium">Email *</Label>
-                  <Input
-                    id="email"
-                    type="email"
-                    value={formData.email}
-                    onChange={(e) => setFormData({ ...formData, email: e.target.value })}
-                    placeholder="seu@email.com"
-                    required
-                    className="h-14 text-lg"
-                  />
-                </div>
-
-                <div className="space-y-2">
-                  <Label htmlFor="phone" className="text-base font-medium">Telefone</Label>
-                  <Input
-                    id="phone"
-                    type="tel"
-                    value={formData.phone}
-                    onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
-                    placeholder="(00) 00000-0000"
-                    className="h-14 text-lg"
-                  />
-                </div>
-
-                {resolvedOffers.length > 0 && (
-                  <div className="space-y-2">
-                    <Label htmlFor="package" className="text-base font-medium">
-                      Pacote (opcional)
-                    </Label>
-                    <Select
-                      value={formData.selectedOfferIndex || undefined}
-                      onValueChange={(value) =>
-                        setFormData({ ...formData, selectedOfferIndex: value })
-                      }
-                    >
-                      <SelectTrigger className="h-14 text-lg">
-                        <SelectValue placeholder="Selecione um pacote (opcional)" />
-                      </SelectTrigger>
-                      <SelectContent>
-                        {resolvedOffers.map((offer, index) => (
-                          <SelectItem key={`offer-${index}`} value={String(index)}>
-                            {getOfferLabel(offer, index)}
-                          </SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
+                <form id="form-inscricao" onSubmit={handleSubmit} className="grid gap-5">
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="name" className="text-sm font-medium">Nome completo *</Label>
+                      <Input
+                        id="name"
+                        value={formData.name}
+                        onChange={(e) => setFormData({ ...formData, name: e.target.value })}
+                        placeholder="Seu nome completo"
+                        required
+                        className="h-12 rounded-2xl bg-white/80 border-slate-200/80 text-sm focus-visible:border-primary/60 focus-visible:ring-primary/20"
+                      />
+                    </div>
+                    <div className="space-y-2">
+                      <Label htmlFor="email" className="text-sm font-medium">Email *</Label>
+                      <Input
+                        id="email"
+                        type="email"
+                        value={formData.email}
+                        onChange={(e) => setFormData({ ...formData, email: e.target.value })}
+                        placeholder="seu@email.com"
+                        required
+                        className="h-12 rounded-2xl bg-white/80 border-slate-200/80 text-sm focus-visible:border-primary/60 focus-visible:ring-primary/20"
+                      />
+                    </div>
                   </div>
-                )}
+
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <Label htmlFor="phone" className="text-sm font-medium">Telefone</Label>
+                      <Input
+                        id="phone"
+                        type="tel"
+                        value={formData.phone}
+                        onChange={(e) => setFormData({ ...formData, phone: e.target.value })}
+                        placeholder="(00) 00000-0000"
+                        className="h-12 rounded-2xl bg-white/80 border-slate-200/80 text-sm focus-visible:border-primary/60 focus-visible:ring-primary/20"
+                      />
+                    </div>
+
+                    {resolvedOffers.length > 0 && (
+                      <div className="space-y-2">
+                        <Label htmlFor="package" className="text-sm font-medium">
+                          Pacote (opcional)
+                        </Label>
+                        <Select
+                          value={formData.selectedOfferIndex || undefined}
+                          onValueChange={(value) =>
+                            setFormData({ ...formData, selectedOfferIndex: value })
+                          }
+                        >
+                          <SelectTrigger className="h-12 rounded-2xl bg-white/80 border-slate-200/80 text-sm focus-visible:border-primary/60 focus-visible:ring-primary/20">
+                            <SelectValue placeholder="Selecione um pacote (opcional)" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            {resolvedOffers.map((offer, index) => (
+                              <SelectItem key={`offer-${index}`} value={String(index)}>
+                                {getOfferLabel(offer, index)}
+                              </SelectItem>
+                            ))}
+                          </SelectContent>
+                        </Select>
+                      </div>
+                    )}
+                  </div>
 
                 {group.show_date_preference && (
                   <div className="space-y-2">
-                    <Label htmlFor="datePreference" className="text-base font-medium">Essa data funciona para você?</Label>
+                    <Label htmlFor="datePreference" className="text-sm font-medium">
+                      Essa data funciona para você?
+                    </Label>
                     <Select
                       value={formData.datePreference}
                       onValueChange={(value) => setFormData({ ...formData, datePreference: value })}
                     >
-                      <SelectTrigger className="h-14 text-lg">
+                      <SelectTrigger className="h-12 rounded-2xl bg-white/80 border-slate-200/80 text-sm focus-visible:border-primary/60 focus-visible:ring-primary/20">
                         <SelectValue placeholder="Selecione uma opção" />
                       </SelectTrigger>
                       <SelectContent>
@@ -1201,44 +1244,138 @@ export default function PublicExpedition() {
                   </div>
                 )}
 
-                <Button 
-                  type="submit" 
-                  className="w-full h-16 text-xl font-bold shadow-xl hover:shadow-2xl transition-all hover:scale-[1.02]" 
-                  size="lg"
-                  disabled={registerMutation.isPending}
-                >
-                  {registerMutation.isPending && <Loader2 className="w-6 h-6 mr-2 animate-spin" />}
-                  {isFull ? 'Entrar na Lista de Espera' : 'Confirmar Minha Inscrição'}
-                </Button>
-              </form>
-            </CardContent>
-          </Card>
-        </section>
+                  <Button
+                    type="submit"
+                    className="h-14 rounded-2xl text-base font-semibold shadow-lg hover:shadow-xl transition-all hover:-translate-y-0.5"
+                    size="lg"
+                    disabled={registerMutation.isPending}
+                  >
+                    {registerMutation.isPending && <Loader2 className="w-5 h-5 mr-2 animate-spin" />}
+                    {isFull ? 'Entrar na lista de espera' : 'Confirmar minha inscrição'}
+                  </Button>
+                </form>
+              </div>
 
-        {/* Agency Footer */}
-        {group.agency && (
-          <footer className="text-center text-muted-foreground pt-12 border-t">
-            <p className="text-lg">Organizado por <span className="font-semibold text-foreground">{(group.agency as any).name}</span></p>
-          </footer>
-        )}
+              {hasCarousel && carouselImages[0] && (
+                <div className="relative h-full min-h-[320px] overflow-hidden rounded-[28px] lg:rounded-l-[32px] lg:rounded-r-none">
+                  <img
+                    src={carouselImages[0]}
+                    alt={`${group.destination} - Foto de capa`}
+                    className="h-full w-full object-cover"
+                  />
+                </div>
+              )}
+            </div>
+          </div>
+        </section>
       </div>
 
-      {itineraryImages.length > 0 && (
+      {/* Agency Footer */}
+      {group.agency && (
+        <footer className="relative mt-0 min-h-[380px] md:min-h-[440px] overflow-hidden w-screen left-1/2 -translate-x-1/2">
+          {footerImageUrl && (
+            <div className="absolute inset-0">
+              <img
+                src={footerImageUrl}
+                alt=""
+                className="h-full w-full object-cover object-bottom"
+                style={{
+                  WebkitMaskImage:
+                    'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 25%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.4) 52%, rgba(0,0,0,0.22) 62%, rgba(0,0,0,0.12) 70%, rgba(0,0,0,0.06) 76%, rgba(0,0,0,0.02) 82%, rgba(0,0,0,0) 88%, rgba(0,0,0,0) 100%)',
+                  maskImage:
+                    'linear-gradient(to top, rgba(0,0,0,1) 0%, rgba(0,0,0,0.85) 25%, rgba(0,0,0,0.6) 40%, rgba(0,0,0,0.4) 52%, rgba(0,0,0,0.22) 62%, rgba(0,0,0,0.12) 70%, rgba(0,0,0,0.06) 76%, rgba(0,0,0,0.02) 82%, rgba(0,0,0,0) 88%, rgba(0,0,0,0) 100%)',
+                }}
+              />
+            </div>
+          )}
+          <div className="relative h-full w-full">
+            <div className="mx-auto flex max-w-7xl flex-col gap-6 px-6 pt-16 pb-0 md:flex-row md:items-center md:justify-between md:px-8 md:pt-20 lg:px-12">
+              <div className="space-y-2">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Organizado por</p>
+                <div>
+                  <p className="text-lg font-semibold text-slate-900">{agency?.name}</p>
+                  {agency?.cnpj && (
+                    <p className="text-sm text-slate-500">CNPJ {agency?.cnpj}</p>
+                  )}
+                </div>
+              </div>
+
+              <div className="flex flex-col items-end gap-3 text-slate-700">
+                <p className="text-xs uppercase tracking-[0.3em] text-slate-400">Entre em contato</p>
+                <div className="flex flex-wrap items-center justify-end gap-5">
+                  {agency?.email && (
+                    <a
+                      href={`mailto:${agency?.email}`}
+                      aria-label="Enviar email"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/80 text-slate-600 shadow-sm transition hover:text-slate-900"
+                    >
+                      <Mail className="h-4 w-4" />
+                    </a>
+                  )}
+                  {agency?.phone && (
+                    whatsappUrl ? (
+                      <a
+                        href={whatsappUrl}
+                        aria-label="Falar no WhatsApp"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/80 text-slate-600 shadow-sm transition hover:text-slate-900"
+                      >
+                        <svg
+                          viewBox="0 0 32 32"
+                          className="h-4 w-4"
+                          aria-hidden="true"
+                        >
+                          <path
+                            fill="currentColor"
+                            d="M16.001 2.003c-7.732 0-14 6.268-14 14 0 2.465.656 4.878 1.902 7.002L2 30l7.144-1.875A13.93 13.93 0 0 0 16.001 30c7.732 0 14-6.268 14-14s-6.268-13.997-14-13.997zm0 25.997a11.93 11.93 0 0 1-6.095-1.688l-.436-.26-4.242 1.114 1.132-4.136-.283-.424A11.926 11.926 0 0 1 4.002 16c0-6.627 5.372-12 11.999-12 6.628 0 12 5.373 12 12 0 6.628-5.372 12-11.999 12zm6.557-8.65c-.358-.179-2.122-1.045-2.452-1.165-.329-.12-.569-.179-.808.179-.239.358-.928 1.165-1.137 1.404-.209.239-.418.269-.776.09-.358-.179-1.513-.557-2.882-1.777-1.065-.95-1.785-2.122-1.994-2.48-.209-.358-.022-.552.157-.732.161-.16.358-.418.537-.627.179-.209.239-.358.358-.597.12-.239.06-.448-.03-.627-.09-.179-.808-1.956-1.107-2.687-.293-.703-.59-.607-.808-.616-.209-.009-.448-.011-.687-.011-.239 0-.627.09-.956.448-.329.358-1.256 1.227-1.256 2.986s1.286 3.459 1.465 3.698c.179.239 2.531 3.87 6.137 5.423.858.37 1.527.59 2.049.756.86.274 1.642.236 2.26.143.69-.103 2.122-.867 2.42-1.704.299-.836.299-1.554.209-1.704-.09-.149-.329-.239-.687-.418z"
+                          />
+                        </svg>
+                      </a>
+                    ) : (
+                      <a
+                        href={`tel:${agency?.phone}`}
+                        aria-label="Ligar"
+                        className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/80 text-slate-600 shadow-sm transition hover:text-slate-900"
+                      >
+                        <Phone className="h-4 w-4" />
+                      </a>
+                    )
+                  )}
+                  {instagramSlug && (
+                    <a
+                      href={instagramUrl}
+                      aria-label="Instagram"
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/70 bg-white/80 text-slate-600 shadow-sm transition hover:text-slate-900"
+                    >
+                      <Instagram className="h-4 w-4" />
+                    </a>
+                  )}
+                </div>
+              </div>
+            </div>
+          </div>
+        </footer>
+      )}
+
+      {lightboxState && (
         <Dialog
-          open={lightboxIndex !== null}
+          open={lightboxState !== null}
           onOpenChange={(open) => {
-            if (!open) setLightboxIndex(null);
+            if (!open) setLightboxState(null);
           }}
         >
           <DialogContent className="max-w-5xl w-[95vw] bg-transparent border-0 shadow-none p-0">
-            {lightboxIndex !== null && (
+            {lightboxState && (
               <div className="relative overflow-hidden rounded-[28px] bg-black">
                 <img
-                  src={itineraryImages[lightboxIndex].url}
-                  alt={itineraryImages[lightboxIndex].title || 'Imagem do roteiro'}
+                  src={lightboxState.images[lightboxState.index].url}
+                  alt={lightboxState.images[lightboxState.index].title || 'Imagem'}
                   className="w-full max-h-[82vh] object-contain bg-black"
                 />
-                {itineraryImages.length > 1 && (
+                {lightboxState.images.length > 1 && (
                   <>
                     <Button
                       type="button"
@@ -1246,8 +1383,13 @@ export default function PublicExpedition() {
                       size="icon"
                       className="absolute left-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white"
                       onClick={() =>
-                        setLightboxIndex((prev) =>
-                          prev === null ? 0 : (prev - 1 + itineraryImages.length) % itineraryImages.length,
+                        setLightboxState((prev) =>
+                          prev
+                            ? {
+                                ...prev,
+                                index: (prev.index - 1 + prev.images.length) % prev.images.length,
+                              }
+                            : prev,
                         )
                       }
                       aria-label="Imagem anterior"
@@ -1260,8 +1402,10 @@ export default function PublicExpedition() {
                       size="icon"
                       className="absolute right-4 top-1/2 -translate-y-1/2 bg-white/80 hover:bg-white"
                       onClick={() =>
-                        setLightboxIndex((prev) =>
-                          prev === null ? 0 : (prev + 1) % itineraryImages.length,
+                        setLightboxState((prev) =>
+                          prev
+                            ? { ...prev, index: (prev.index + 1) % prev.images.length }
+                            : prev,
                         )
                       }
                       aria-label="Próxima imagem"
@@ -1270,16 +1414,17 @@ export default function PublicExpedition() {
                     </Button>
                   </>
                 )}
-                {(itineraryImages[lightboxIndex].title || itineraryImages[lightboxIndex].description) && (
+                {(lightboxState.images[lightboxState.index].title ||
+                  lightboxState.images[lightboxState.index].description) && (
                   <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/70 via-black/20 to-transparent p-6 text-white">
-                    {itineraryImages[lightboxIndex].title && (
+                    {lightboxState.images[lightboxState.index].title && (
                       <h3 className="text-lg font-semibold">
-                        {itineraryImages[lightboxIndex].title}
+                        {lightboxState.images[lightboxState.index].title}
                       </h3>
                     )}
-                    {itineraryImages[lightboxIndex].description &&
+                    {lightboxState.images[lightboxState.index].description &&
                       renderParagraphs(
-                        itineraryImages[lightboxIndex].description,
+                        lightboxState.images[lightboxState.index].description,
                         'space-y-2 text-sm text-white/80 leading-relaxed',
                       )}
                   </div>

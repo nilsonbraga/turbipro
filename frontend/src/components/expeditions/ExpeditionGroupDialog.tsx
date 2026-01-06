@@ -106,6 +106,8 @@ export function ExpeditionGroupDialog({
 }: ExpeditionGroupDialogProps) {
   const { toast } = useToast();
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const logoInputRef = useRef<HTMLInputElement>(null);
+  const footerImageInputRef = useRef<HTMLInputElement>(null);
   const carouselInputRef = useRef<HTMLInputElement>(null);
   const testimonialPhotoRef = useRef<HTMLInputElement>(null);
   const testimonialEditPhotoRef = useRef<HTMLInputElement>(null);
@@ -123,6 +125,8 @@ export function ExpeditionGroupDialog({
     description: '',
     is_active: true,
     cover_image_url: '',
+    logo_url: '',
+    footer_image_url: '',
     carousel_images: [],
     landing_text: '',
     impact_phrase: '',
@@ -154,6 +158,8 @@ export function ExpeditionGroupDialog({
     testimonials: [],
     faqs: [],
   });
+  const [durationInput, setDurationInput] = useState('1');
+  const [maxParticipantsInput, setMaxParticipantsInput] = useState('10');
   const [isUploading, setIsUploading] = useState(false);
   const [newIncludedItem, setNewIncludedItem] = useState('');
   const [newExcludedItem, setNewExcludedItem] = useState('');
@@ -286,6 +292,8 @@ export function ExpeditionGroupDialog({
         description: group.description || '',
         is_active: group.is_active,
         cover_image_url: group.cover_image_url || '',
+        logo_url: group.logo_url || '',
+        footer_image_url: group.footer_image_url || '',
         carousel_images: group.carousel_images || [],
         landing_text: group.landing_text || '',
         impact_phrase: group.impact_phrase || '',
@@ -322,6 +330,8 @@ export function ExpeditionGroupDialog({
         testimonials: (group.testimonials as Testimonial[]) || [],
         faqs: (group.faqs as FAQ[]) || [],
       });
+      setDurationInput(String(group.duration_days ?? 1));
+      setMaxParticipantsInput(String(group.max_participants ?? 10));
       setPricingOfferInputs(
         resolvedOffers.length > 0 ? buildOfferInputs(resolvedOffers, currency) : [],
       );
@@ -343,6 +353,8 @@ export function ExpeditionGroupDialog({
         description: '',
         is_active: true,
         cover_image_url: '',
+        logo_url: '',
+        footer_image_url: '',
         carousel_images: [],
         landing_text: '',
         impact_phrase: '',
@@ -374,6 +386,8 @@ export function ExpeditionGroupDialog({
         testimonials: [],
         faqs: [],
       });
+      setDurationInput('1');
+      setMaxParticipantsInput('10');
       setPriceCashInput('');
       setPriceInstallmentInput('');
       setPricingOfferInputs([]);
@@ -389,10 +403,22 @@ export function ExpeditionGroupDialog({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    const normalizeInt = (value: string, fallback: number) => {
+      const parsed = Number.parseInt(value, 10);
+      if (Number.isFinite(parsed) && parsed > 0) return parsed;
+      return fallback;
+    };
+    const durationDays = normalizeInt(durationInput, 1);
+    const maxParticipants = normalizeInt(maxParticipantsInput, 1);
+    const payload = {
+      ...formData,
+      duration_days: durationDays,
+      max_participants: maxParticipants,
+    };
     if (group) {
-      onSubmit({ ...formData, id: group.id });
+      onSubmit({ ...payload, id: group.id });
     } else {
-      onSubmit(formData);
+      onSubmit(payload);
     }
     onOpenChange(false);
   };
@@ -475,6 +501,30 @@ export function ExpeditionGroupDialog({
     const url = await uploadImage(file);
     if (url) {
       setFormData({ ...formData, cover_image_url: url });
+    }
+    setIsUploading(false);
+  };
+
+  const handleLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const url = await uploadImage(file);
+    if (url) {
+      setFormData({ ...formData, logo_url: url });
+    }
+    setIsUploading(false);
+  };
+
+  const handleFooterImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    setIsUploading(true);
+    const url = await uploadImage(file);
+    if (url) {
+      setFormData({ ...formData, footer_image_url: url });
     }
     setIsUploading(false);
   };
@@ -896,7 +946,7 @@ export function ExpeditionGroupDialog({
                 />
               </div>
 
-            <div className="grid grid-cols-2 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="start_date">Data de Início *</Label>
                 <DatePickerField
@@ -906,17 +956,24 @@ export function ExpeditionGroupDialog({
                 />
               </div>
 
-                <div className="space-y-2">
-                  <Label htmlFor="duration">Duração (dias) *</Label>
-                  <Input
-                    id="duration"
-                    type="number"
-                    min="1"
-                    value={formData.duration_days}
-                    onChange={(e) => setFormData({ ...formData, duration_days: parseInt(e.target.value) || 1 })}
-                    required
-                  />
-                </div>
+              <div className="space-y-2">
+                <Label htmlFor="duration">Duração (dias) *</Label>
+                <Input
+                  id="duration"
+                  type="number"
+                  min="1"
+                  value={durationInput}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d+$/.test(value)) {
+                      setDurationInput(value);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!durationInput) setDurationInput('1');
+                  }}
+                  required
+                />
               </div>
 
               <div className="space-y-2">
@@ -925,11 +982,20 @@ export function ExpeditionGroupDialog({
                   id="max_participants"
                   type="number"
                   min="1"
-                  value={formData.max_participants}
-                  onChange={(e) => setFormData({ ...formData, max_participants: parseInt(e.target.value) || 1 })}
+                  value={maxParticipantsInput}
+                  onChange={(e) => {
+                    const value = e.target.value;
+                    if (value === '' || /^\d+$/.test(value)) {
+                      setMaxParticipantsInput(value);
+                    }
+                  }}
+                  onBlur={() => {
+                    if (!maxParticipantsInput) setMaxParticipantsInput('1');
+                  }}
                   required
                 />
               </div>
+            </div>
 
               <div className="space-y-2">
                 <Label htmlFor="description">Descrição</Label>
@@ -1304,6 +1370,52 @@ export function ExpeditionGroupDialog({
                 </p>
               </div>
 
+              {/* Expedition Logo */}
+              <div className="space-y-2">
+                <Label>Logo da Expedição</Label>
+                <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                  {formData.logo_url ? (
+                    <div className="relative">
+                      <img
+                        src={formData.logo_url}
+                        alt="Logo da expedição"
+                        className="w-full h-28 object-contain rounded-lg bg-white"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2"
+                        onClick={() => setFormData({ ...formData, logo_url: '' })}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div
+                      className="cursor-pointer py-6"
+                      onClick={() => logoInputRef.current?.click()}
+                    >
+                      {isUploading ? (
+                        <Loader2 className="w-7 h-7 animate-spin mx-auto text-muted-foreground" />
+                      ) : (
+                        <>
+                          <Upload className="w-7 h-7 mx-auto text-muted-foreground mb-2" />
+                          <p className="text-sm text-muted-foreground">Clique para fazer upload</p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <input
+                    ref={logoInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleLogoUpload}
+                  />
+                </div>
+              </div>
+
               {/* Cover Image */}
               <div className="space-y-2">
                 <Label>Imagem de Capa</Label>
@@ -1346,6 +1458,52 @@ export function ExpeditionGroupDialog({
                     accept="image/*"
                     className="hidden"
                     onChange={handleCoverUpload}
+                  />
+                </div>
+              </div>
+
+              {/* Footer Image */}
+              <div className="space-y-2">
+                <Label>Imagem do Rodapé</Label>
+                <div className="border-2 border-dashed rounded-lg p-4 text-center">
+                  {formData.footer_image_url ? (
+                    <div className="relative">
+                      <img
+                        src={formData.footer_image_url}
+                        alt="Rodapé"
+                        className="w-full h-32 object-cover rounded-lg"
+                      />
+                      <Button
+                        type="button"
+                        variant="destructive"
+                        size="icon"
+                        className="absolute top-2 right-2"
+                        onClick={() => setFormData({ ...formData, footer_image_url: '' })}
+                      >
+                        <X className="w-4 h-4" />
+                      </Button>
+                    </div>
+                  ) : (
+                    <div
+                      className="cursor-pointer py-6"
+                      onClick={() => footerImageInputRef.current?.click()}
+                    >
+                      {isUploading ? (
+                        <Loader2 className="w-7 h-7 animate-spin mx-auto text-muted-foreground" />
+                      ) : (
+                        <>
+                          <Upload className="w-7 h-7 mx-auto text-muted-foreground mb-2" />
+                          <p className="text-sm text-muted-foreground">Clique para fazer upload</p>
+                        </>
+                      )}
+                    </div>
+                  )}
+                  <input
+                    ref={footerImageInputRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={handleFooterImageUpload}
                   />
                 </div>
               </div>

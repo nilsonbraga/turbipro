@@ -40,6 +40,7 @@ const mapAgency = (agency: any | null) =>
         phone: agency.phone,
         address: agency.address,
         logoUrl: agency.logoUrl,
+        logoMinimalUrl: agency.logoMinimalUrl,
         websiteUrl: agency.websiteUrl,
         instagramHandle: agency.instagramHandle,
         isActive: agency.isActive,

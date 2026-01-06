@@ -69,6 +69,7 @@ model Agency {
   email      String?
   address    String?
   logoUrl    String?
+  logoMinimalUrl String?
   websiteUrl String?
   instagramHandle String?
   isActive   Boolean  @default(true)
@@ -605,6 +606,7 @@ model ExpeditionGroup {
   currency           String   @default("BRL")
   pricingOffers      Json     @default("[]")
   coverImageUrl      String?
+  logoUrl            String?
   carouselImages     String[]
   landingText        String?
   impactPhrase       String?
@@ -622,6 +624,7 @@ model ExpeditionGroup {
   transportTitle     String?
   transportText      String?
   transportImages    String[]
+  footerImageUrl     String?
   notRecommendedItems Json    @default("[]")
   includedItems      String[]
   excludedItems      String[]

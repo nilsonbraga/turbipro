@@ -51,6 +51,7 @@ export interface ExpeditionGroup {
   created_at: string;
   updated_at: string;
   cover_image_url?: string | null;
+  logo_url?: string | null;
   carousel_images?: string[] | null;
   landing_text?: string | null;
   impact_phrase?: string | null;
@@ -68,6 +69,7 @@ export interface ExpeditionGroup {
   transport_title?: string | null;
   transport_text?: string | null;
   transport_images?: string[] | null;
+  footer_image_url?: string | null;
   not_recommended_items?: NotRecommendedItem[] | null;
   registrations_count?: number;
   waitlist_count?: number;
@@ -110,6 +112,7 @@ export interface ExpeditionGroupInput {
   description?: string;
   is_active?: boolean;
   cover_image_url?: string;
+  logo_url?: string;
   carousel_images?: string[];
   landing_text?: string;
   impact_phrase?: string;
@@ -127,6 +130,7 @@ export interface ExpeditionGroupInput {
   transport_title?: string;
   transport_text?: string;
   transport_images?: string[];
+  footer_image_url?: string;
   not_recommended_items?: NotRecommendedItem[];
   // Pricing fields
   price_cash?: number | null;
@@ -163,6 +167,7 @@ const mapBackendToFront = (g: any): ExpeditionGroup => ({
   created_at: g.createdAt,
   updated_at: g.updatedAt,
   cover_image_url: g.coverImageUrl,
+  logo_url: g.logoUrl,
   carousel_images: g.carouselImages || [],
   landing_text: g.landingText,
   impact_phrase: g.impactPhrase,
@@ -180,6 +185,7 @@ const mapBackendToFront = (g: any): ExpeditionGroup => ({
   transport_title: g.transportTitle,
   transport_text: g.transportText,
   transport_images: g.transportImages || [],
+  footer_image_url: g.footerImageUrl,
   not_recommended_items: g.notRecommendedItems || [],
   registrations_count: g.registrations_count,
   waitlist_count: g.waitlist_count,
@@ -206,6 +212,7 @@ const mapFrontToBackendGroup = (input: ExpeditionGroupInput & { agency_id?: stri
   description: input.description ?? null,
   isActive: input.is_active ?? true,
   coverImageUrl: input.cover_image_url ?? null,
+  logoUrl: input.logo_url ?? null,
   carouselImages: input.carousel_images ?? [],
   landingText: input.landing_text ?? null,
   impactPhrase: input.impact_phrase ?? null,
@@ -223,6 +230,7 @@ const mapFrontToBackendGroup = (input: ExpeditionGroupInput & { agency_id?: stri
   transportTitle: input.transport_title ?? null,
   transportText: input.transport_text ?? null,
   transportImages: input.transport_images ?? [],
+  footerImageUrl: input.footer_image_url ?? null,
   notRecommendedItems: input.not_recommended_items ?? [],
   priceCash: input.price_cash ?? null,
   priceInstallment: input.price_installment ?? null,

@@ -21,6 +21,7 @@ interface Agency {
   phone: string | null;
   address: string | null;
   logo_url: string | null;
+  logo_minimal_url?: string | null;
   website_url?: string | null;
   instagram_handle?: string | null;
   is_active: boolean;
@@ -86,6 +87,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       phone: agencyPayload.phone,
       address: agencyPayload.address,
       logo_url: agencyPayload.logoUrl,
+      logo_minimal_url: agencyPayload.logoMinimalUrl,
       website_url: agencyPayload.websiteUrl,
       instagram_handle: agencyPayload.instagramHandle,
       is_active: agencyPayload.isActive,

@@ -31,6 +31,7 @@ export type AuthPayload = {
     phone: string | null;
     address: string | null;
     logoUrl: string | null;
+    logoMinimalUrl?: string | null;
     websiteUrl?: string | null;
     instagramHandle?: string | null;
     isActive: boolean;

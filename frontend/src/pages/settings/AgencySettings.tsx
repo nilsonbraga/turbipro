@@ -25,16 +25,19 @@ export default function AgencySettings() {
   const { agency, refreshProfile } = useAuth();
   const { toast } = useToast();
   const logoInputRef = useRef<HTMLInputElement>(null);
+  const minimalLogoInputRef = useRef<HTMLInputElement>(null);
   
   const [agencyName, setAgencyName] = useState(agency?.name || '');
   const [agencyEmail, setAgencyEmail] = useState(agency?.email || '');
   const [agencyPhone, setAgencyPhone] = useState(agency?.phone || '');
   const [agencyAddress, setAgencyAddress] = useState(agency?.address || '');
   const [agencyLogo, setAgencyLogo] = useState(agency?.logo_url || '');
+  const [agencyMinimalLogo, setAgencyMinimalLogo] = useState(agency?.logo_minimal_url || '');
   const [agencyWebsite, setAgencyWebsite] = useState(agency?.website_url || '');
   const [agencyInstagram, setAgencyInstagram] = useState(agency?.instagram_handle || '');
   const [isSaving, setIsSaving] = useState(false);
   const [isUploadingLogo, setIsUploadingLogo] = useState(false);
+  const [isUploadingMinimalLogo, setIsUploadingMinimalLogo] = useState(false);
 
   useEffect(() => {
     if (agency) {
@@ -43,6 +46,7 @@ export default function AgencySettings() {
       setAgencyPhone(agency.phone || '');
       setAgencyAddress(agency.address || '');
       setAgencyLogo(agency.logo_url || '');
+      setAgencyMinimalLogo(agency.logo_minimal_url || '');
       setAgencyWebsite(agency.website_url || '');
       setAgencyInstagram(agency.instagram_handle || '');
     }
@@ -83,6 +87,42 @@ export default function AgencySettings() {
       if (logoInputRef.current) logoInputRef.current.value = '';
     }
   };
+
+  const handleMinimalLogoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file || !agency?.id) return;
+
+    setIsUploadingMinimalLogo(true);
+    try {
+      const toBase64 = () =>
+        new Promise<string>((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result as string);
+          reader.onerror = reject;
+          reader.readAsDataURL(file);
+        });
+
+      const dataUrl = await toBase64();
+
+      await apiFetch(`/api/agency/${agency.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          logoMinimalUrl: dataUrl,
+          updatedAt: new Date().toISOString(),
+        }),
+      });
+
+      setAgencyMinimalLogo(dataUrl);
+      toast({ title: 'Logo mínima atualizada com sucesso!' });
+      await refreshProfile();
+    } catch (error: any) {
+      toast({ title: 'Erro ao enviar logo mínima', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsUploadingMinimalLogo(false);
+      if (minimalLogoInputRef.current) minimalLogoInputRef.current.value = '';
+    }
+  };
+
 
   const saveAgencyFavicon = async (dataUrl: string | null) => {
     if (!agency?.id) return;
@@ -165,6 +205,23 @@ export default function AgencySettings() {
     }
   };
 
+  const handleRemoveMinimalLogo = async () => {
+    if (!agency?.id) return;
+
+    try {
+      await apiFetch(`/api/agency/${agency.id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ logoMinimalUrl: null, updatedAt: new Date().toISOString() }),
+      });
+      setAgencyMinimalLogo('');
+      toast({ title: 'Logo mínima removida!' });
+      await refreshProfile();
+    } catch (error: any) {
+      toast({ title: 'Erro ao remover logo mínima', description: error.message, variant: 'destructive' });
+    }
+  };
+
+
   const handleSave = async () => {
     if (!agency?.id) return;
     
@@ -178,6 +235,7 @@ export default function AgencySettings() {
           phone: agencyPhone,
           address: agencyAddress,
           logoUrl: agencyLogo || null,
+          logoMinimalUrl: agencyMinimalLogo || null,
           websiteUrl: agencyWebsite || null,
           instagramHandle: agencyInstagram || null,
           updatedAt: new Date().toISOString(),
@@ -361,6 +419,64 @@ export default function AgencySettings() {
           </div>
 
           <Separator />
+
+          <div className="space-y-4">
+            <div>
+              <Label className="flex items-center gap-2">
+                <Image className="w-4 h-4" />
+                Logo mínima
+              </Label>
+              <p className="text-sm text-muted-foreground mt-1">
+                Versão compacta para usos em espaços reduzidos
+              </p>
+            </div>
+
+            <div className="flex items-center gap-4">
+              {agencyMinimalLogo ? (
+                <div className="relative">
+                  <img
+                    src={agencyMinimalLogo}
+                    alt="Logo mínima da agência"
+                    className="h-12 w-12 object-contain rounded border bg-background p-2"
+                  />
+                  <Button
+                    variant="destructive"
+                    size="icon"
+                    className="absolute -top-2 -right-2 h-6 w-6"
+                    onClick={handleRemoveMinimalLogo}
+                  >
+                    <X className="w-3 h-3" />
+                  </Button>
+                </div>
+              ) : (
+                <div className="h-12 w-12 border-2 border-dashed rounded flex items-center justify-center text-muted-foreground">
+                  <Image className="w-5 h-5" />
+                </div>
+              )}
+
+              <div>
+                <input
+                  type="file"
+                  ref={minimalLogoInputRef}
+                  onChange={handleMinimalLogoUpload}
+                  className="hidden"
+                  accept="image/*"
+                />
+                <Button
+                  variant="outline"
+                  onClick={() => minimalLogoInputRef.current?.click()}
+                  disabled={isUploadingMinimalLogo}
+                >
+                  {isUploadingMinimalLogo ? (
+                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                  ) : (
+                    <Upload className="w-4 h-4 mr-2" />
+                  )}
+                  {agencyMinimalLogo ? 'Alterar Logo mínima' : 'Enviar Logo mínima'}
+                </Button>
+              </div>
+            </div>
+          </div>
 
           <div className="flex justify-end">
             <Button onClick={handleSave} disabled={isSaving}>
