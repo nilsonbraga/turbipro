@@ -1,27 +1,20 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useCustomItineraries } from '@/hooks/useCustomItineraries';
 import { useAgencies } from '@/hooks/useAgencies';
 import { useAuth } from '@/contexts/AuthContext';
 import { Button } from '@/components/ui/button';
+import { Combobox } from '@/components/ui/combobox';
 import { Input } from '@/components/ui/input';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import {
-  Table,
-  TableBody,
-  TableCell,
-  TableHead,
-  TableHeader,
-  TableRow,
-} from '@/components/ui/table';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -35,20 +28,23 @@ import {
 import { 
   Plus, 
   Search, 
-  Edit, 
-  Trash2, 
-  Copy, 
+  Edit,
+  Trash2,
+  Copy,
   ExternalLink,
   Map,
   Calendar,
   MapPin,
   CheckCircle,
-  Clock,
   FileEdit,
-  Send
+  Send,
+  MoreHorizontal,
+  Users,
+  Building2,
+  Check,
+  Loader2,
+  MessageSquare
 } from 'lucide-react';
-import { format } from 'date-fns';
-import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
 import ItineraryDialog from '@/components/itineraries/ItineraryDialog';
 
@@ -59,23 +55,60 @@ export default function Itineraries() {
   const [searchTerm, setSearchTerm] = useState('');
   const [agencyFilter, setAgencyFilter] = useState<string | null>(null);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [editingItinerary, setEditingItinerary] = useState<any>(null);
-  const [deleteId, setDeleteId] = useState<string | null>(null);
+  const [statusFilter, setStatusFilter] = useState<'all' | 'draft' | 'sent' | 'approved' | 'revision'>('all');
+  const [periodFilter, setPeriodFilter] = useState<'all' | 'month' | 'year'>('all');
+  const [copiedId, setCopiedId] = useState<string | null>(null);
+  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
+  const [itineraryToDelete, setItineraryToDelete] = useState<any | null>(null);
 
   const { agencies } = useAgencies();
-  const { itineraries, isLoading, deleteItinerary, isDeleting } = useCustomItineraries(agencyFilter);
+  const { itineraries, isLoading, deleteItinerary, isDeleting } = useCustomItineraries(agencyFilter, {
+    includeFeedbacks: true,
+  });
+  const now = new Date();
 
-  const filteredItineraries = itineraries.filter(itinerary =>
-    itinerary.title.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    itinerary.destination?.toLowerCase().includes(searchTerm.toLowerCase()) ||
-    itinerary.client?.name?.toLowerCase().includes(searchTerm.toLowerCase())
-  );
+  const filteredItineraries = itineraries.filter((itinerary) => {
+    const searchLower = searchTerm.toLowerCase();
+    const matchesSearch =
+      itinerary.title.toLowerCase().includes(searchLower) ||
+      itinerary.destination?.toLowerCase().includes(searchLower) ||
+      itinerary.client?.name?.toLowerCase().includes(searchLower);
 
-  const handleCopyUrl = (token: string, requiresToken: boolean, accessToken: string | null) => {
-    const baseUrl = `${window.location.origin}/roteiro/${token}`;
-    const url = requiresToken && accessToken ? `${baseUrl}?access=${accessToken}` : baseUrl;
-    navigator.clipboard.writeText(url);
+    const statusValue = itinerary.status || 'draft';
+    const matchesStatus = statusFilter === 'all' || statusValue === statusFilter;
+
+    const startDate = itinerary.start_date ? new Date(itinerary.start_date) : null;
+    const matchesPeriod =
+      periodFilter === 'all' ||
+      (periodFilter === 'year' &&
+        startDate &&
+        startDate.getFullYear() === now.getFullYear()) ||
+      (periodFilter === 'month' &&
+        startDate &&
+        startDate.getFullYear() === now.getFullYear() &&
+        startDate.getMonth() === now.getMonth());
+
+    return matchesSearch && matchesStatus && matchesPeriod;
+  });
+
+  const buildPublicUrl = (itinerary: any) => {
+    const baseUrl = `${window.location.origin}/roteiro/${itinerary.public_token}`;
+    return itinerary.requires_token && itinerary.access_token
+      ? `${baseUrl}?access=${itinerary.access_token}`
+      : baseUrl;
+  };
+
+  const handleCopyUrl = async (itinerary: any) => {
+    const url = buildPublicUrl(itinerary);
+    await navigator.clipboard.writeText(url);
+    setCopiedId(itinerary.id);
     toast({ title: 'Link copiado!' });
+    setTimeout(() => setCopiedId(null), 2000);
+  };
+
+  const handleViewPublicPage = (itinerary: any) => {
+    const url = buildPublicUrl(itinerary);
+    window.open(url, '_blank', 'noopener,noreferrer');
   };
 
   const handleEdit = (itinerary: any) => {
@@ -83,9 +116,10 @@ export default function Itineraries() {
   };
 
   const handleDelete = () => {
-    if (deleteId) {
-      deleteItinerary(deleteId);
-      setDeleteId(null);
+    if (itineraryToDelete) {
+      deleteItinerary(itineraryToDelete.id);
+      setDeleteDialogOpen(false);
+      setItineraryToDelete(null);
     }
   };
 
@@ -97,18 +131,75 @@ export default function Itineraries() {
       revision: { label: 'Em Revisão', className: 'bg-yellow-100 text-yellow-800' },
     };
     const variant = variants[status] || variants.draft;
-    return <Badge className={variant.className}>{variant.label}</Badge>;
+    return (
+      <Badge className={`rounded-full px-3 py-1 text-xs font-semibold ${variant.className}`}>
+        {variant.label}
+      </Badge>
+    );
   };
 
   const formatDate = (date: string | null) => {
     if (!date) return '-';
-    return format(new Date(date), "dd 'de' MMM, yyyy", { locale: ptBR });
+    const [yyyy, mm, dd] = date.split('T')[0].split('-').map(Number);
+    if (!yyyy || !mm || !dd) return date;
+    return new Date(yyyy, mm - 1, dd).toLocaleDateString('pt-BR', {
+      day: '2-digit',
+      month: '2-digit',
+      year: 'numeric',
+    });
+  };
+
+  const isAgencySender = (name?: string | null) => {
+    if (!name) return false;
+    const normalized = name.trim().toLowerCase();
+    return normalized === 'agência' || normalized === 'agencia';
+  };
+
+  const getMessageSummary = (itinerary: any) => {
+    const days = itinerary.days || [];
+    let total = 0;
+    let latestClientAt = 0;
+    let latestAgencyAt = 0;
+
+    const registerFeedback = (feedback: any) => {
+      if (!feedback) return;
+      total += 1;
+      const ts = feedback.createdAt ? new Date(feedback.createdAt).getTime() : 0;
+      const isAgencyFeedback =
+        feedback.isApproved === null ||
+        (feedback.isApproved === undefined && isAgencySender(feedback.clientName));
+      if (!ts) return;
+      if (isAgencyFeedback) {
+        latestAgencyAt = Math.max(latestAgencyAt, ts);
+        return;
+      }
+      latestClientAt = Math.max(latestClientAt, ts);
+    };
+
+    days.forEach((day: any) => {
+      (day.feedbacks || []).forEach(registerFeedback);
+      (day.items || []).forEach((item: any) => {
+        (item.feedbacks || []).forEach(registerFeedback);
+      });
+    });
+
+    return {
+      total,
+      hasPending: total > 0 && latestClientAt > latestAgencyAt,
+    };
   };
 
   // Stats
   const totalItineraries = itineraries.length;
   const approvedCount = itineraries.filter(i => i.status === 'approved').length;
   const sentCount = itineraries.filter(i => i.status === 'sent').length;
+  const agencyOptions = useMemo(
+    () => [
+      { value: 'all', label: 'Todas as agências' },
+      ...(agencies ?? []).map((agency) => ({ value: agency.id, label: agency.name })),
+    ],
+    [agencies],
+  );
 
   return (
     <div className="p-6 space-y-8">
@@ -119,11 +210,95 @@ export default function Itineraries() {
             Crie roteiros detalhados dia a dia para seus clientes
           </p>
         </div>
-        <Button size="sm" onClick={() => setDialogOpen(true)}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Roteiro
-        </Button>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="relative w-64">
+            <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
+            <Input
+              placeholder="Buscar por roteiro, destino..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="pl-9 h-9 bg-white"
+            />
+          </div>
+          <Button size="sm" onClick={() => setDialogOpen(true)}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Roteiro
+          </Button>
+        </div>
       </div>
+
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { label: 'Aprovado', value: 'approved' },
+            { label: 'Enviado', value: 'sent' },
+            { label: 'Em Revisão', value: 'revision' },
+            { label: 'Rascunho', value: 'draft' },
+            { label: 'Todos', value: 'all' },
+          ].map((option) => {
+            const isActive = statusFilter === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setStatusFilter(option.value as typeof statusFilter)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  isActive
+                    ? 'bg-[#f06a12] text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+        <div className="hidden sm:block h-5 w-px bg-border" />
+        <div className="flex flex-wrap items-center gap-2">
+          {[
+            { label: 'Este ano', value: 'year' },
+            { label: 'Este mês', value: 'month' },
+            { label: 'Todos', value: 'all' },
+          ].map((option) => {
+            const isActive = periodFilter === option.value;
+            return (
+              <button
+                key={option.value}
+                type="button"
+                onClick={() => setPeriodFilter(option.value as typeof periodFilter)}
+                className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                  isActive
+                    ? 'bg-[#f06a12] text-white'
+                    : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                }`}
+              >
+                {option.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {isSuperAdmin && (
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80">
+          <CardContent className="flex flex-col gap-3 p-4 sm:flex-row sm:items-center">
+            <div className="flex items-center gap-2 text-sm text-muted-foreground">
+              <Building2 className="h-4 w-4" />
+              <span>Filtrar por agência</span>
+            </div>
+            <Combobox
+              options={agencyOptions}
+              value={agencyFilter || 'all'}
+              onValueChange={(value) => setAgencyFilter(value === 'all' ? null : value)}
+              placeholder="Todas as agências"
+              searchPlaceholder="Buscar agência..."
+              emptyText="Nenhuma agência encontrada"
+              buttonClassName="w-64 h-9"
+              contentClassName="w-72"
+            />
+          </CardContent>
+        </Card>
+      )}
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
@@ -183,125 +358,155 @@ export default function Itineraries() {
         </Card>
       </div>
 
-      {/* Filters */}
-      <div className="flex flex-col md:flex-row gap-4">
-        {isSuperAdmin && (
-          <Select value={agencyFilter || 'all'} onValueChange={(v) => setAgencyFilter(v === 'all' ? null : v)}>
-            <SelectTrigger className="w-full md:w-[250px] h-9 bg-white">
-              <SelectValue placeholder="Todas as agências" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todas as agências</SelectItem>
-              {agencies.map((agency) => (
-                <SelectItem key={agency.id} value={agency.id}>
-                  {agency.name}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        )}
-        <div className="relative flex-1">
-          <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground w-4 h-4" />
-          <Input
-            placeholder="Buscar roteiros..."
-            value={searchTerm}
-            onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-10 h-9 bg-white"
-          />
-        </div>
-      </div>
-
-      {/* Table */}
-      <Card className="rounded-2xl border-0 shadow-none bg-white overflow-hidden">
-        <Table>
-          <TableHeader>
-            <TableRow className="bg-slate-50/80">
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Título</TableHead>
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Cliente</TableHead>
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Destino</TableHead>
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Período</TableHead>
-              <TableHead className="text-xs uppercase tracking-wide text-muted-foreground">Status</TableHead>
-              <TableHead className="text-right text-xs uppercase tracking-wide text-muted-foreground">Ações</TableHead>
-            </TableRow>
-          </TableHeader>
-          <TableBody>
-            {isLoading ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8">
-                  Carregando...
-                </TableCell>
-              </TableRow>
-            ) : filteredItineraries.length === 0 ? (
-              <TableRow>
-                <TableCell colSpan={6} className="text-center py-8 text-muted-foreground">
-                  Nenhum roteiro encontrado
-                </TableCell>
-              </TableRow>
-            ) : (
-              filteredItineraries.map((itinerary) => (
-                <TableRow key={itinerary.id}>
-                  <TableCell className="font-medium">{itinerary.title}</TableCell>
-                  <TableCell>{itinerary.client?.name || '-'}</TableCell>
-                  <TableCell>
-                    {itinerary.destination && (
-                      <div className="flex items-center gap-1">
-                        <MapPin className="w-3 h-3 text-muted-foreground" />
-                        {itinerary.destination}
+      <div className="space-y-4">
+        {isLoading ? (
+          <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+            <CardContent className="p-10 flex items-center justify-center">
+              <Loader2 className="w-6 h-6 animate-spin text-primary" />
+            </CardContent>
+          </Card>
+        ) : filteredItineraries.length === 0 ? (
+          <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+            <CardContent className="p-10 text-center text-muted-foreground">
+              Nenhum roteiro encontrado
+            </CardContent>
+          </Card>
+        ) : (
+          filteredItineraries.map((itinerary) => {
+            const hasCover = Boolean(itinerary.cover_image_url);
+            const messageSummary = getMessageSummary(itinerary);
+            return (
+              <Card
+                key={itinerary.id}
+                className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg overflow-hidden cursor-pointer"
+                onClick={(event) => {
+                  const target = event.target as HTMLElement;
+                  if (target.closest('button') || target.closest('a') || target.closest('input') || target.closest('[data-card-action]')) {
+                    return;
+                  }
+                  handleEdit(itinerary);
+                }}
+              >
+                <CardContent className="p-0">
+                  <div className="flex flex-col gap-1 lg:flex-row lg:items-stretch">
+                    {hasCover && (
+                      <div className="w-full lg:w-1/6">
+                        <img
+                          src={itinerary.cover_image_url}
+                          alt={`Capa ${itinerary.title}`}
+                          className="h-36 w-full object-cover lg:h-full"
+                          loading="lazy"
+                        />
                       </div>
                     )}
-                  </TableCell>
-                  <TableCell>
-                    {itinerary.start_date && (
-                      <div className="flex items-center gap-1 text-sm">
-                        <Calendar className="w-3 h-3 text-muted-foreground" />
-                        {formatDate(itinerary.start_date)}
-                        {itinerary.end_date && ` - ${formatDate(itinerary.end_date)}`}
+                    <div className="flex flex-1 flex-col gap-4 p-5">
+                      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+                        <div className="flex items-start gap-3">
+                          {!hasCover && (
+                            <div className="h-10 w-10 shrink-0 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                              <Map className="h-5 w-5" />
+                            </div>
+                          )}
+                          <div>
+                            <div className="flex flex-wrap items-center gap-2">
+                              <p className="text-base font-semibold">{itinerary.title}</p>
+                            </div>
+                            {(itinerary.destination || itinerary.client?.name) && (
+                              <div className="mt-1 flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                                {itinerary.destination && (
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3" />
+                                    {itinerary.destination}
+                                  </span>
+                                )}
+                                {itinerary.client?.name && (
+                                  <span className="flex items-center gap-1">
+                                    <Users className="w-3 h-3" />
+                                    {itinerary.client.name}
+                                  </span>
+                                )}
+                              </div>
+                            )}
+                            {itinerary.description && (
+                              <p className="mt-2 text-sm text-muted-foreground line-clamp-2">
+                                {itinerary.description}
+                              </p>
+                            )}
+                          </div>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {getStatusBadge(itinerary.status)}
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="icon">
+                                <MoreHorizontal className="w-4 h-4" />
+                              </Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end" data-card-action>
+                              <DropdownMenuItem onClick={() => handleViewPublicPage(itinerary)}>
+                                <ExternalLink className="w-4 h-4 mr-2" />
+                                Visualizar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => handleCopyUrl(itinerary)}>
+                                {copiedId === itinerary.id ? (
+                                  <Check className="w-4 h-4 mr-2" />
+                                ) : (
+                                  <Copy className="w-4 h-4 mr-2" />
+                                )}
+                                Copiar Link
+                              </DropdownMenuItem>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem onClick={() => handleEdit(itinerary)}>
+                                <Edit className="w-4 h-4 mr-2" />
+                                Editar
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive"
+                                onClick={() => {
+                                  setItineraryToDelete(itinerary);
+                                  setDeleteDialogOpen(true);
+                                }}
+                              >
+                                <Trash2 className="w-4 h-4 mr-2" />
+                                Excluir
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </div>
                       </div>
-                    )}
-                  </TableCell>
-                  <TableCell>{getStatusBadge(itinerary.status)}</TableCell>
-                  <TableCell>
-                    <div className="flex justify-end gap-2">
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleCopyUrl(itinerary.public_token, itinerary.requires_token, itinerary.access_token)}
-                        title="Copiar link"
-                      >
-                        <Copy className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => window.open(`/roteiro/${itinerary.public_token}`, '_blank')}
-                        title="Visualizar"
-                      >
-                        <ExternalLink className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => handleEdit(itinerary)}
-                        title="Editar"
-                      >
-                        <Edit className="w-4 h-4" />
-                      </Button>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => setDeleteId(itinerary.id)}
-                        title="Excluir"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </Button>
+                      <div className="mt-auto flex flex-wrap items-center gap-5 text-sm text-muted-foreground sm:justify-end">
+                        {messageSummary.total > 0 && (
+                          <div
+                            className={`flex items-center gap-2 rounded-full px-3 py-1 text-xs font-semibold ${
+                              messageSummary.hasPending
+                                ? 'bg-amber-100 text-amber-800'
+                                : 'bg-slate-100 text-slate-600'
+                            }`}
+                          >
+                            <MessageSquare className="w-4 h-4" />
+                            <span>
+                              {messageSummary.total} mensagem{messageSummary.total === 1 ? '' : 's'}
+                            </span>
+                          </div>
+                        )}
+                        {itinerary.start_date && (
+                          <div className="flex items-center gap-2">
+                            <Calendar className="w-4 h-4" />
+                            <span>
+                              {formatDate(itinerary.start_date)}
+                              {itinerary.end_date ? ` - ${formatDate(itinerary.end_date)}` : ''}
+                            </span>
+                          </div>
+                        )}
+                      </div>
                     </div>
-                  </TableCell>
-                </TableRow>
-              ))
-            )}
-          </TableBody>
-        </Table>
-      </Card>
+                  </div>
+                </CardContent>
+              </Card>
+            );
+          })
+        )}
+      </div>
 
       {/* Create Dialog */}
       <ItineraryDialog
@@ -310,18 +515,25 @@ export default function Itineraries() {
       />
 
       {/* Delete Confirmation */}
-      <AlertDialog open={!!deleteId} onOpenChange={() => setDeleteId(null)}>
+      <AlertDialog
+        open={deleteDialogOpen}
+        onOpenChange={(open) => {
+          setDeleteDialogOpen(open);
+          if (!open) setItineraryToDelete(null);
+        }}
+      >
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Excluir roteiro?</AlertDialogTitle>
             <AlertDialogDescription>
-              Esta ação não pode ser desfeita. Todos os dias e itens do roteiro serão excluídos.
+              Tem certeza que deseja excluir o roteiro "{itineraryToDelete?.title}"?
+              Todos os dias e itens do roteiro serão excluídos.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel>Cancelar</AlertDialogCancel>
-            <AlertDialogAction onClick={handleDelete} disabled={isDeleting}>
-              {isDeleting ? 'Excluindo...' : 'Excluir'}
+            <AlertDialogAction onClick={handleDelete} className="bg-destructive text-destructive-foreground">
+              {isDeleting ? <Loader2 className="w-4 h-4 animate-spin" /> : 'Excluir'}
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

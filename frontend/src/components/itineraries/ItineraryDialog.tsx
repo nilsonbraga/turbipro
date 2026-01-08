@@ -13,6 +13,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
+import { ImageUploader } from '@/components/itineraries/ImageUploader';
 import {
   Select,
   SelectContent,
@@ -39,6 +40,7 @@ export default function ItineraryDialog({ open, onOpenChange, editingItinerary }
     client_id: '',
     start_date: '',
     end_date: '',
+    logo_url: '',
     requires_token: false,
     access_token: '',
   });
@@ -52,6 +54,7 @@ export default function ItineraryDialog({ open, onOpenChange, editingItinerary }
         client_id: editingItinerary.client_id || '',
         start_date: editingItinerary.start_date ? editingItinerary.start_date.slice(0, 10) : '',
         end_date: editingItinerary.end_date ? editingItinerary.end_date.slice(0, 10) : '',
+        logo_url: editingItinerary.logo_url || '',
         requires_token: editingItinerary.requires_token || false,
         access_token: editingItinerary.access_token || '',
       });
@@ -63,6 +66,7 @@ export default function ItineraryDialog({ open, onOpenChange, editingItinerary }
         client_id: '',
         start_date: '',
         end_date: '',
+        logo_url: '',
         requires_token: false,
         access_token: '',
       });
@@ -92,6 +96,15 @@ export default function ItineraryDialog({ open, onOpenChange, editingItinerary }
 
         <form onSubmit={handleSubmit} className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
+            <div className="col-span-2">
+              <ImageUploader
+                value={formData.logo_url || ''}
+                onChange={(url) => setFormData({ ...formData, logo_url: url })}
+                label="Logo do Roteiro"
+                folder="logos"
+                aspectRatio="square"
+              />
+            </div>
             <div className="col-span-2">
               <Label htmlFor="title">Título do Roteiro *</Label>
               <Input

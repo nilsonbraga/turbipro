@@ -1,9 +1,10 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { usePublicProposal } from '@/hooks/usePublicProposalLinks';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Separator } from '@/components/ui/separator';
+import { Dialog, DialogContent } from '@/components/ui/dialog';
 import {
   Loader2,
   Plane,
@@ -425,6 +426,7 @@ function HotelDetail({ service }: { service: any }) {
   const provider = service?.partners?.name || service?.provider;
   const guests = details?.guests || {};
   const totalGuests = Number(guests.adults || 0) + Number(guests.children || 0);
+  const [lightbox, setLightbox] = useState<{ images: string[]; index: number } | null>(null);
   const photos = Array.isArray(details?.photos)
     ? details.photos.filter((photo: string) => Boolean(photo))
     : [];
@@ -469,15 +471,34 @@ function HotelDetail({ service }: { service: any }) {
       {photos.length > 0 && (
         <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
           {photos.map((photo: string, index: number) => (
-            <div key={`${photo}-${index}`} className="overflow-hidden rounded-xl bg-muted">
+            <button
+              key={`${photo}-${index}`}
+              type="button"
+              onClick={() => setLightbox({ images: photos, index })}
+              className="group overflow-hidden rounded-xl bg-muted text-left transition-transform duration-500 ease-out hover:-translate-y-0.5"
+            >
               <img
                 src={photo}
                 alt={`Hotel ${details?.hotelName || ''}`.trim() || `Hotel ${index + 1}`}
-                className="h-40 md:h-44 w-full object-cover"
+                className="h-40 md:h-44 w-full object-cover transition-transform duration-700 ease-out group-hover:scale-[1.04]"
               />
-            </div>
+            </button>
           ))}
         </div>
+      )}
+
+      {lightbox && (
+        <Dialog open={!!lightbox} onOpenChange={(open) => !open && setLightbox(null)}>
+          <DialogContent className="max-w-4xl border-none bg-transparent p-0 shadow-none">
+            <div className="overflow-hidden rounded-2xl bg-black/90">
+              <img
+                src={lightbox.images[lightbox.index]}
+                alt={`Hotel ${details?.hotelName || ''}`.trim() || 'Hotel'}
+                className="max-h-[80vh] w-full object-contain"
+              />
+            </div>
+          </DialogContent>
+        </Dialog>
       )}
 
     </div>

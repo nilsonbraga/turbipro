@@ -92,6 +92,9 @@ export const StudioPreview = forwardRef<HTMLDivElement, StudioPreviewProps>(
     const displayWidth = format.width / 2;
     const displayHeight = format.height / 2;
 
+    const storySafeTop = 125;    
+const storySafeBottom = 170;
+
     return (
       <div
         ref={ref}
@@ -146,11 +149,17 @@ export const StudioPreview = forwardRef<HTMLDivElement, StudioPreviewProps>(
         )}
 
         {/* Content Layer - centered for Stories */}
-        <div className={cn(
-          "relative h-full flex flex-col", 
-          isVertical ? "p-5" : "p-4",
-          isStories && "justify-center py-[15%]"
-        )}>
+        <div
+  className={cn(
+    "relative h-full flex flex-col",
+    isVertical ? "px-5" : "px-4",
+    isStories ? "justify-between" : ""
+  )}
+  style={{
+    paddingTop: isStories ? storySafeTop : undefined,
+    paddingBottom: isStories ? storySafeBottom : undefined,
+  }}
+>
           {artType.id === 'pacote' && (
             <PacoteTemplate 
               data={data as PacoteData} 

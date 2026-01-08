@@ -44,6 +44,11 @@ export interface ItineraryDayFeedback {
   updated_at: string;
 }
 
+export interface ItineraryLink {
+  label: string;
+  url: string;
+}
+
 export interface ItineraryItem {
   id: string;
   day_id: string;
@@ -56,6 +61,7 @@ export interface ItineraryItem {
   address: string | null;
   details: ItineraryItemDetails;
   images: string[] | null;
+  links?: ItineraryLink[] | null;
   price: number | null;
   currency: string;
   booking_reference: string | null;
@@ -76,6 +82,7 @@ export interface ItineraryDay {
   description: string | null;
   cover_image_url: string | null;
   images: string[] | null;
+  links?: ItineraryLink[] | null;
   sort_order: number;
   created_at: string;
   updated_at: string;
@@ -90,6 +97,7 @@ export interface CustomItinerary {
   title: string;
   description: string | null;
   cover_image_url: string | null;
+  logo_url: string | null;
   start_date: string | null;
   end_date: string | null;
   destination: string | null;
@@ -111,6 +119,7 @@ export interface CustomItineraryInput {
   title: string;
   description?: string;
   cover_image_url?: string;
+  logo_url?: string;
   start_date?: string;
   end_date?: string;
   destination?: string;
@@ -130,6 +139,7 @@ export interface ItineraryDayInput {
   description?: string;
   cover_image_url?: string;
   images?: string[];
+  links?: ItineraryLink[];
   sort_order?: number;
 }
 
@@ -144,6 +154,7 @@ export interface ItineraryItemInput {
   address?: string;
   details?: ItineraryItemDetails;
   images?: string[];
+  links?: ItineraryLink[];
   price?: number;
   currency?: string;
   booking_reference?: string;
@@ -158,6 +169,7 @@ const mapItinerary = (i: any): CustomItinerary => ({
   title: i.title,
   description: i.description,
   cover_image_url: i.coverImageUrl,
+  logo_url: i.logoUrl,
   start_date: i.startDate,
   end_date: i.endDate,
   destination: i.destination,
@@ -185,6 +197,7 @@ const mapDay = (d: any): ItineraryDay => ({
   description: d.description,
   cover_image_url: d.coverImageUrl,
   images: d.images || [],
+  links: d.links || [],
   sort_order: d.sortOrder ?? 0,
   created_at: d.createdAt,
   updated_at: d.updatedAt,
@@ -204,6 +217,7 @@ const mapItem = (i: any): ItineraryItem => ({
   address: i.address,
   details: i.details || {},
   images: i.images || [],
+  links: i.links || [],
   price: i.price ?? null,
   currency: i.currency,
   booking_reference: i.bookingReference,
@@ -268,6 +282,7 @@ const mapItineraryInput = (input: CustomItineraryInput & { agency_id?: string })
   title: input.title,
   description: input.description ?? null,
   coverImageUrl: input.cover_image_url ?? null,
+  logoUrl: input.logo_url ?? null,
   startDate: input.start_date ? new Date(input.start_date).toISOString() : null,
   endDate: input.end_date ? new Date(input.end_date).toISOString() : null,
   destination: input.destination ?? null,
@@ -286,6 +301,7 @@ const mapDayInput = (input: ItineraryDayInput) => ({
   description: input.description ?? null,
   coverImageUrl: input.cover_image_url ?? null,
   images: input.images ?? [],
+  links: input.links ?? [],
   sortOrder: input.sort_order ?? 0,
 });
 
@@ -303,6 +319,7 @@ const mapItemInput = (input: ItineraryItemInput) => ({
   address: input.address ?? null,
   details: input.details ?? {},
   images: input.images ?? [],
+  links: input.links ?? [],
   price: input.price ?? null,
   currency: input.currency ?? 'BRL',
   bookingReference: input.booking_reference ?? null,
@@ -310,13 +327,21 @@ const mapItemInput = (input: ItineraryItemInput) => ({
   sortOrder: input.sort_order ?? 0,
 });
 
-export function useCustomItineraries(agencyFilter?: string | null) {
+export function useCustomItineraries(
+  agencyFilter?: string | null,
+  options?: { includeFeedbacks?: boolean },
+) {
   const { agency, isSuperAdmin } = useAuth();
   const { toast } = useToast();
   const queryClient = useQueryClient();
 
   const query = useQuery({
-    queryKey: ['custom-itineraries', isSuperAdmin ? 'all' : agency?.id, agencyFilter],
+    queryKey: [
+      'custom-itineraries',
+      isSuperAdmin ? 'all' : agency?.id,
+      agencyFilter,
+      options?.includeFeedbacks ? 'with-feedbacks' : 'basic',
+    ],
     queryFn: async () => {
       const where: Record<string, unknown> = {};
       if (!isSuperAdmin && agency?.id) {
@@ -325,9 +350,27 @@ export function useCustomItineraries(agencyFilter?: string | null) {
         where.agencyId = agencyFilter;
       }
 
+      const include: Record<string, unknown> = {
+        client: { select: { id: true, name: true, email: true } },
+      };
+      if (options?.includeFeedbacks) {
+        include.days = {
+          select: {
+            id: true,
+            feedbacks: { select: { id: true, clientName: true, createdAt: true, isApproved: true } },
+            items: {
+              select: {
+                id: true,
+                feedbacks: { select: { id: true, clientName: true, createdAt: true, isApproved: true } },
+              },
+            },
+          },
+        };
+      }
+
       const params = new URLSearchParams({
         where: JSON.stringify(where),
-        include: JSON.stringify({ client: { select: { id: true, name: true, email: true } } }),
+        include: JSON.stringify(include),
         orderBy: JSON.stringify({ createdAt: 'desc' }),
       });
 
@@ -472,6 +515,7 @@ export function useItineraryDetails(itineraryId: string | null) {
       if (input.description !== undefined) payload.description = input.description ?? null;
       if (input.cover_image_url !== undefined) payload.coverImageUrl = input.cover_image_url ?? null;
       if (input.images !== undefined) payload.images = input.images ?? [];
+      if (input.links !== undefined) payload.links = input.links ?? [];
       if (input.sort_order !== undefined) payload.sortOrder = input.sort_order ?? 0;
 
       const updated = await apiFetch<any>(`/api/itineraryDay/${id}`, {
@@ -534,6 +578,7 @@ export function useItineraryDetails(itineraryId: string | null) {
       if (input.address !== undefined) payload.address = input.address ?? null;
       if (input.details !== undefined) payload.details = input.details ?? {};
       if (input.images !== undefined) payload.images = input.images ?? [];
+      if (input.links !== undefined) payload.links = input.links ?? [];
       if (input.price !== undefined) payload.price = input.price ?? null;
       if (input.currency !== undefined) payload.currency = input.currency ?? 'BRL';
       if (input.booking_reference !== undefined) payload.bookingReference = input.booking_reference ?? null;
@@ -591,7 +636,7 @@ export function usePublicItinerary(token: string | null, accessToken?: string | 
       const params = new URLSearchParams({
         where: JSON.stringify({ publicToken: token, isActive: true }),
         include: JSON.stringify({
-          agency: { select: { id: true, name: true, logoUrl: true, email: true, phone: true } },
+          agency: { select: { id: true, name: true, logoUrl: true, email: true, phone: true, instagramHandle: true } },
           days: {
             include: {
               items: { include: { feedbacks: true } },

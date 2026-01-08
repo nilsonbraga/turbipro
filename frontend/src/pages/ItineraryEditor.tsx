@@ -1,6 +1,16 @@
 import { useState, useEffect } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { useItineraryDetails, useCustomItineraries, ItineraryDay, ItineraryItem, ItineraryItemInput, ItineraryDayInput, ItineraryItemFeedback, ItineraryDayFeedback } from '@/hooks/useCustomItineraries';
+import {
+  useItineraryDetails,
+  useCustomItineraries,
+  ItineraryDay,
+  ItineraryItem,
+  ItineraryItemInput,
+  ItineraryDayInput,
+  ItineraryItemFeedback,
+  ItineraryDayFeedback,
+  ItineraryLink,
+} from '@/hooks/useCustomItineraries';
 import { useClients } from '@/hooks/useClients';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -64,7 +74,9 @@ import {
   ThumbsUp,
   ThumbsDown,
   Send,
-  Reply
+  Reply,
+  Link2,
+  X
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
@@ -137,6 +149,129 @@ const ITEM_TYPES = [
   { value: 'meal', label: 'Refeição', icon: Utensils, color: 'bg-orange-500' },
   { value: 'other', label: 'Outro', icon: MoreHorizontal, color: 'bg-slate-500' },
 ];
+
+const formatCurrencyValue = (value?: number | string | null, currency = 'BRL') => {
+  if (value === null || value === undefined) return null;
+  const numeric = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numeric)) return null;
+  return new Intl.NumberFormat('pt-BR', { style: 'currency', currency }).format(numeric);
+};
+
+const formatDateOnly = (date: Date) => {
+  const yyyy = date.getFullYear();
+  const mm = String(date.getMonth() + 1).padStart(2, '0');
+  const dd = String(date.getDate()).padStart(2, '0');
+  return `${yyyy}-${mm}-${dd}`;
+};
+
+const parseDateOnly = (value?: string) => {
+  if (!value) return null;
+  const [yyyy, mm, dd] = value.split('-').map(Number);
+  if (!yyyy || !mm || !dd) return null;
+  return new Date(yyyy, mm - 1, dd);
+};
+
+const parseTimeToMinutes = (value?: string | null) => {
+  if (!value) return null;
+  const parts = value.split(':');
+  if (parts.length < 2) return null;
+  const hh = Number(parts[0]);
+  const mm = Number(parts[1]);
+  if (!Number.isFinite(hh) || !Number.isFinite(mm)) return null;
+  return hh * 60 + mm;
+};
+
+const normalizeUrl = (value: string) => {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  return /^https?:\/\//i.test(trimmed) ? trimmed : `https://${trimmed}`;
+};
+
+function LinksEditor({
+  value,
+  onChange,
+  label = 'Links úteis',
+}: {
+  value: ItineraryLink[];
+  onChange: (next: ItineraryLink[]) => void;
+  label?: string;
+}) {
+  const [draftLabel, setDraftLabel] = useState('');
+  const [draftUrl, setDraftUrl] = useState('');
+
+  const handleAdd = () => {
+    if (!draftUrl.trim()) return;
+    const url = normalizeUrl(draftUrl);
+    const next = [
+      ...value,
+      { label: draftLabel.trim() || url.replace(/^https?:\/\//, ''), url },
+    ];
+    onChange(next);
+    setDraftLabel('');
+    setDraftUrl('');
+  };
+
+  const handleRemove = (index: number) => {
+    const next = [...value];
+    next.splice(index, 1);
+    onChange(next);
+  };
+
+  return (
+    <div className="space-y-3">
+      <Label className="text-sm font-medium flex items-center gap-2">
+        <Link2 className="w-4 h-4" />
+        {label}
+      </Label>
+      <div className="grid gap-3 md:grid-cols-[1.2fr_1.8fr_auto]">
+        <Input
+          value={draftLabel}
+          onChange={(e) => setDraftLabel(e.target.value)}
+          placeholder="Título (opcional)"
+        />
+        <Input
+          value={draftUrl}
+          onChange={(e) => setDraftUrl(e.target.value)}
+          placeholder="https://..."
+        />
+        <Button type="button" onClick={handleAdd} className="gap-2">
+          <Plus className="w-4 h-4" />
+          Adicionar
+        </Button>
+      </div>
+      {value.length > 0 && (
+        <div className="space-y-2">
+          {value.map((link, index) => (
+            <div key={`${link.url}-${index}`} className="flex items-center gap-2 rounded-xl border bg-muted/40 px-3 py-2">
+              <Link2 className="w-4 h-4 text-muted-foreground" />
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-medium truncate">{link.label}</p>
+                <a
+                  href={link.url}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-xs text-muted-foreground truncate block hover:text-primary"
+                >
+                  {link.url}
+                </a>
+              </div>
+              <Button type="button" variant="ghost" size="icon" onClick={() => handleRemove(index)}>
+                <X className="w-4 h-4" />
+              </Button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+const formatDateOnlyLabel = (value?: string | null) => {
+  if (!value) return '';
+  const [yyyy, mm, dd] = value.split('T')[0].split('-').map(Number);
+  if (!yyyy || !mm || !dd) return value;
+  return format(new Date(yyyy, mm - 1, dd), "EEEE, d 'de' MMMM", { locale: ptBR });
+};
 
 interface FeedbackReplyProps {
   feedback: ItineraryItemFeedback | ItineraryDayFeedback;
@@ -248,6 +383,7 @@ export default function ItineraryEditor() {
     start_date: '',
     end_date: '',
     cover_image_url: '',
+    logo_url: '',
     requires_token: false,
     access_token: '',
     status: 'draft',
@@ -272,6 +408,7 @@ export default function ItineraryEditor() {
     description: '',
     cover_image_url: '',
     images: [],
+    links: [],
   });
 
   const [itemForm, setItemForm] = useState<Partial<ItineraryItemInput>>({
@@ -284,6 +421,7 @@ export default function ItineraryEditor() {
     address: '',
     images: [],
     details: {},
+    links: [],
   });
 
   useEffect(() => {
@@ -296,6 +434,7 @@ export default function ItineraryEditor() {
         start_date: itinerary.start_date ? itinerary.start_date.slice(0, 10) : '',
         end_date: itinerary.end_date ? itinerary.end_date.slice(0, 10) : '',
         cover_image_url: itinerary.cover_image_url || '',
+        logo_url: itinerary.logo_url || '',
         requires_token: itinerary.requires_token || false,
         access_token: itinerary.access_token || '',
         status: itinerary.status || 'draft',
@@ -331,14 +470,23 @@ export default function ItineraryEditor() {
 
   const handleAddDay = () => {
     const nextDayNumber = (itinerary?.days?.length || 0) + 1;
+    const startDate = parseDateOnly(headerForm.start_date);
+    const endDate = parseDateOnly(headerForm.end_date);
+    const computedDate = startDate
+      ? new Date(startDate.getFullYear(), startDate.getMonth(), startDate.getDate() + (nextDayNumber - 1))
+      : null;
+    const exceedsEndDate = Boolean(endDate && computedDate && computedDate > endDate);
+    const clampedDate = computedDate && !exceedsEndDate ? formatDateOnly(computedDate) : '';
+
     setDayForm({
       day_number: nextDayNumber,
       title: `Dia ${nextDayNumber}`,
-      date: '',
+      date: clampedDate,
       location: '',
       description: '',
       cover_image_url: '',
       images: [],
+      links: [],
     });
     setEditingDay(null);
     setDayDialogOpen(true);
@@ -353,6 +501,7 @@ export default function ItineraryEditor() {
       description: day.description || '',
       cover_image_url: day.cover_image_url || '',
       images: day.images || [],
+      links: day.links || [],
     });
     setEditingDay(day);
     setDayDialogOpen(true);
@@ -373,6 +522,7 @@ export default function ItineraryEditor() {
         description: dayForm.description,
         cover_image_url: dayForm.cover_image_url,
         images: dayForm.images,
+        links: dayForm.links,
         sort_order: itinerary?.days?.length || 0,
       });
     }
@@ -390,6 +540,7 @@ export default function ItineraryEditor() {
       address: '',
       images: [],
       details: {},
+      links: [],
     });
     setEditingItem(null);
     setSelectedDayId(dayId);
@@ -407,6 +558,7 @@ export default function ItineraryEditor() {
       address: item.address || '',
       images: item.images || [],
       details: item.details || {},
+      links: item.links || [],
     });
     setEditingItem(item);
     setSelectedDayId(item.day_id);
@@ -431,6 +583,7 @@ export default function ItineraryEditor() {
         address: itemForm.address,
         images: itemForm.images,
         details: itemForm.details,
+        links: itemForm.links,
         sort_order: day?.items?.length || 0,
       });
     }
@@ -501,6 +654,77 @@ export default function ItineraryEditor() {
 
   const getItemType = (type: string) => {
     return ITEM_TYPES.find(t => t.value === type) || ITEM_TYPES[ITEM_TYPES.length - 1];
+  };
+
+  const getSortedItems = (items: ItineraryItem[] = []) => {
+    return [...items].sort((a, b) => {
+      const aTime = parseTimeToMinutes(a.start_time || a.end_time);
+      const bTime = parseTimeToMinutes(b.start_time || b.end_time);
+      if (aTime === null && bTime === null) {
+        return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+      }
+      if (aTime === null) return 1;
+      if (bTime === null) return -1;
+      if (aTime !== bTime) return aTime - bTime;
+      return (a.sort_order ?? 0) - (b.sort_order ?? 0);
+    });
+  };
+
+  const getItemDetailPairs = (item: ItineraryItem) => {
+    const details = item.details || {};
+    const rows: Array<{ label: string; value: string }> = [];
+    const push = (label: string, value?: string | number | null) => {
+      if (value === null || value === undefined) return;
+      const text = String(value).trim();
+      if (!text) return;
+      rows.push({ label, value: text });
+    };
+
+    const priceLabel = formatCurrencyValue(item.price, item.currency || 'BRL');
+    if (priceLabel) push('Valor', priceLabel);
+    push('Endereço', item.address);
+    push('Reserva', item.booking_reference);
+    push('Confirmação', item.confirmation_number);
+
+    if (item.type === 'hotel') {
+      push('Hotel', (details as any).hotelName);
+      push('Quarto', (details as any).roomType);
+      push('Check-in', (details as any).checkIn);
+      push('Check-out', (details as any).checkOut);
+      push('Estrelas', (details as any).stars);
+    }
+
+    if (item.type === 'flight') {
+      push('Companhia', (details as any).airline);
+      push('Voo', (details as any).flightNumber);
+      push('Origem', (details as any).departureLocation);
+      push('Destino', (details as any).arrivalLocation);
+      push('Saída', (details as any).departure);
+      push('Chegada', (details as any).arrival);
+      push('Classe', (details as any).flightClass);
+    }
+
+    if (item.type === 'transport' || item.type === 'transfer') {
+      push('Veículo', (details as any).vehicleType);
+      push('Empresa', (details as any).company);
+      push('Origem', (details as any).departureLocation);
+      push('Destino', (details as any).arrivalLocation);
+    }
+
+    if (item.type === 'ticket') {
+      push('Evento', (details as any).eventName);
+      push('Local', (details as any).venue);
+      push('Assento', (details as any).seatInfo);
+    }
+
+    if (item.type === 'activity' || item.type === 'meal' || item.type === 'other') {
+      push('Local', (details as any).venue);
+    }
+
+    if (item.links && item.links.length > 0) {
+      push('Links', `${item.links.length}`);
+    }
+    return rows;
   };
 
   const getStatusConfig = (status: string) => {
@@ -589,8 +813,15 @@ export default function ItineraryEditor() {
         </div>
       </div>
 
-      {/* Cover Image */}
-      <div className="space-y-4">
+      {/* Logo + Cover */}
+      <div className="grid gap-6 md:grid-cols-[220px_1fr]">
+        <ImageUploader
+          value={headerForm.logo_url}
+          onChange={(url) => setHeaderForm({ ...headerForm, logo_url: url })}
+          label="Logo do Roteiro"
+          folder="logos"
+          aspectRatio="square"
+        />
         <ImageUploader
           value={headerForm.cover_image_url}
           onChange={(url) => setHeaderForm({ ...headerForm, cover_image_url: url })}
@@ -697,10 +928,11 @@ export default function ItineraryEditor() {
           </Card>
         ) : (
           <div className="space-y-4">
-            {itinerary.days?.map((day, index) => {
+            {itinerary.days?.map((day) => {
               const isExpanded = expandedDays.includes(day.id);
               const dayFeedbackCount = (day.feedbacks?.length || 0) + 
                 (day.items?.reduce((acc, item) => acc + (item.feedbacks?.length || 0), 0) || 0);
+              const sortedItems = getSortedItems(day.items || []);
               
               return (
                 <Card key={day.id} className="overflow-hidden">
@@ -721,7 +953,7 @@ export default function ItineraryEditor() {
                         {day.date && (
                           <span className="flex items-center gap-1">
                             <Calendar className="w-3.5 h-3.5" />
-                            {format(new Date(day.date), "EEEE, d 'de' MMMM", { locale: ptBR })}
+                            {formatDateOnlyLabel(day.date)}
                           </span>
                         )}
                         {day.location && (
@@ -764,37 +996,39 @@ export default function ItineraryEditor() {
                   {isExpanded && (
                     <div className="px-4 pb-4">
                       {day.description && (
-                        <p className="text-muted-foreground mb-4 pl-20">{day.description}</p>
+                        <p className="text-muted-foreground mb-4 pl-14">{day.description}</p>
                       )}
 
                       {/* Timeline */}
-                      <div className="relative pl-20">
+                      <div className="relative">
                         {/* Timeline line */}
-                        {(day.items?.length || 0) > 0 && (
-                          <div className="absolute left-[47px] top-0 bottom-8 w-0.5 bg-border" />
+                        {sortedItems.length > 0 && (
+                          <div className="absolute left-5 top-2 bottom-6 w-px bg-border" />
                         )}
 
                         {/* Items */}
-                        <div className="space-y-3">
-                          {day.items?.map((item, itemIndex) => {
+                        <div className="space-y-4">
+                          {sortedItems.map((item) => {
                             const itemType = getItemType(item.type);
                             const Icon = itemType.icon;
                             const itemFeedbackCount = item.feedbacks?.length || 0;
+                            const detailPairs = getItemDetailPairs(item);
                             
                             return (
                               <div 
                                 key={item.id} 
-                                className="relative flex gap-4 group"
+                                className="grid grid-cols-[40px_1fr] gap-4 group"
                               >
                                 {/* Timeline dot */}
-                                <div className={`absolute -left-[33px] w-8 h-8 rounded-full ${itemType.color} flex items-center justify-center z-10 shadow-lg`}>
-                                  <Icon className="w-4 h-4 text-white" />
+                                <div className="relative z-10 flex items-start justify-center pt-1">
+                                  <div className={`w-8 h-8 rounded-full ${itemType.color} flex items-center justify-center shadow-lg`}>
+                                    <Icon className="w-4 h-4 text-white" />
+                                  </div>
                                 </div>
 
                                 {/* Item content */}
                                 <div 
-                                  className="flex-1 bg-card border rounded-xl p-4 hover:shadow-md transition-shadow cursor-pointer"
-                                  onClick={() => handleEditItem(item)}
+                                  className="bg-card border rounded-xl p-4 hover:shadow-md transition-shadow"
                                 >
                                   <div className="flex items-start justify-between gap-4">
                                     <div className="flex-1 min-w-0">
@@ -818,7 +1052,7 @@ export default function ItineraryEditor() {
                                         )}
                                       </div>
                                       {item.description && (
-                                        <p className="text-sm text-muted-foreground mt-1 line-clamp-2">{item.description}</p>
+                                        <p className="text-sm text-muted-foreground mt-1">{item.description}</p>
                                       )}
                                       {item.location && (
                                         <p className="text-xs text-muted-foreground flex items-center gap-1 mt-2">
@@ -826,18 +1060,33 @@ export default function ItineraryEditor() {
                                           {item.location}
                                         </p>
                                       )}
+                                      {detailPairs.length > 0 && (
+                                        <div className="mt-3 grid gap-2 sm:grid-cols-2 lg:grid-cols-3 text-xs text-muted-foreground">
+                                          {detailPairs.map((pair) => (
+                                            <div key={`${pair.label}-${pair.value}`} className="rounded-lg bg-muted/40 px-2 py-1">
+                                              <span className="font-medium text-foreground/80">{pair.label}:</span>{' '}
+                                              {pair.value}
+                                            </div>
+                                          ))}
+                                        </div>
+                                      )}
                                     </div>
-                                    <Button 
-                                      variant="ghost" 
-                                      size="icon"
-                                      className="opacity-0 group-hover:opacity-100 transition-opacity"
-                                      onClick={(e) => {
-                                        e.stopPropagation();
-                                        setDeleteConfirm({ type: 'item', id: item.id });
-                                      }}
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => handleEditItem(item)}
+                                      >
+                                        <Pencil className="w-4 h-4" />
+                                      </Button>
+                                      <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        onClick={() => setDeleteConfirm({ type: 'item', id: item.id })}
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </Button>
+                                    </div>
                                   </div>
                                 </div>
                               </div>
@@ -846,14 +1095,16 @@ export default function ItineraryEditor() {
                         </div>
 
                         {/* Add item button */}
-                        <Button 
-                          variant="outline" 
-                          className="w-full mt-4 border-dashed gap-2" 
-                          onClick={() => handleAddItem(day.id)}
-                        >
-                          <Plus className="w-4 h-4" />
-                          Adicionar Item
-                        </Button>
+                        <div className="pl-14">
+                          <Button
+                            variant="outline"
+                            className="w-full mt-4 border-dashed gap-2"
+                            onClick={() => handleAddItem(day.id)}
+                          >
+                            <Plus className="w-4 h-4" />
+                            Adicionar Item
+                          </Button>
+                        </div>
                       </div>
                     </div>
                   )}
@@ -1097,6 +1348,11 @@ export default function ItineraryEditor() {
                 folder="days"
                 maxImages={10}
               />
+              <LinksEditor
+                value={dayForm.links || []}
+                onChange={(next) => setDayForm({ ...dayForm, links: next })}
+                label="Links do Dia"
+              />
             </div>
           </div>
           <div className="flex justify-end gap-2 pt-4 border-t flex-shrink-0">
@@ -1198,6 +1454,11 @@ export default function ItineraryEditor() {
                 label="Fotos do Item"
                 folder="items"
                 maxImages={8}
+              />
+              <LinksEditor
+                value={itemForm.links || []}
+                onChange={(next) => setItemForm({ ...itemForm, links: next })}
+                label="Links do Item"
               />
             </div>
           </div>

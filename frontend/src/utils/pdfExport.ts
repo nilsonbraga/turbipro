@@ -21,6 +21,21 @@ const formatDateTime = (date: string | Date) => {
   return `${formatDate(d)} ${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
 };
 
+const formatDateRange = (start?: any, end?: any) => {
+  const s = start ? formatDate(start) : "";
+  const e = end ? formatDate(end) : "";
+  if (!s && !e) return "";
+  if (s && e && s !== e) return `${s} → ${e}`;
+  return s || e;
+};
+
+const formatTime = (date: string | Date) => {
+  if (!date) return "";
+  const d = date instanceof Date ? date : new Date(date);
+  if (Number.isNaN(d.getTime())) return String(date);
+  return `${pad2(d.getHours())}:${pad2(d.getMinutes())}`;
+};
+
 const escapeHtml = (unsafe: any) => {
   const s = String(unsafe ?? "");
   return s
@@ -33,6 +48,9 @@ const escapeHtml = (unsafe: any) => {
 
 const isBlank = (v: any) =>
   v === null || v === undefined || (typeof v === "string" && v.trim() === "");
+
+const isEmptyValue = (v: any) =>
+  v === null || v === undefined || v === "" || (Array.isArray(v) && v.length === 0);
 
 const safeStr = (v: any) => String(v ?? "").trim();
 
@@ -113,7 +131,7 @@ const serviceLabels: Record<string, string> = {
   hotel: "Hotel",
   car: "Carro",
   package: "Pacote",
-  tour: "Roteiro",
+  tour: "Passeio / Roteiro",
   cruise: "Cruzeiro",
   insurance: "Seguro",
   transfer: "Transfer",
@@ -122,9 +140,15 @@ const serviceLabels: Record<string, string> = {
 
 const cabinLabels: Record<string, string> = {
   economy: "Econômica",
-  premium_economy: "Econômica Premium",
+  premium_economy: "Premium Economy",
   business: "Executiva",
   first: "Primeira Classe",
+};
+
+const tripTypeLabels: Record<string, string> = {
+  oneway: "Só ida",
+  roundtrip: "Ida e volta",
+  multicity: "Múltiplos trechos",
 };
 
 const boardLabels: Record<string, string> = {
@@ -132,7 +156,258 @@ const boardLabels: Record<string, string> = {
   BB: "Café da manhã",
   HB: "Meia pensão",
   FB: "Pensão completa",
-  AI: "Tudo incluído",
+  AI: "All inclusive",
+};
+
+const iconNodes: Record<string, Array<[string, Record<string, string>]>> = {
+  plane: [
+    [
+      "path",
+      {
+        d: "M17.8 19.2 16 11l3.5-3.5C21 6 21.5 4 21 3c-1-.5-3 0-4.5 1.5L13 8 4.8 6.2c-.5-.1-.9.1-1.1.5l-.3.5c-.2.5-.1 1 .3 1.3L9 12l-2 3H4l-1 1 3 2 2 3 1-1v-3l3-2 3.5 5.3c.3.4.8.5 1.3.3l.5-.2c.4-.3.6-.7.5-1.2z",
+        key: "1v9wt8",
+      },
+    ],
+  ],
+  hotel: [
+    ["path", { d: "M10 22v-6.57", key: "1wmca3" }],
+    ["path", { d: "M12 11h.01", key: "z322tv" }],
+    ["path", { d: "M12 7h.01", key: "1ivr5q" }],
+    ["path", { d: "M14 15.43V22", key: "1q2vjd" }],
+    ["path", { d: "M15 16a5 5 0 0 0-6 0", key: "o9wqvi" }],
+    ["path", { d: "M16 11h.01", key: "xkw8gn" }],
+    ["path", { d: "M16 7h.01", key: "1kdx03" }],
+    ["path", { d: "M8 11h.01", key: "1dfujw" }],
+    ["path", { d: "M8 7h.01", key: "1vti4s" }],
+    ["rect", { x: "4", y: "2", width: "16", height: "20", rx: "2", key: "1uxh74" }],
+  ],
+  car: [
+    [
+      "path",
+      {
+        d: "M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2",
+        key: "5owen",
+      },
+    ],
+    ["circle", { cx: "7", cy: "17", r: "2", key: "u2ysq9" }],
+    ["path", { d: "M9 17h6", key: "r8uit2" }],
+    ["circle", { cx: "17", cy: "17", r: "2", key: "axvx0g" }],
+  ],
+  package: [
+    [
+      "path",
+      {
+        d: "M11 21.73a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73z",
+        key: "1a0edw",
+      },
+    ],
+    ["path", { d: "M12 22V12", key: "d0xqtd" }],
+    [
+      "path",
+      { d: "m3.3 7 7.703 4.734a2 2 0 0 0 1.994 0L20.7 7", key: "yx3hmr" },
+    ],
+    ["path", { d: "m7.5 4.27 9 5.15", key: "1c824w" }],
+  ],
+  map: [
+    [
+      "path",
+      {
+        d: "M14.106 5.553a2 2 0 0 0 1.788 0l3.659-1.83A1 1 0 0 1 21 4.619v12.764a1 1 0 0 1-.553.894l-4.553 2.277a2 2 0 0 1-1.788 0l-4.212-2.106a2 2 0 0 0-1.788 0l-3.659 1.83A1 1 0 0 1 3 19.381V6.618a1 1 0 0 1 .553-.894l4.553-2.277a2 2 0 0 1 1.788 0z",
+        key: "169xi5",
+      },
+    ],
+    ["path", { d: "M15 5.764v15", key: "1pn4in" }],
+    ["path", { d: "M9 3.236v15", key: "1uimfh" }],
+  ],
+  ship: [
+    ["path", { d: "M12 10.189V14", key: "1p8cqu" }],
+    ["path", { d: "M12 2v3", key: "qbqxhf" }],
+    [
+      "path",
+      { d: "M19 13V7a2 2 0 0 0-2-2H7a2 2 0 0 0-2 2v6", key: "qpkstq" },
+    ],
+    [
+      "path",
+      {
+        d: "M19.38 20A11.6 11.6 0 0 0 21 14l-8.188-3.639a2 2 0 0 0-1.624 0L3 14a11.6 11.6 0 0 0 2.81 7.76",
+        key: "7tigtc",
+      },
+    ],
+    [
+      "path",
+      {
+        d: "M2 21c.6.5 1.2 1 2.5 1 2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1s1.2 1 2.5 1c2.5 0 2.5-2 5-2 1.3 0 1.9.5 2.5 1",
+        key: "1924j5",
+      },
+    ],
+  ],
+  shield: [
+    [
+      "path",
+      {
+        d: "M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z",
+        key: "oel41y",
+      },
+    ],
+  ],
+  bus: [
+    ["path", { d: "M8 6v6", key: "18i7km" }],
+    ["path", { d: "M15 6v6", key: "1sg6z9" }],
+    ["path", { d: "M2 12h19.6", key: "de5uta" }],
+    [
+      "path",
+      {
+        d: "M18 18h3s.5-1.7.8-2.8c.1-.4.2-.8.2-1.2 0-.4-.1-.8-.2-1.2l-1.4-5C20.1 6.8 19.1 6 18 6H4a2 2 0 0 0-2 2v10h3",
+        key: "1wwztk",
+      },
+    ],
+    ["circle", { cx: "7", cy: "18", r: "2", key: "19iecd" }],
+    ["path", { d: "M9 18h5", key: "lrx6i" }],
+    ["circle", { cx: "16", cy: "18", r: "2", key: "1v4tcr" }],
+  ],
+  calendar: [
+    ["path", { d: "M8 2v4", key: "1cmpym" }],
+    ["path", { d: "M16 2v4", key: "4m81vk" }],
+    ["rect", { width: "18", height: "18", x: "3", y: "4", rx: "2", key: "1hopcy" }],
+    ["path", { d: "M3 10h18", key: "8toen8" }],
+  ],
+  ticket: [
+    [
+      "path",
+      {
+        d: "M2 9a3 3 0 0 1 0 6v2a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-2a3 3 0 0 1 0-6V7a2 2 0 0 0-2-2H4a2 2 0 0 0-2 2Z",
+        key: "qn84l0",
+      },
+    ],
+    ["path", { d: "M13 5v2", key: "dyzc3o" }],
+    ["path", { d: "M13 17v2", key: "1ont0d" }],
+    ["path", { d: "M13 11v2", key: "1wjjxi" }],
+  ],
+  users: [
+    ["path", { d: "M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2", key: "1yyitq" }],
+    ["circle", { cx: "9", cy: "7", r: "4", key: "nufk8" }],
+    ["path", { d: "M22 21v-2a4 4 0 0 0-3-3.87", key: "kshegd" }],
+    ["path", { d: "M16 3.13a4 4 0 0 1 0 7.75", key: "1da9ce" }],
+  ],
+  briefcase: [
+    ["path", { d: "M16 20V4a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16", key: "jecpp" }],
+    ["rect", { width: "20", height: "14", x: "2", y: "6", rx: "2", key: "i6l2r4" }],
+  ],
+  luggage: [
+    ["path", { d: "M6 20a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v10a2 2 0 0 1-2 2", key: "1m57jg" }],
+    ["path", { d: "M8 18V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v14", key: "1l99gc" }],
+    ["path", { d: "M10 20h4", key: "ni2waw" }],
+    ["circle", { cx: "16", cy: "20", r: "2", key: "1vifvg" }],
+    ["circle", { cx: "8", cy: "20", r: "2", key: "ckkr5m" }],
+  ],
+  bed: [
+    ["path", { d: "M2 20v-8a2 2 0 0 1 2-2h16a2 2 0 0 1 2 2v8", key: "1k78r4" }],
+    ["path", { d: "M4 10V6a2 2 0 0 1 2-2h12a2 2 0 0 1 2 2v4", key: "fb3tl2" }],
+    ["path", { d: "M12 4v6", key: "1dcgq2" }],
+    ["path", { d: "M2 18h20", key: "ajqnye" }],
+  ],
+  utensils: [
+    ["path", { d: "m16 2-2.3 2.3a3 3 0 0 0 0 4.2l1.8 1.8a3 3 0 0 0 4.2 0L22 8", key: "n7qcjb" }],
+    ["path", { d: "M15 15 3.3 3.3a4.2 4.2 0 0 0 0 6l7.3 7.3c.7.7 2 .7 2.8 0L15 15Zm0 0 7 7", key: "d0u48b" }],
+    ["path", { d: "m2.1 21.8 6.4-6.3", key: "yn04lh" }],
+    ["path", { d: "m19 5-7 7", key: "194lzd" }],
+  ],
+  key: [
+    [
+      "path",
+      {
+        d: "M2.586 17.414A2 2 0 0 0 2 18.828V21a1 1 0 0 0 1 1h3a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h1a1 1 0 0 0 1-1v-1a1 1 0 0 1 1-1h.172a2 2 0 0 0 1.414-.586l.814-.814a6.5 6.5 0 1 0-4-4z",
+        key: "1s6t7t",
+      },
+    ],
+    ["circle", { cx: "16.5", cy: "7.5", r: ".5", fill: "currentColor", key: "w0ekpg" }],
+  ],
+  building: [
+    ["path", { d: "M6 22V4a2 2 0 0 1 2-2h8a2 2 0 0 1 2 2v18Z", key: "1b4qmf" }],
+    ["path", { d: "M6 12H4a2 2 0 0 0-2 2v6a2 2 0 0 0 2 2h2", key: "i71pzd" }],
+    ["path", { d: "M18 9h2a2 2 0 0 1 2 2v9a2 2 0 0 1-2 2h-2", key: "10jefs" }],
+    ["path", { d: "M10 6h4", key: "1itunk" }],
+    ["path", { d: "M10 10h4", key: "tcdvrf" }],
+    ["path", { d: "M10 14h4", key: "kelpxr" }],
+    ["path", { d: "M10 18h4", key: "1ulq68" }],
+  ],
+  wallet: [
+    [
+      "path",
+      {
+        d: "M19 7V4a1 1 0 0 0-1-1H5a2 2 0 0 0 0 4h15a1 1 0 0 1 1 1v4h-3a2 2 0 0 0 0 4h3a1 1 0 0 0 1-1v-2a1 1 0 0 0-1-1",
+        key: "18etb6",
+      },
+    ],
+    ["path", { d: "M3 5v14a2 2 0 0 0 2 2h15a1 1 0 0 0 1-1v-4", key: "xoc0q4" }],
+  ],
+  mapPin: [
+    [
+      "path",
+      {
+        d: "M20 10c0 4.993-5.539 10.193-7.399 11.799a1 1 0 0 1-1.202 0C9.539 20.193 4 14.993 4 10a8 8 0 0 1 16 0",
+        key: "1r0f0z",
+      },
+    ],
+    ["circle", { cx: "12", cy: "10", r: "3", key: "ilqhr7" }],
+  ],
+  mail: [
+    ["rect", { width: "20", height: "16", x: "2", y: "4", rx: "2", key: "18n3k1" }],
+    ["path", { d: "m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7", key: "1ocrg3" }],
+  ],
+  phone: [
+    [
+      "path",
+      {
+        d: "M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z",
+        key: "foiqr5",
+      },
+    ],
+  ],
+  gauge: [
+    ["path", { d: "m12 14 4-4", key: "9kzdfg" }],
+    ["path", { d: "M3.34 19a10 10 0 1 1 17.32 0", key: "19p75a" }],
+  ],
+  activity: [
+    [
+      "path",
+      {
+        d: "M22 12h-2.48a2 2 0 0 0-1.93 1.46l-2.35 8.36a.25.25 0 0 1-.48 0L9.24 2.18a.25.25 0 0 0-.48 0l-2.35 8.36A2 2 0 0 1 4.49 12H2",
+        key: "169zse",
+      },
+    ],
+  ],
+  moon: [
+    ["path", { d: "M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z", key: "a7tn18" }],
+  ],
+  dot: [["circle", { cx: "12", cy: "12", r: "1.25", fill: "currentColor", key: "dot" }]],
+};
+
+const renderIcon = (name: string, className = "") => {
+  const nodes = iconNodes[name] || iconNodes.dot;
+  const cls = className ? ` ${className}` : "";
+  const body = nodes
+    .map(([tag, attrs]) => {
+      const attrStr = Object.entries(attrs)
+        .filter(([key]) => key !== "key")
+        .map(([key, value]) => `${key}="${escapeHtml(String(value))}"`)
+        .join(" ");
+      return `<${tag}${attrStr ? ` ${attrStr}` : ""} />`;
+    })
+    .join("");
+  return `<svg class="icon${cls}" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${body}</svg>`;
+};
+
+const serviceIconMap: Record<string, string> = {
+  flight: "plane",
+  hotel: "hotel",
+  car: "car",
+  package: "package",
+  tour: "map",
+  cruise: "ship",
+  insurance: "shield",
+  transfer: "bus",
+  other: "package",
 };
 
 const keyLabelPt: Record<string, string> = {
@@ -349,6 +624,65 @@ function buildKeyValueList(items: Array<{ key?: string; label: string; value?: a
   `;
 }
 
+function buildPillGrid(items: Array<{ label: string; value: any }>) {
+  const clean = items.filter((item) => !isBlank(item.value));
+  if (!clean.length) return "";
+
+  return `
+    <div class="pill-grid">
+      ${clean
+        .map((item) => {
+          const vv = formatValueByKey(item.label, item.value);
+          if (isBlank(vv)) return "";
+          return `
+            <div class="pill">
+              <div class="pill-label">${escapeHtml(item.label)}</div>
+              <div class="pill-value">${escapeHtml(vv)}</div>
+            </div>
+          `;
+        })
+        .filter(Boolean)
+        .join("")}
+    </div>
+  `;
+}
+
+function formatInfoValue(value: any) {
+  if (isEmptyValue(value)) return "";
+  if (typeof value === "boolean") return value ? "Sim" : "Não";
+  if (Array.isArray(value)) {
+    return value
+      .map((item) => (item == null ? "" : String(item)))
+      .filter((item) => !isBlank(item))
+      .join(", ");
+  }
+  return String(value);
+}
+
+function renderInfoPill(icon: string, label: string, value: any) {
+  const v = formatInfoValue(value);
+  if (isBlank(v)) return "";
+  return `
+    <div class="info-pill">
+      <div class="info-icon">${renderIcon(icon, "icon-xs")}</div>
+      <div class="info-text">
+        <div class="info-label">${escapeHtml(label)}</div>
+        <div class="info-value">${escapeHtml(v)}</div>
+      </div>
+    </div>
+  `;
+}
+
+function renderMetaLine(icon: string, value: string) {
+  if (isBlank(value)) return "";
+  return `
+    <div class="meta-line">
+      ${renderIcon(icon, "icon-sm")}
+      <span>${escapeHtml(value)}</span>
+    </div>
+  `;
+}
+
 function renderValueCompact(v: any): string {
   if (isBlank(v)) return "";
   if (typeof v === "boolean") return v ? "Sim" : "Não";
@@ -390,6 +724,62 @@ function renderValueCompact(v: any): string {
   }
 
   return String(v);
+}
+
+function renderExtraDetails(details: any, exclude: string[] = []) {
+  const blacklist = new Set([
+    "unit_value",
+    "quantity",
+    "commission_value",
+    "commission_type",
+    "segments",
+    "passengers",
+    "baggage",
+  ]);
+
+  const entries = Object.entries(details || {}).filter(([k, v]) => {
+    if (exclude.includes(k) || blacklist.has(k)) return false;
+    if (isEmptyValue(v)) return false;
+    if (typeof v === "object" && !Array.isArray(v)) return false;
+    return true;
+  });
+
+  if (!entries.length) return "";
+
+  const rows = entries
+    .map(([k, v]) => {
+      let value = "";
+      if (Array.isArray(v)) {
+        value = v
+          .map((item) => renderValueCompact(item))
+          .filter(Boolean)
+          .join(" • ");
+      } else if (typeof v === "boolean") {
+        value = v ? "Sim" : "Não";
+      } else {
+        value = formatValueByKey(k, v);
+      }
+      if (isBlank(value)) return "";
+      return `
+        <div class="extra-row">
+          <div class="extra-label">${escapeHtml(toLabelPT(k))}</div>
+          <div class="extra-value">${escapeHtml(value)}</div>
+        </div>
+      `;
+    })
+    .filter(Boolean)
+    .join("");
+
+  if (!rows) return "";
+
+  return `
+    <div class="extra-details">
+      <div class="extra-title">Outros detalhes</div>
+      <div class="extra-list">
+        ${rows}
+      </div>
+    </div>
+  `;
 }
 
 function hasAnyNonBlankDeep(obj: any): boolean {
@@ -584,515 +974,552 @@ function getServicePricing(service: ProposalService) {
   return { total, quantity: normalizedQty, unitValue };
 }
 
-/* -------------------- Render por tipo (sem “cards dentro de cards”) -------------------- */
+/* -------------------- Render por tipo (layout público) -------------------- */
 
-function renderFlightDetails(details: any): string {
-  if (!details) return "";
-  const used = new Set<string>();
+function renderFlightDetails(service: ProposalService): string {
+  const details: any = service.details || {};
+  const provider = (service as any)?.partners?.name || (service as any)?.provider;
 
   const passengers = Array.isArray(details.passengers) ? details.passengers : [];
-  used.add("passengers");
-
-  const paxInfo = passengers
+  const paxSummary = passengers
     .map((p: any) => {
-      const labels: Record<string, string> = {
-        ADT: "Adulto",
-        CHD: "Criança",
-        INF: "Bebê",
-      };
       const count = Number(p?.count || 0);
-      if (!count) return null;
-      const type = labels[p?.type] || p?.type || "Passageiro";
-      return `${count} ${type}${count > 1 ? "s" : ""}`;
+      if (!count) return "";
+      const label =
+        p?.type === "ADT"
+          ? "Adulto"
+          : p?.type === "CHD"
+          ? "Criança"
+          : p?.type === "INF"
+          ? "Bebê"
+          : "Passageiro";
+      return `${count} ${label}${count > 1 ? "s" : ""}`;
     })
     .filter(Boolean)
     .join(", ");
 
-  used.add("cabinClass");
-
-  const baggage = details.baggage || null;
-  if (baggage) used.add("baggage");
-
-  const baggageItems: string[] = [];
-  if (baggage?.carryOn) baggageItems.push(`${baggage.carryOnQty || 1}x Mão`);
-  if (baggage?.checked)
-    baggageItems.push(
-      `${baggage.checkedQty || 1}x Despachada (${baggage.checkedWeight || "23kg"})`
-    );
-
-  used.add("pnr");
-
-  const top = buildKeyValueList([
-    { key: "passengers", label: "Passageiros", value: paxInfo },
-    {
-      key: "cabinClass",
-      label: "Classe",
-      value: details.cabinClass
-        ? cabinLabels[details.cabinClass] || details.cabinClass
-        : "",
-    },
-    {
-      key: "baggage",
-      label: "Bagagem",
-      value: baggageItems.length ? baggageItems.join(" + ") : "",
-    },
-    { key: "pnr", label: "Localizador", value: details.pnr || "" },
-  ]);
-
-  const segments = Array.isArray(details.segments) ? details.segments : [];
-  used.add("segments");
-
-  const parseMs = (iso: any) => {
-    const d = new Date(iso);
-    return Number.isNaN(d.getTime()) ? null : d.getTime();
-  };
-
-  const diffHuman = (ms: number) => {
-    const min = Math.max(0, Math.round(ms / 60000));
-    const h = Math.floor(min / 60);
-    const m = min % 60;
-    if (!h) return `${m}min`;
-    if (!m) return `${h}h`;
-    return `${h}h${String(m).padStart(2, "0")}`;
-  };
-
-  const stopsCount = Math.max(0, segments.length - 1);
-
-  const segRows = segments
-    .filter((s: any) => s?.fromIata || s?.toIata || s?.departureAt || s?.arrivalAt)
-    .map((seg: any, idx: number) => {
-      const route = `${escapeHtml(seg.fromIata || "---")} → ${escapeHtml(
-        seg.toIata || "---"
-      )}`;
-
-      const flightNo =
-        seg.airlineCode && seg.flightNumber
-          ? `${escapeHtml(seg.airlineCode)}${escapeHtml(seg.flightNumber)}`
-          : "";
-
-      const dep = seg.departureAt ? formatDateTime(seg.departureAt) : "";
-      const arr = seg.arrivalAt ? formatDateTime(seg.arrivalAt) : "";
-
-      const segDuration =
-        seg.duration || seg.durationMinutes
-          ? seg.duration
-            ? String(seg.duration)
-            : `${Math.round(Number(seg.durationMinutes))}min`
-          : "";
-
-      const extraParts = [
-        segDuration ? `Duração: ${escapeHtml(segDuration)}` : "",
-        seg.cabinClass
-          ? `Classe: ${escapeHtml(cabinLabels[seg.cabinClass] || seg.cabinClass)}`
-          : "",
-        seg.aircraft || seg.aircraftModel
-          ? `Aeronave: ${escapeHtml(seg.aircraft || seg.aircraftModel)}`
-          : "",
-        seg.operatedBy || seg.operatingAirline
-          ? `Operado por: ${escapeHtml(seg.operatedBy || seg.operatingAirline)}`
-          : "",
-        seg.terminal ? `Terminal: ${escapeHtml(seg.terminal)}` : "",
-        seg.gate ? `Portão: ${escapeHtml(seg.gate)}` : "",
-        seg.bookingClass ? `Classe de reserva: ${escapeHtml(seg.bookingClass)}` : "",
-        seg.fareFamily ? `Família tarifária: ${escapeHtml(seg.fareFamily)}` : "",
-      ].filter(Boolean);
-
-      let connHtml = "";
-      if (idx < segments.length - 1) {
-        const a = parseMs(seg.arrivalAt);
-        const b = parseMs(segments[idx + 1]?.departureAt);
-        if (a != null && b != null && b > a) {
-          connHtml = `<div class="conn">Conexão em <strong>${escapeHtml(
-            seg.toIata || ""
-          )}</strong>: ${escapeHtml(diffHuman(b - a))}</div>`;
-        } else {
-          const conn = seg.connection || seg.layover || "";
-          if (conn)
-            connHtml = `<div class="conn">Conexão: ${escapeHtml(
-              renderValueCompact(conn)
-            )}</div>`;
-        }
-      }
-
-      const timeLine = [dep ? `Partida: ${dep}` : "", arr ? `Chegada: ${arr}` : ""]
-        .filter(Boolean)
-        .join(" • ");
-
-      return `
-        <div class="seg-row">
-          <div>
-            <div class="seg-route">${route}</div>
-            ${
-              extraParts.length
-                ? `<div class="seg-extra">${extraParts.join(" • ")}</div>`
-                : ""
-            }
-            ${connHtml}
-          </div>
-          <div class="seg-time">${escapeHtml(timeLine)}</div>
-          <div class="seg-right">${
-            flightNo ? `<span class="seg-chip">${flightNo}</span>` : ""
-          }</div>
-        </div>
-      `;
-    })
-    .join("");
-
-  const segHtml = segRows
-    ? `
-      <div class="subsection">
-        <div class="subsection-title">
-          Trechos${
-            stopsCount
-              ? ` • ${stopsCount} ${pluralize(stopsCount, "conexão", "conexões")}`
-              : ""
-          }
-        </div>
-        <div class="segments">
-          <div class="seg-head">
-            <div>Rota</div>
-            <div>Horários</div>
-            <div>Voo</div>
-          </div>
-          ${segRows}
-        </div>
-      </div>
-    `
+  const baggage = details?.baggage || {};
+  const carryOnText = baggage?.carryOn ? `${baggage.carryOnQty || 1}x` : "";
+  const checkedText = baggage?.checked
+    ? `${baggage.checkedQty || 1}x${
+        baggage.checkedWeight ? ` (${baggage.checkedWeight})` : ""
+      }`
     : "";
 
-  const remaining = renderAllRemainingDetails(
-    details,
-    used,
-    "Detalhes adicionais do voo"
-  );
-  return `${top}${segHtml}${remaining}`;
-}
+  const segments = Array.isArray(details.segments) ? details.segments : [];
+  const firstSegment = segments[0] || {};
+  const airline =
+    details?.airline ||
+    (service as any)?.airline ||
+    firstSegment?.airlineCode ||
+    firstSegment?.operatingCarrier ||
+    "";
+  const mainFlightNumber = firstSegment?.flightNumber || details?.flight_number || "";
 
-function renderHotelDetails(details: any): string {
-  if (!details) return "";
-  const used = new Set<string>();
+  const pills = [
+    renderInfoPill("briefcase", "Fornecedor", provider),
+    renderInfoPill("users", "Passageiros", paxSummary),
+    renderInfoPill("plane", "Companhia", airline),
+    renderInfoPill("ticket", "Voo", mainFlightNumber),
+    details?.tripType
+      ? renderInfoPill(
+          "plane",
+          "Tipo de viagem",
+          tripTypeLabels[details.tripType] || details.tripType
+        )
+      : "",
+    details?.cabinClass
+      ? renderInfoPill(
+          "ticket",
+          "Classe",
+          cabinLabels[details.cabinClass] || details.cabinClass
+        )
+      : "",
+    details?.fareClass
+      ? renderInfoPill("ticket", "Classe tarifária", details.fareClass)
+      : "",
+    carryOnText ? renderInfoPill("briefcase", "Bagagem de mão", carryOnText) : "",
+    checkedText ? renderInfoPill("luggage", "Despachada", checkedText) : "",
+    details?.pnr ? renderInfoPill("ticket", "Localizador", details.pnr) : "",
+    typeof details?.refundable === "boolean"
+      ? renderInfoPill("shield", "Reembolsável", details.refundable)
+      : "",
+  ]
+    .filter(Boolean)
+    .join("");
 
-  used.add("hotelName");
-  used.add("city");
-  used.add("country");
-  used.add("checkIn");
-  used.add("checkOut");
-  used.add("checkInTime");
-  used.add("checkOutTime");
-  used.add("roomType");
-  used.add("board");
-  used.add("guests");
-  used.add("confirmationNumber");
-  used.add("photos");
-  used.add("quantity");
-  used.add("unit_value");
-
-  const guestsParts: string[] = [];
-  if (details?.guests?.adults)
-    guestsParts.push(
-      `${details.guests.adults} adulto${details.guests.adults > 1 ? "s" : ""}`
-    );
-  if (details?.guests?.children)
-    guestsParts.push(
-      `${details.guests.children} criança${details.guests.children > 1 ? "s" : ""}`
-    );
-
-  const checkInTime = details.checkInTime ? ` ${details.checkInTime}` : "";
-  const checkOutTime = details.checkOutTime ? ` ${details.checkOutTime}` : "";
-
-  const title = !isBlank(details.hotelName) ? `${details.hotelName}` : "";
-
-  const photos = Array.isArray(details.photos)
-    ? details.photos.filter((photo: any) => typeof photo === "string" && photo.trim().length > 0).slice(0, 4)
-    : [];
-
-  const photoBlock = photos.length
+  const segmentsHtml = segments.length
     ? `
-      <div class="subsection">
-        <div class="subsection-title">Fotos do hotel</div>
-        <div class="photo-grid">
-          ${photos
-            .map((photo: string) => `<div class="photo-cell"><img src="${escapeHtml(photo)}" alt="Hotel"/></div>`)
+      <div class="detail-section">
+        <div class="detail-section-title">Trechos</div>
+        <div class="segment-list">
+          ${segments
+            .map((seg: any, idx: number) => {
+              const flightNo =
+                seg?.airlineCode || seg?.flightNumber
+                  ? `${seg?.airlineCode || ""}${
+                      seg?.flightNumber ? ` ${seg.flightNumber}` : ""
+                    }`
+                  : "";
+              const dep = formatDateTime(seg?.departureAt);
+              const arr = formatDateTime(seg?.arrivalAt);
+
+              const connections = Array.isArray(seg?.connections)
+                ? seg.connections
+                : [];
+
+              const connectionsHtml = connections.length
+                ? `
+                  <div class="segment-connections">
+                    <div class="segment-conn-title">Conexões</div>
+                    ${connections
+                      .map((conn: any, cIdx: number) => {
+                        const connFlight =
+                          conn?.airlineCode || conn?.flightNumber
+                            ? `${conn?.airlineCode || ""}${
+                                conn?.flightNumber ? ` ${conn.flightNumber}` : ""
+                              }`
+                            : "";
+                        const times = [
+                          conn?.departureAt
+                            ? `Saída ${formatTime(conn.departureAt)}`
+                            : "",
+                          conn?.arrivalAt
+                            ? `Chegada ${formatTime(conn.arrivalAt)}`
+                            : "",
+                        ]
+                          .filter(Boolean)
+                          .join("  ");
+                        return `
+                          <div class="segment-conn-row" key="${idx}-${cIdx}">
+                            <div class="segment-conn-code">${escapeHtml(
+                              String(conn?.iata || "---").toUpperCase()
+                            )}</div>
+                            <div class="segment-conn-meta">${escapeHtml(
+                              [times, connFlight].filter(Boolean).join(" | ")
+                            )}</div>
+                          </div>
+                        `;
+                      })
+                      .join("")}
+                  </div>
+                `
+                : "";
+
+              const timesHtml =
+                dep || arr
+                  ? `
+                    <div class="segment-times">
+                      ${dep ? `<div>Partida: ${escapeHtml(dep)}</div>` : ""}
+                      ${arr ? `<div>Chegada: ${escapeHtml(arr)}</div>` : ""}
+                    </div>
+                  `
+                  : "";
+
+              return `
+                <div class="segment-card">
+                  <div class="segment-top">
+                    <div class="segment-route">${escapeHtml(
+                      String(seg?.fromIata || "---").toUpperCase()
+                    )} → ${escapeHtml(
+                      String(seg?.toIata || "---").toUpperCase()
+                    )}</div>
+                    ${
+                      flightNo
+                        ? `<div class="segment-flight">${escapeHtml(flightNo)}</div>`
+                        : ""
+                    }
+                  </div>
+                  ${timesHtml}
+                  ${connectionsHtml}
+                </div>
+              `;
+            })
             .join("")}
         </div>
       </div>
     `
     : "";
 
-  const base = `
-    ${title ? `<div class="service-main">${escapeHtml(title)}</div>` : ""}
-    ${buildKeyValueList([
-      {
-        key: "local",
-        label: "Local",
-        value: [details.city, details.country].filter(Boolean).join(", "),
-      },
-      {
-        key: "periodo",
-        label: "Período",
-        value:
-          (details.checkIn ? `${formatDate(details.checkIn)}${checkInTime}` : "") +
-          (details.checkIn && details.checkOut ? " → " : "") +
-          (details.checkOut ? `${formatDate(details.checkOut)}${checkOutTime}` : ""),
-      },
-      { key: "roomType", label: "Quarto", value: details.roomType || "" },
-      {
-        key: "board",
-        label: "Regime",
-        value: details.board ? boardLabels[details.board] || details.board : "",
-      },
-      { key: "guests", label: "Hóspedes", value: guestsParts.join(", ") },
-      {
-        key: "confirmationNumber",
-        label: "Confirmação",
-        value: details.confirmationNumber || "",
-      },
-    ])}
-    ${photoBlock}
-  `;
+  const extras = renderExtraDetails(details, [
+    "passengers",
+    "segments",
+    "baggage",
+    "pnr",
+    "tripType",
+    "cabinClass",
+    "fareClass",
+    "refundable",
+  ]);
 
-  const remaining = renderAllRemainingDetails(
-    details,
-    used,
-    "Detalhes adicionais do hotel"
-  );
-  return `${base}${remaining}`;
+  return `
+    <div class="detail-block">
+      ${pills ? `<div class="info-grid">${pills}</div>` : ""}
+      ${segmentsHtml}
+      ${extras}
+    </div>
+  `;
 }
 
-function renderCarDetails(details: any): string {
-  if (!details) return "";
-  const used = new Set<string>();
+function renderHotelDetails(service: ProposalService): string {
+  const details: any = service.details || {};
+  const provider = (service as any)?.partners?.name || (service as any)?.provider;
+  const guests = details?.guests || {};
+  const totalGuests = Number(guests.adults || 0) + Number(guests.children || 0);
 
-  used.add("rentalCompany");
-  used.add("carCategory");
-  used.add("transmission");
-  used.add("pickupLocation");
-  used.add("pickupAt");
-  used.add("dropoffLocation");
-  used.add("dropoffAt");
-  used.add("mileagePolicy");
-  used.add("fuelPolicy");
-  used.add("insurance");
-  used.add("deposit");
-  used.add("driverAge");
-  used.add("franchise");
+  const nights = (() => {
+    const a = details?.checkIn ? new Date(details.checkIn) : null;
+    const b = details?.checkOut ? new Date(details.checkOut) : null;
+    if (!a || !b || Number.isNaN(a.getTime()) || Number.isNaN(b.getTime()))
+      return null;
+    return Math.max(0, Math.round((b.getTime() - a.getTime()) / 86400000));
+  })();
 
-  const trans =
-    details.transmission === "auto"
+  const pills = [
+    renderInfoPill("briefcase", "Fornecedor", provider),
+    renderInfoPill("bed", "Hotel", details?.hotelName),
+    renderInfoPill(
+      "mapPin",
+      "Local",
+      [details?.city, details?.country, details?.address]
+        .filter(Boolean)
+        .join(" • ")
+    ),
+    renderInfoPill("key", "Quarto", details?.roomType),
+    renderInfoPill(
+      "utensils",
+      "Regime",
+      details?.board ? boardLabels[details.board] || details.board : ""
+    ),
+    totalGuests > 0
+      ? renderInfoPill(
+          "users",
+          "Hóspedes",
+          `${totalGuests} hóspede${totalGuests > 1 ? "s" : ""}`
+        )
+      : "",
+    renderInfoPill("ticket", "Tarifa", details?.ratePlan),
+  ]
+    .filter(Boolean)
+    .join("");
+
+  const checkInText = formatDateTime(details?.checkIn);
+  const checkOutText = formatDateTime(details?.checkOut);
+  const lines = `
+    <div class="detail-lines">
+      ${
+        checkInText
+          ? `<div>Check-in: ${escapeHtml(checkInText)}${
+              details?.checkInTime ? ` às ${escapeHtml(details.checkInTime)}` : ""
+            }</div>`
+          : ""
+      }
+      ${
+        checkOutText
+          ? `<div>Check-out: ${escapeHtml(checkOutText)}${
+              details?.checkOutTime ? ` às ${escapeHtml(details.checkOutTime)}` : ""
+            }</div>`
+          : ""
+      }
+      ${
+        nights != null
+          ? `<div class="detail-strong">Estadia: ${nights} noite${
+              nights === 1 ? "" : "s"
+            }</div>`
+          : ""
+      }
+    </div>
+  `;
+
+  const photos = Array.isArray(details?.photos)
+    ? details.photos.filter((photo: string) => Boolean(photo)).slice(0, 6)
+    : [];
+
+  const photoBlock = photos.length
+    ? `
+      <div class="detail-section">
+        <div class="detail-section-title">Fotos do hotel</div>
+        <div class="photo-grid">
+          ${photos
+            .map(
+              (photo: string) =>
+                `<div class="photo-cell"><img src="${escapeHtml(
+                  photo
+                )}" alt="Hotel"/></div>`
+            )
+            .join("")}
+        </div>
+      </div>
+    `
+    : "";
+
+  const extras = renderExtraDetails(details, [
+    "hotelName",
+    "city",
+    "country",
+    "address",
+    "checkIn",
+    "checkOut",
+    "checkInTime",
+    "checkOutTime",
+    "roomType",
+    "board",
+    "guests",
+    "ratePlan",
+    "photos",
+  ]);
+
+  return `
+    <div class="detail-block">
+      ${pills ? `<div class="info-grid">${pills}</div>` : ""}
+      ${lines}
+      ${photoBlock}
+      ${extras}
+    </div>
+  `;
+}
+
+function renderCarDetails(service: ProposalService): string {
+  const details: any = service.details || {};
+  const provider = (service as any)?.partners?.name || (service as any)?.provider;
+  const transmission =
+    details?.transmission === "auto"
       ? "Automático"
-      : details.transmission === "manual"
+      : details?.transmission === "manual"
       ? "Manual"
-      : translateCommonValuePT(details.transmission || "");
+      : details?.transmission || "";
 
-  const title = !isBlank(details.rentalCompany) ? `${details.rentalCompany}` : "";
+  const pills = [
+    renderInfoPill("briefcase", "Fornecedor", provider),
+    renderInfoPill("building", "Locadora", details?.rentalCompany),
+    renderInfoPill("car", "Categoria", details?.carCategory),
+    renderInfoPill("key", "Câmbio", transmission),
+    renderInfoPill("shield", "Seguro", details?.insurance),
+    renderInfoPill("wallet", "Depósito", details?.deposit),
+  ]
+    .filter(Boolean)
+    .join("");
 
-  const base = `
-    ${title ? `<div class="service-main">${escapeHtml(title)}</div>` : ""}
-    ${buildKeyValueList([
-      {
-        key: "carCategory",
-        label: "Categoria",
-        value: details.carCategory
-          ? `${details.carCategory}${trans ? ` (${trans})` : ""}`
-          : "",
-      },
-      {
-        key: "pickup",
-        label: "Retirada",
-        value:
-          details.pickupLocation && details.pickupAt
-            ? `${details.pickupLocation} • ${formatDateTime(details.pickupAt)}`
-            : "",
-      },
-      {
-        key: "dropoff",
-        label: "Devolução",
-        value:
-          details.dropoffLocation && details.dropoffAt
-            ? `${details.dropoffLocation} • ${formatDateTime(details.dropoffAt)}`
-            : "",
-      },
-      {
-        key: "mileagePolicy",
-        label: "Política de quilometragem",
-        value: details.mileagePolicy || "",
-      },
-      {
-        key: "fuelPolicy",
-        label: "Política de combustível",
-        value: details.fuelPolicy || "",
-      },
-      { key: "deposit", label: "Caução", value: details.deposit ?? "" },
-      { key: "franchise", label: "Franquia", value: details.franchise ?? "" },
-      { key: "insurance", label: "Seguro", value: details.insurance || "" },
-    ])}
+  const pickupAt = details?.pickupAt ? formatDateTime(details.pickupAt) : "";
+  const dropoffAt = details?.dropoffAt ? formatDateTime(details.dropoffAt) : "";
+  const lines = `
+    <div class="detail-lines">
+      ${
+        details?.pickupLocation
+          ? `<div>Retirada: ${escapeHtml(details.pickupLocation)}${
+              pickupAt ? ` • ${escapeHtml(pickupAt)}` : ""
+            }</div>`
+          : ""
+      }
+      ${
+        details?.dropoffLocation
+          ? `<div>Devolução: ${escapeHtml(details.dropoffLocation)}${
+              dropoffAt ? ` • ${escapeHtml(dropoffAt)}` : ""
+            }</div>`
+          : ""
+      }
+    </div>
   `;
 
-  const remaining = renderAllRemainingDetails(
-    details,
-    used,
-    "Detalhes adicionais do carro"
-  );
-  return `${base}${remaining}`;
+  const extras = renderExtraDetails(details, [
+    "pickupAt",
+    "dropoffAt",
+    "pickupLocation",
+    "dropoffLocation",
+    "rentalCompany",
+    "carCategory",
+    "transmission",
+    "insurance",
+    "deposit",
+  ]);
+
+  return `
+    <div class="detail-block">
+      ${pills ? `<div class="info-grid">${pills}</div>` : ""}
+      ${lines}
+      ${extras}
+    </div>
+  `;
 }
 
-function renderCruiseDetails(details: any): string {
-  if (!details) return "";
-  const used = new Set<string>();
+function renderCruiseDetails(service: ProposalService): string {
+  const details: any = service.details || {};
+  const provider = (service as any)?.partners?.name || (service as any)?.provider;
 
-  used.add("cruiseLine");
-  used.add("shipName");
-  used.add("embarkPort");
-  used.add("disembarkPort");
-  used.add("sailingDate");
-  used.add("returnDate");
-  used.add("cabinType");
-  used.add("cabinCategory");
-  used.add("itineraryPorts");
+  const pills = [
+    renderInfoPill("briefcase", "Fornecedor", provider),
+    renderInfoPill("ship", "Navio", details?.ship || details?.shipName),
+    renderInfoPill("bed", "Cabine", details?.cabin || details?.cabinType),
+  ]
+    .filter(Boolean)
+    .join("");
 
-  const title = [details.cruiseLine, details.shipName].filter(Boolean).join(" ");
-  const main = title ? `${title}` : "";
-
-  const base = `
-    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ""}
-    ${buildKeyValueList([
-      {
-        key: "ports",
-        label: "Portos",
-        value: [details.embarkPort, details.disembarkPort].filter(Boolean).join(" → "),
-      },
-      {
-        key: "period",
-        label: "Período",
-        value:
-          (details.sailingDate ? formatDate(details.sailingDate) : "") +
-          (details.sailingDate && details.returnDate ? " → " : "") +
-          (details.returnDate ? formatDate(details.returnDate) : ""),
-      },
-      {
-        key: "cabin",
-        label: "Cabine",
-        value: [details.cabinType, details.cabinCategory].filter(Boolean).join(" - "),
-      },
-      { key: "itineraryPorts", label: "Itinerário", value: details.itineraryPorts || "" },
-    ])}
+  const lines = `
+    <div class="detail-lines">
+      ${
+        details?.sailingDate || details?.startDate
+          ? `<div>Início: ${escapeHtml(
+              formatDateTime(details?.sailingDate || details?.startDate)
+            )}</div>`
+          : ""
+      }
+      ${
+        details?.returnDate || details?.endDate
+          ? `<div>Retorno: ${escapeHtml(
+              formatDateTime(details?.returnDate || details?.endDate)
+            )}</div>`
+          : ""
+      }
+    </div>
   `;
 
-  const remaining = renderAllRemainingDetails(
-    details,
-    used,
-    "Detalhes adicionais do cruzeiro"
-  );
-  return `${base}${remaining}`;
+  const extras = renderExtraDetails(details, [
+    "ship",
+    "shipName",
+    "cabin",
+    "cabinType",
+    "sailingDate",
+    "returnDate",
+    "startDate",
+    "endDate",
+  ]);
+
+  return `
+    <div class="detail-block">
+      ${pills ? `<div class="info-grid">${pills}</div>` : ""}
+      ${lines}
+      ${extras}
+    </div>
+  `;
 }
 
-function renderInsuranceDetails(details: any): string {
-  if (!details) return "";
-  const used = new Set<string>();
+function renderInsuranceDetails(service: ProposalService): string {
+  const details: any = service.details || {};
+  const provider = (service as any)?.partners?.name || (service as any)?.provider;
+  const travellers = Array.isArray(details?.travellers)
+    ? details.travellers.join(", ")
+    : details?.travellers;
 
-  used.add("insurer");
-  used.add("planName");
-  used.add("coverageStart");
-  used.add("coverageEnd");
-  used.add("destinationRegion");
-  used.add("medicalCoverageAmount");
-  used.add("baggageCoverageAmount");
-  used.add("cancellationCoverageAmount");
-  used.add("policyNumber");
+  const pills = [
+    renderInfoPill("briefcase", "Fornecedor", provider),
+    renderInfoPill("shield", "Plano", details?.plan),
+    renderInfoPill("shield", "Cobertura", details?.coverage),
+    renderInfoPill("users", "Viajantes", travellers),
+  ]
+    .filter(Boolean)
+    .join("");
 
-  const title = [details.insurer, details.planName].filter(Boolean).join(" - ");
-  const main = title ? `${title}` : "";
-
-  const base = `
-    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ""}
-    ${buildKeyValueList([
-      {
-        key: "coveragePeriod",
-        label: "Vigência",
-        value:
-          (details.coverageStart ? formatDate(details.coverageStart) : "") +
-          (details.coverageStart && details.coverageEnd ? " → " : "") +
-          (details.coverageEnd ? formatDate(details.coverageEnd) : ""),
-      },
-      {
-        key: "destinationRegion",
-        label: "Região",
-        value: details.destinationRegion || "",
-      },
-      {
-        key: "medicalCoverageAmount",
-        label: "Cobertura médica",
-        value: details.medicalCoverageAmount ?? "",
-      },
-      {
-        key: "baggageCoverageAmount",
-        label: "Cobertura de bagagem",
-        value: details.baggageCoverageAmount ?? "",
-      },
-      {
-        key: "cancellationCoverageAmount",
-        label: "Cobertura de cancelamento",
-        value: details.cancellationCoverageAmount ?? "",
-      },
-      { key: "policyNumber", label: "Apólice", value: details.policyNumber || "" },
-    ])}
+  const lines = `
+    <div class="detail-lines">
+      ${
+        details?.coverageStart
+          ? `<div>Início da cobertura: ${escapeHtml(
+              formatDateTime(details.coverageStart)
+            )}</div>`
+          : ""
+      }
+      ${
+        details?.coverageEnd
+          ? `<div>Fim da cobertura: ${escapeHtml(
+              formatDateTime(details.coverageEnd)
+            )}</div>`
+          : ""
+      }
+    </div>
   `;
 
-  const remaining = renderAllRemainingDetails(
-    details,
-    used,
-    "Detalhes adicionais do seguro"
-  );
-  return `${base}${remaining}`;
+  const extras = renderExtraDetails(details, [
+    "plan",
+    "coverage",
+    "travellers",
+    "coverageStart",
+    "coverageEnd",
+  ]);
+
+  return `
+    <div class="detail-block">
+      ${pills ? `<div class="info-grid">${pills}</div>` : ""}
+      ${lines}
+      ${extras}
+    </div>
+  `;
 }
 
-function renderTransferDetails(details: any): string {
-  if (!details) return "";
-  const used = new Set<string>();
-
-  used.add("transferType");
-  used.add("pickupPlace");
-  used.add("dropoffPlace");
-  used.add("pickupAt");
-  used.add("vehicleType");
-  used.add("passengersCount");
-
-  const type =
-    details.transferType === "privado"
+function renderTransferDetails(service: ProposalService): string {
+  const details: any = service.details || {};
+  const provider = (service as any)?.partners?.name || (service as any)?.provider;
+  const transferType =
+    details?.transferType === "privado"
       ? "Privado"
-      : details.transferType === "compartilhado"
+      : details?.transferType === "compartilhado"
       ? "Compartilhado"
-      : translateCommonValuePT(details.transferType || "");
+      : details?.transferType || "";
 
-  const base = `
-    <div class="service-main">${escapeHtml(`Transfer ${type}`)}</div>
-    ${buildKeyValueList([
-      { key: "pickupPlace", label: "Origem", value: details.pickupPlace || "" },
-      { key: "dropoffPlace", label: "Destino", value: details.dropoffPlace || "" },
-      {
-        key: "pickupAt",
-        label: "Horário",
-        value: details.pickupAt ? formatDateTime(details.pickupAt) : "",
-      },
-      { key: "vehicleType", label: "Veículo", value: details.vehicleType || "" },
-      {
-        key: "passengersCount",
-        label: "Passageiros",
-        value: details.passengersCount
-          ? `${details.passengersCount} passageiro${
-              details.passengersCount > 1 ? "s" : ""
-            }`
-          : "",
-      },
-    ])}
+  const pills = [
+    renderInfoPill("briefcase", "Fornecedor", provider),
+    renderInfoPill("bus", "Tipo de transfer", transferType),
+    renderInfoPill("car", "Veículo", details?.vehicleType),
+    renderInfoPill(
+      "users",
+      "Passageiros",
+      details?.passengersCount ? `${details.passengersCount}` : ""
+    ),
+    renderInfoPill("plane", "Ref. do voo", details?.flightRef),
+    renderInfoPill("bus", "Ref. do trem", details?.trainRef),
+  ]
+    .filter(Boolean)
+    .join("");
+
+  const pickupAt = details?.pickupAt ? formatDateTime(details.pickupAt) : "";
+  const lines = `
+    <div class="detail-lines">
+      ${
+        details?.pickupPlace
+          ? `<div>Embarque: ${escapeHtml(details.pickupPlace)}${
+              pickupAt ? ` • ${escapeHtml(pickupAt)}` : ""
+            }</div>`
+          : ""
+      }
+      ${
+        details?.dropoffPlace
+          ? `<div>Desembarque: ${escapeHtml(details.dropoffPlace)}</div>`
+          : ""
+      }
+      ${
+        details?.meetingPointInstructions
+          ? `<div>Ponto de encontro: ${escapeHtml(
+              details.meetingPointInstructions
+            )}</div>`
+          : ""
+      }
+      ${
+        details?.luggageInfo
+          ? `<div>Bagagem: ${escapeHtml(details.luggageInfo)}</div>`
+          : ""
+      }
+    </div>
   `;
 
-  const remaining = renderAllRemainingDetails(
-    details,
-    used,
-    "Detalhes adicionais do transfer"
-  );
-  return `${base}${remaining}`;
+  const extras = renderExtraDetails(details, [
+    "transferType",
+    "vehicleType",
+    "passengersCount",
+    "pickupPlace",
+    "dropoffPlace",
+    "pickupAt",
+    "meetingPointInstructions",
+    "luggageInfo",
+    "flightRef",
+    "trainRef",
+  ]);
+
+  return `
+    <div class="detail-block">
+      ${pills ? `<div class="info-grid">${pills}</div>` : ""}
+      ${lines}
+      ${extras}
+    </div>
+  `;
 }
 
 /* ---- Programação (sem JSON “meleca”) ---- */
@@ -1191,152 +1618,293 @@ function renderProgramacao(days: any[], titulo: string) {
   `;
 }
 
-function renderPackageDetails(details: any): string {
-  if (!details) return "";
-  const used = new Set<string>();
+function renderPackageDetails(service: ProposalService): string {
+  const details: any = service.details || {};
+  const provider = (service as any)?.partners?.name || (service as any)?.provider;
 
-  used.add("packageName");
-  used.add("destinations");
-  used.add("startDate");
-  used.add("endDate");
-  used.add("nights");
-  used.add("inclusions");
-  used.add("days");
-  used.add("itinerary");
-  used.add("program");
+  const pills = [
+    renderInfoPill("briefcase", "Fornecedor", provider),
+    renderInfoPill("package", "Pacote", details?.packageName),
+    renderInfoPill("mapPin", "Destinos", details?.destinations),
+    typeof details?.nights === "number"
+      ? renderInfoPill("moon", "Noites", `${details.nights} noite(s)`)
+      : "",
+  ]
+    .filter(Boolean)
+    .join("");
 
-  const nights = details.nights ? ` (${details.nights} noites)` : "";
-  const main = details.packageName ? `📦 ${details.packageName}` : "";
-
-  const days = Array.isArray(details.days)
-    ? details.days
-    : Array.isArray(details.itinerary)
-    ? details.itinerary
-    : Array.isArray(details.program)
-    ? details.program
-    : [];
-
-  const programHtml = renderProgramacao(days, "Programação do pacote");
-
-  const base = `
-    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ""}
-    ${buildKeyValueList([
-      { key: "destinations", label: "Destinos", value: details.destinations || "" },
-      {
-        key: "period",
-        label: "Período",
-        value:
-          (details.startDate ? formatDate(details.startDate) : "") +
-          (details.startDate && details.endDate ? " → " : "") +
-          (details.endDate ? formatDate(details.endDate) : "") +
-          nights,
-      },
-      { key: "inclusions", label: "Inclui", value: details.inclusions || "" },
-    ])}
-    ${programHtml}
+  const lines = `
+    <div class="detail-lines">
+      ${
+        details?.startDate
+          ? `<div>Início: ${escapeHtml(formatDateTime(details.startDate))}</div>`
+          : ""
+      }
+      ${
+        details?.endDate
+          ? `<div>Fim: ${escapeHtml(formatDateTime(details.endDate))}</div>`
+          : ""
+      }
+    </div>
   `;
 
-  const remaining = renderAllRemainingDetails(
-    details,
-    used,
-    "Detalhes adicionais do pacote"
-  );
-  return `${base}${remaining}`;
+  const sections = [
+    details?.itinerarySummary
+      ? `<div class="detail-section">
+          <div class="detail-section-title">Resumo do roteiro</div>
+          <div class="detail-text">${escapeHtml(details.itinerarySummary)}</div>
+        </div>`
+      : "",
+    details?.inclusions
+      ? `<div class="detail-section">
+          <div class="detail-section-title">Inclusões</div>
+          <div class="detail-text pre-wrap">${escapeHtml(details.inclusions)}</div>
+        </div>`
+      : "",
+    details?.exclusions
+      ? `<div class="detail-section">
+          <div class="detail-section-title">Exclusões</div>
+          <div class="detail-text pre-wrap">${escapeHtml(details.exclusions)}</div>
+        </div>`
+      : "",
+    details?.cancellationPolicy
+      ? `<div class="detail-section">
+          <div class="detail-section-title">Política de cancelamento</div>
+          <div class="detail-text pre-wrap">${escapeHtml(
+            details.cancellationPolicy
+          )}</div>
+        </div>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("");
+
+  const extras = renderExtraDetails(details, [
+    "packageName",
+    "destinations",
+    "nights",
+    "startDate",
+    "endDate",
+    "itinerarySummary",
+    "inclusions",
+    "exclusions",
+    "cancellationPolicy",
+  ]);
+
+  return `
+    <div class="detail-block">
+      ${pills ? `<div class="info-grid">${pills}</div>` : ""}
+      ${lines}
+      ${sections}
+      ${extras}
+    </div>
+  `;
 }
 
-function renderTourDetails(details: any): string {
-  if (!details) return "";
-  const used = new Set<string>();
-
-  used.add("destinationBase");
-  used.add("startDate");
-  used.add("endDate");
-  used.add("pace");
-  used.add("days");
-  used.add("program");
-  used.add("itinerary");
+function renderTourDetails(service: ProposalService): string {
+  const details: any = service.details || {};
+  const provider = (service as any)?.partners?.name || (service as any)?.provider;
+  const days = Array.isArray(details?.days) ? details.days : [];
 
   const paceLabels: Record<string, string> = {
     leve: "Leve",
     moderado: "Moderado",
     intenso: "Intenso",
   };
-  const main = details.destinationBase ? `Roteiro: ${details.destinationBase}` : "";
 
-  const days = Array.isArray(details.days)
-    ? details.days
-    : Array.isArray(details.program)
-    ? details.program
-    : Array.isArray(details.itinerary)
-    ? details.itinerary
-    : [];
+  const pills = [
+    renderInfoPill("briefcase", "Fornecedor", provider),
+    renderInfoPill("map", "Destino base", details?.destinationBase),
+    renderInfoPill(
+      "gauge",
+      "Ritmo",
+      details?.pace ? paceLabels[details.pace] || details.pace : ""
+    ),
+    days.length
+      ? renderInfoPill("activity", "Dias", `${days.length} dia(s)`)
+      : "",
+    renderInfoPill(
+      "calendar",
+      "Início",
+      details?.startDate || details?.start_date
+        ? formatDateTime(details?.startDate || details?.start_date)
+        : ""
+    ),
+    renderInfoPill(
+      "calendar",
+      "Fim",
+      details?.endDate || details?.end_date
+        ? formatDateTime(details?.endDate || details?.end_date)
+        : ""
+    ),
+    renderInfoPill("shield", "Mobilidade", details?.mobilityNotes),
+  ]
+    .filter(Boolean)
+    .join("");
 
-  const programHtml = renderProgramacao(days, "Programação do roteiro");
+  const itineraryHtml = days.length
+    ? `
+      <div class="detail-section">
+        <div class="detail-section-title">Itinerário</div>
+        <div class="itinerary-list">
+          ${days
+            .map((day: any, idx: number) => {
+              const acts =
+                Array.isArray(day?.activities) && day.activities.length
+                  ? day.activities
+                  : [{ name: "Sem atividades", summary: "", time: "" }];
 
-  const base = `
-    ${main ? `<div class="service-main">${escapeHtml(main)}</div>` : ""}
-    ${buildKeyValueList([
-      {
-        key: "period",
-        label: "Período",
-        value:
-          (details.startDate ? formatDate(details.startDate) : "") +
-          (details.startDate && details.endDate ? " → " : "") +
-          (details.endDate ? formatDate(details.endDate) : ""),
-      },
-      {
-        key: "pace",
-        label: "Ritmo",
-        value: details.pace
-          ? paceLabels[details.pace] || translateCommonValuePT(details.pace)
-          : "",
-      },
-      {
-        key: "days",
-        label: "Dias",
-        value: days?.length
-          ? `${days.length} ${pluralize(days.length, "dia", "dias")}`
-          : "",
-      },
-    ])}
-    ${programHtml}
+              return `
+                <div class="itinerary-card">
+                  <div class="itinerary-day">Dia ${day?.dayNumber || idx + 1}</div>
+                  ${
+                    day?.title
+                      ? `<div class="itinerary-sub">${escapeHtml(day.title)}</div>`
+                      : ""
+                  }
+                  <div class="itinerary-table">
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Atividade</th>
+                          <th>Hora</th>
+                          <th>Descrição da atividade</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${acts
+                          .map(
+                            (act: any) => `
+                              <tr>
+                                <td>${escapeHtml(act?.name || "Atividade")}</td>
+                                <td>${escapeHtml(act?.time || "—")}</td>
+                                <td>${escapeHtml(act?.summary || "—")}</td>
+                              </tr>
+                            `
+                          )
+                          .join("")}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              `;
+            })
+            .join("")}
+        </div>
+      </div>
+    `
+    : "";
+
+  const extras = renderExtraDetails(details, [
+    "destinationBase",
+    "pace",
+    "startDate",
+    "endDate",
+    "start_date",
+    "end_date",
+    "days",
+    "mobilityNotes",
+  ]);
+
+  return `
+    <div class="detail-block">
+      ${pills ? `<div class="info-grid">${pills}</div>` : ""}
+      ${itineraryHtml}
+      ${extras}
+    </div>
   `;
+}
 
-  const remaining = renderAllRemainingDetails(
-    details,
-    used,
-    "Detalhes adicionais do roteiro"
-  );
-  return `${base}${remaining}`;
+function renderGenericDetails(service: ProposalService): string {
+  const details: any = service.details || {};
+  const provider = (service as any)?.partners?.name || (service as any)?.provider;
+  const pills = [renderInfoPill("briefcase", "Fornecedor", provider)]
+    .filter(Boolean)
+    .join("");
+  const extras = renderExtraDetails(details);
+  return `
+    <div class="detail-block">
+      ${pills ? `<div class="info-grid">${pills}</div>` : ""}
+      ${extras}
+    </div>
+  `;
 }
 
 function renderServiceDetails(service: ProposalService): string {
-  const details: any = service.details || {};
   switch (service.type) {
     case "flight":
-      return renderFlightDetails(details);
+      return renderFlightDetails(service);
     case "hotel":
-      return renderHotelDetails(details);
+      return renderHotelDetails(service);
     case "car":
-      return renderCarDetails(details);
+      return renderCarDetails(service);
     case "cruise":
-      return renderCruiseDetails(details);
+      return renderCruiseDetails(service);
     case "insurance":
-      return renderInsuranceDetails(details);
+      return renderInsuranceDetails(service);
     case "transfer":
-      return renderTransferDetails(details);
+      return renderTransferDetails(service);
     case "package":
-      return renderPackageDetails(details);
+      return renderPackageDetails(service);
     case "tour":
-      return renderTourDetails(details);
-    default: {
-      const used = new Set<string>();
-      const main = !isBlank(details?.title || details?.name)
-        ? `<div class="service-main">${escapeHtml(details.title || details.name)}</div>`
-        : "";
-      return `${main}${renderAllRemainingDetails(details, used, "Detalhes do serviço")}`;
-    }
+      return renderTourDetails(service);
+    default:
+      return renderGenericDetails(service);
   }
+}
+
+function renderServiceCard(service: ProposalService): string {
+  const iconName = serviceIconMap[service.type] || "package";
+  const label = serviceLabels[service.type] || translateCommonValuePT(service.type);
+  const providerName = (service as any)?.partners?.name || (service as any)?.provider;
+
+  const hasRoute = Boolean((service as any)?.origin || (service as any)?.destination);
+  const routeText = [
+    (service as any)?.origin || "",
+    (service as any)?.destination || "",
+  ]
+    .filter(Boolean)
+    .join(" → ");
+  const dateLine = formatDateRange(
+    (service as any)?.start_date,
+    (service as any)?.end_date
+  );
+
+  const { total, quantity, unitValue } = getServicePricing(service);
+  const desc = safeStr((service as any)?.description) || "Sem descrição";
+
+  return `
+    <div class="service-card">
+      <div class="service-icon-box">${renderIcon(iconName, "icon-lg")}</div>
+      <div class="service-body">
+        <div class="service-tags">
+          <span class="badge">${escapeHtml(label)}</span>
+          ${
+            providerName
+              ? `<span class="service-provider">${escapeHtml(providerName)}</span>`
+              : ""
+          }
+        </div>
+        <div class="service-title">${escapeHtml(desc)}</div>
+        <div class="service-meta">
+          ${hasRoute ? renderMetaLine("map", routeText) : ""}
+          ${dateLine ? renderMetaLine("calendar", dateLine) : ""}
+        </div>
+        <div class="service-details">${renderServiceDetails(service)}</div>
+      </div>
+      <div class="service-price">
+        <div class="service-price-label">Valor</div>
+        <div class="service-price-value">${escapeHtml(formatCurrency(total))}</div>
+        ${
+          quantity && quantity > 1
+            ? `<div class="service-price-sub">${escapeHtml(
+                String(quantity)
+              )} x ${escapeHtml(formatCurrency(unitValue))}</div>`
+            : ""
+        }
+      </div>
+    </div>
+  `;
 }
 
 function inferTripPeriod(services: ProposalService[]) {
@@ -1388,26 +1956,14 @@ export function generateProposalPDF(
   const discountValue = (totalServices * discountPct) / 100;
   const finalValue = totalServices - discountValue;
 
-  const proposalCode = proposal.number ? String(proposal.number) : "";
   const createdAt = (proposal as any).created_at
     ? formatDate(String((proposal as any).created_at))
     : "";
   const client = (proposal as any).clients || null;
 
-  const tripPeriod = inferTripPeriod(services);
-  const tripPeriodText = tripPeriod
-    ? `${formatDate(tripPeriod.start)} → ${formatDate(tripPeriod.end)}`
-    : "";
-
-  const logoSection = agencyLogo
-    ? `<img src="${escapeHtml(agencyLogo)}" alt="${escapeHtml(
-        agencyName
-      )}" class="agency-logo" />`
-    : `<div class="agency-name">${escapeHtml(agencyName)}</div>`;
-
   const contactInfo = [
-    agencyPhone ? `Telefone: ${agencyPhone}` : "",
     agencyEmail || "",
+    agencyPhone || "",
     agencyAddress || "",
   ].filter(Boolean);
 
@@ -1417,9 +1973,59 @@ export function generateProposalPDF(
     (proposal as any).observation ||
     "";
 
-  const servicesCountText = services.length
-    ? `${services.length} ${pluralize(services.length, "item", "itens")}`
-    : "";
+  const servicesCountText = `${services.length} ${pluralize(
+    services.length,
+    "serviço",
+    "serviços"
+  )}`;
+
+  const logoSection = agencyLogo
+    ? `<img src="${escapeHtml(agencyLogo)}" alt="${escapeHtml(
+        agencyName
+      )}" class="agency-logo" />`
+    : `<div class="agency-logo-placeholder">LOGO</div>`;
+
+  const summaryRows = (services || []).map((s: any) => {
+    const qty = Number(s?.details?.quantity) || 1;
+    const total = Number(s?.value || 0);
+    const unit = qty > 0 ? total / qty : total;
+    const typeLabel = serviceLabels[s?.type] || "Serviço";
+    const label = s?.description || typeLabel;
+    const sublabel = s?.description && s?.description !== typeLabel ? typeLabel : "";
+    return { id: s?.id || `${label}-${total}`, label, sublabel, qty, total, unit };
+  });
+  const summaryTotal = summaryRows.reduce((sum, r) => sum + r.total, 0);
+
+  const contactItemsHtml = [
+    agencyEmail
+      ? `<span class="contact-item">${renderIcon(
+          "mail",
+          "icon-sm"
+        )}<span>${escapeHtml(agencyEmail)}</span></span>`
+      : "",
+    agencyPhone
+      ? `<span class="contact-item">${renderIcon(
+          "phone",
+          "icon-sm"
+        )}<span>${escapeHtml(agencyPhone)}</span></span>`
+      : "",
+    agencyAddress
+      ? `<span class="contact-item">${renderIcon(
+          "mapPin",
+          "icon-sm"
+        )}<span>${escapeHtml(agencyAddress)}</span></span>`
+      : "",
+  ]
+    .filter(Boolean)
+    .join("");
+
+  const servicesHtml = services.length
+    ? services.map((service) => renderServiceCard(service)).join("")
+    : `<div class="empty-state">Nenhum serviço adicionado nesta proposta.</div>`;
+
+  const footerLine = contactInfo.length
+    ? escapeHtml(contactInfo.join(" | "))
+    : "Entre em contato para confirmar disponibilidade e condições.";
 
   const html = `
   <!DOCTYPE html>
@@ -1427,617 +2033,722 @@ export function generateProposalPDF(
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>Proposta #${escapeHtml(proposal.number)} - ${escapeHtml(
-    proposal.title
+    <title>Proposta #${escapeHtml(String(proposal.number || ""))} - ${escapeHtml(
+    proposal.title || "Proposta"
   )}</title>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Poppins:wght@300;400;500;600;700&display=swap" rel="stylesheet">
     <style>
       :root{
         --ink:#0f172a;
-        --muted:#475569;
-        --muted2:#64748b;
-        --line:#e5e7eb;
+        --muted:#64748b;
+        --muted2:#94a3b8;
+        --border:#e2e8f0;
         --soft:#f8fafc;
-        --accent:#2563eb;
+        --bg:#f1f5f9;
       }
       *{ margin:0; padding:0; box-sizing:border-box; }
       body{
-        font-family:'Inter', -apple-system, BlinkMacSystemFont, sans-serif;
+        font-family:'Poppins', -apple-system, BlinkMacSystemFont, sans-serif;
         color:var(--ink);
-        background:#fff;
-        line-height:1.55;
+        background:var(--bg);
+        line-height:1.5;
         font-size:14px;
       }
-      .container{ max-width:940px; margin:0 auto; padding:44px; }
-
-      /* Header */
-      .topbar{
+      .page{ max-width:980px; margin:0 auto; padding:32px; }
+      .sheet{
+        background:#fff;
+        border-radius:18px;
+        overflow:hidden;
+      }
+      .hero{
+        position:relative;
+        padding:28px 32px;
+      }
+      .hero::before{
+        content:"";
+        position:absolute;
+        inset:0;
+        opacity:0.18;
+        background:
+          radial-gradient(circle at 20% 20%, rgba(15,23,42,0.18) 0%, transparent 42%),
+          radial-gradient(circle at 80% 15%, rgba(15,23,42,0.14) 0%, transparent 38%),
+          radial-gradient(circle at 65% 85%, rgba(15,23,42,0.12) 0%, transparent 40%);
+      }
+      .hero-content{ position:relative; display:flex; flex-direction:column; gap:18px; }
+      .hero-top{
         display:flex;
         justify-content:space-between;
         align-items:flex-start;
         gap:20px;
-        padding-bottom:18px;
-        border-bottom:1px solid var(--line);
+        flex-wrap:wrap;
       }
-      .agency-logo{ max-width:180px; max-height:56px; object-fit:contain; display:block; }
-      .agency-name{ font-size:22px; font-weight:700; letter-spacing:-0.02em; }
-      .agency-contact{ margin-top:0px; font-size:12px; color:var(--muted2); line-height:1.6; }
-
-      .docmeta{ text-align:right; }
-      .badge{
-        display:inline-block;
-        border:1px solid var(--line);
-        color:var(--muted);
-        padding:7px 12px;
-        border-radius:999px;
-        font-size:11px;
-        font-weight:600;
-        letter-spacing:.08em;
-        text-transform:uppercase;
-        background:#fff;
-      }
-      .code{ font-size:18px; font-weight:700; margin-top:10px; letter-spacing:-0.02em; }
-      .muted{ color:var(--muted2); font-size:12.5px; margin-top:4px; }
-
-      .hero{
-        display:flex;
-        justify-content:space-between;
-        align-items:flex-end;
-        gap:18px;
-        margin:22px 0 18px 0;
-      }
-      .hero h1{
-        font-size:30px;
-        font-weight:700;
-        letter-spacing:-0.03em;
-        line-height:1.08;
-      }
-      .hero .sub{
-        margin-top:8px;
-        color:var(--muted);
-        font-size:14px;
-        font-weight:500;
-      }
-      .meta{
-        text-align:right;
-        border:1px solid var(--line);
-        background:#fff;
-        padding:12px 14px;
+      .agency{ display:flex; gap:18px; align-items:center; min-width:0; }
+      .agency-logo{
+        width:90px;
+        height:90px;
         border-radius:14px;
-        min-width:280px;
+        object-fit:contain;
+        background:transparent;
+        display:block;
       }
-      .meta-row{
+      .agency-logo-placeholder{
+        width:56px;
+        height:56px;
+        border-radius:14px;
+        border:1px solid var(--border);
+        background:var(--soft);
         display:flex;
+        align-items:center;
+        justify-content:center;
+        font-size:11px;
+        color:var(--muted);
+      }
+      .agency-name{
+        font-size:14px;
+        font-weight:600;
+        text-transform: uppercase;
+      }
+      .agency-contact{
+        margin-top:0px;
+        display:flex;
+        flex-wrap:wrap;
+        gap:12px;
+        font-size:12.5px;
+        color:var(--muted);
+      }
+      .contact-item{ display:inline-flex; align-items:center; gap:6px; }
+      .proposal-meta{
+        text-align:right;
+        font-size:12.5px;
+        color:var(--muted);
+      }
+      .proposal-meta strong{ color:var(--ink); font-weight:600; }
+      .proposal-meta .meta-line{ justify-content:flex-end; }
+      .hero-bottom{
+        display:flex;
+        align-items:flex-end;
         justify-content:space-between;
         gap:12px;
-        padding:12px 0;
-        border-top:1px dashed var(--line);
+        flex-wrap:wrap;
       }
-      .meta-row:first-child{ border-top:none; padding-top:0; }
-      .meta-k{
-        font-size:11px;
-        color:var(--muted2);
-        text-transform:uppercase;
-        letter-spacing:.10em;
-        font-weight:600;
+      .proposal-title{
+        font-size:22px;
+        font-weight:700;
+        line-height:1.2;
       }
-      .meta-v{
-        font-size:13.5px;
-        font-weight:600;
-        color:var(--ink);
-      }
+.badge{
+  display:inline-flex;
+  align-items:center;
 
-      .grid{
-        display:grid;
-        gap:18px;
-        margin-top:18px;
-      }
-      .block{
-        border:1px solid var(--line);
-        border-radius:14px;
-        padding:14px 16px;
-        background:#fff;
-      }
-      .block-title{
-        font-size:11px;
-        letter-spacing:.12em;
-        text-transform:uppercase;
-        color:var(--accent);
-        font-weight:600;
-        margin-bottom:10px;
-      }
+  /* mantém a fonte igual */
+  font-size:11px;
+  font-weight:600;
+  text-transform:uppercase;
+  letter-spacing:.12em;
+  color:var(--muted);
 
-      .totals .row{
-        display:flex; justify-content:space-between; align-items:baseline;
-        gap:12px; padding:8px 0;
-        border-top:1px dashed var(--line);
-      }
-      .totals .row:first-child{ border-top:none; padding-top:0; }
-      .totals .k{ color:var(--muted); font-weight:500; font-size:13px; }
-      .totals .v{ font-weight:600; font-size:13.5px; }
-      .totals .final{
-        margin-top:10px;
-        padding-top:12px;
-        border-top:1px solid var(--line);
-        display:flex; justify-content:space-between; align-items:baseline;
-      }
-      .totals .final .k{ letter-spacing:.12em; text-transform:uppercase; font-size:11px; color:var(--muted2); font-weight:600; }
-      .totals .final .v{ font-size:22px; font-weight:700; color:var(--accent); letter-spacing:-0.02em; }
-      .totals .note{ margin-top:10px; color:var(--muted2); font-size:12.5px; line-height:1.5; font-weight:500; }
+  /* remove o “badge/pill” */
+  padding:0;
+  border:none;
+  background:transparent;
+  border-radius:0;
+}
 
-      .section{ margin-top:26px; }
+      .content{ padding:20px 9px 9px; }
       .section-head{
         display:flex;
         justify-content:space-between;
         align-items:flex-end;
         gap:12px;
-        padding-bottom:10px;
-        border-bottom:1px solid var(--line);
-        margin-bottom:14px;
+        margin-bottom:12px;
       }
       .section-title{
-        font-size:12px;
+        font-size:11px;
         letter-spacing:.14em;
         text-transform:uppercase;
-        color:var(--accent);
+        color:var(--muted);
         font-weight:600;
       }
       .section-sub{
         color:var(--muted2);
-        font-size:12.5px;
-        font-weight:500;
+        font-size:11px;
+        font-weight:600;
       }
-
-     .service {
-  padding: 45px 0 12px 0;
-  break-inside: avoid;
-
-
-  /* linha dashed custom */
-  background-image: repeating-linear-gradient(
-    90deg,
-    var(--line) 0 14px,        /* tamanho do traço */
-    transparent 14px 20px      /* gap (26-14 = 12px) */
-  );
-  background-repeat: no-repeat;
-  background-position: left bottom;
-  background-size: 100% 1px;   /* espessura da linha */
-}
-
-      .service:last-child{ border-bottom:none; }
-      .service-top{
+      .summary-card{
+        border:1px solid var(--border);
+        border-radius:12px;
+        overflow:hidden;
+      }
+      .summary-head{
         display:flex;
         justify-content:space-between;
-        gap:16px;
-        align-items:flex-start;
-      }
-      .type-chip{
-        text-align: right;
-        font-size: 17px;
-        font-weight: 700;
-        letter-spacing: -0.02em;
-        color: var(--ink);
-        white-space: nowrap;
-        text-transform: uppercase;
-      }
-      .service-desc{
-        margin-top:8px;
-        font-size:16px;
-        font-weight:600;
-        letter-spacing:-0.02em;
-        line-height:1.22;
-      }
-      .service-meta{
-        margin-top:6px;
+        align-items:center;
+        padding:8px 12px;
+        background:var(--soft);
+        font-size:11px;
+        text-transform:uppercase;
+        letter-spacing:.12em;
         color:var(--muted);
+        font-weight:600;
+      }
+      .summary-table{
+        width:100%;
+        border-collapse:collapse;
         font-size:13px;
-        font-weight:500;
       }
-      .price{
-        text-align:right;
-        font-size:16px;
+      .summary-table thead th{
+        text-transform:uppercase;
+        font-size:11px;
+        letter-spacing:.1em;
+        color:var(--muted);
+        background:var(--soft);
+        padding:8px 12px;
+        text-align:left;
+      }
+      .summary-table tbody td{
+        padding:10px 12px;
+        border-top:1px solid var(--border);
+        vertical-align:top;
+      }
+      .summary-table tfoot td{
+        padding:10px 12px;
+        background:var(--soft);
         font-weight:700;
-        letter-spacing:-0.02em;
-        color:var(--ink);
-        white-space:nowrap;
       }
-      .price-sub{
-        margin-top:6px;
-        text-align:right;
+      .summary-label{ font-weight:600; }
+      .summary-sublabel{
+        font-size:11px;
+        color:var(--muted);
+        margin-top:2px;
+      }
+      .summary-qty{ text-align:center; }
+      .summary-qty small{
+        display:block;
+        font-size:11px;
+        color:var(--muted);
+        margin-top:2px;
+      }
+      .summary-total{ text-align:right; font-weight:600; }
+      .summary-empty{
+        padding:12px;
         font-size:12.5px;
-        color:var(--muted2);
-        font-weight:500;
+        color:var(--muted);
       }
-      .service-body{
+      .client-card{
+        border:1px solid var(--border);
+        border-radius:12px;
+        padding:12px;
+        background:var(--soft);
+      }
+      .client-name{ font-weight:600; }
+      .client-email{ font-size:12.5px; color:var(--muted); margin-top:2px; }
+      .service-list{ display:flex; flex-direction:column; gap:14px; }
+      .service-card{
+        border:1px solid var(--border);
+        border-radius:16px;
+        padding:16px;
+        display:flex;
+        gap:16px;
+        background:#fff;
+        break-inside:avoid;
+      }
+      .service-icon-box{
+        width:44px;
+        height:44px;
+        border-radius:12px;
+        background:var(--soft);
+        border:1px solid var(--border);
+        display:flex;
+        align-items:center;
+        justify-content:center;
+        flex-shrink:0;
+      }
+      .service-body{ flex:1; min-width:0; }
+      .service-tags{
+        display:flex;
+        gap:8px;
+        align-items:center;
+        flex-wrap:wrap;
+      }
+      .service-provider{ font-size:12px; color:var(--muted); }
+      .service-title{ margin-top:4px; font-size:15px; font-weight:600; }
+      .service-meta{
+        margin-top:8px;
+        display:flex;
+        flex-direction:column;
+        gap:4px;
+      }
+      .meta-line{
+        display:flex;
+        align-items:center;
+        gap:6px;
+        font-size:12px;
+        color:var(--muted);
+      }
+      .service-details{
         margin-top:12px;
         padding-top:12px;
-        border-top:1px solid var(--line);
+        border-top:1px solid var(--border);
       }
-      .service-main{
-        font-size:14.5px;
-        font-weight:600;
-        margin-bottom:10px;
-      }
-
-      .kv{
-        display:grid;
-        grid-template-columns: 1fr 1fr;
-        gap:10px 18px;
-      }
-      .kv-row{
-        display:grid;
-        grid-template-columns: 160px 1fr;
-        gap:10px;
-        align-items:start;
-        padding:6px 0;
-        border-bottom:1px dashed #eef2f7;
-      }
-      .kv-row:nth-last-child(-n+2){ border-bottom:none; }
-      .kv-k{
+      .service-price{ text-align:right; min-width:120px; }
+      .service-price-label{
         font-size:11px;
-        color:var(--muted2);
         text-transform:uppercase;
-        letter-spacing:.10em;
-        font-weight:600;
-      }
-      .kv-v{
-        font-size:13.5px;
-        color:var(--ink);
-        font-weight:500;
-        word-break:break-word;
-      }
-      .kv-block{ margin-top:12px; }
-
-      .pre{
-        margin-top:8px;
-        padding:12px 12px;
-        background:var(--soft);
-        border:1px solid #eef2f7;
-        border-radius:12px;
-        font-size:12px;
-        line-height:1.5;
-        white-space:pre-wrap;
-        word-break:break-word;
-        color:#111827;
-      }
-
-      .subsection{ margin-top:14px; }
-      .subsection-title{
-        font-size:11px;
         letter-spacing:.12em;
+        color:var(--muted);
+      }
+      .service-price-value{
+        font-size:16px;
+        font-weight:700;
+        margin-top:2px;
+      }
+      .service-price-sub{
+        font-size:12px;
+        color:var(--muted);
+        margin-top:4px;
+      }
+      .detail-block{
+        display:flex;
+        flex-direction:column;
+        gap:10px;
+      }
+      .info-grid{
+        display:grid;
+        grid-template-columns:repeat(auto-fit, minmax(180px, 1fr));
+        gap:4px 12px;
+      }
+      .info-pill{
+        border:none;
+        border-radius:0;
+        padding:0;
+        background:transparent;
+        display:flex;
+        gap:6px;
+        align-items:center;
+      }
+      .info-label{
+        font-size:10px;
         text-transform:uppercase;
+        letter-spacing:.12em;
         color:var(--muted2);
         font-weight:600;
-        margin-bottom:10px;
       }
+      .info-value{
+        font-size:12.5px;
+        font-weight:600;
+        color:var(--ink);
+      }
+      .detail-lines{
+        margin-top:10px;
+        display:grid;
+        grid-template-columns:repeat(auto-fit, minmax(220px, 1fr));
+        gap:6px;
+        font-size:12px;
+        color:var(--muted);
+      }
+      .detail-strong{ color:var(--ink); font-weight:600; }
+      .detail-section{ margin-top:14px; }
+      .detail-section-title{
+        font-size:11px;
+        text-transform:uppercase;
+        letter-spacing:.12em;
+        color:var(--muted);
+        font-weight:600;
+        margin-bottom:8px;
+      }
+      .detail-text{ font-size:12.5px; color:var(--ink); }
+      .pre-wrap{ white-space:pre-wrap; }
+      .segment-list{ display:flex; flex-direction:column; gap:8px; }
+      .segment-card{
+        border:none;
+        border-top:1px dashed var(--border);
+        border-radius:0;
+        padding:8px 0;
+        background:transparent;
+      }
+      .segment-card:first-child{
+        border-top:none;
+        padding-top:0;
+      }
+      .segment-top{
+        display:flex;
+        justify-content:space-between;
+        gap:8px;
+        font-size:13px;
+        font-weight:600;
+      }
+      .segment-flight{ font-size:12px; color:var(--muted); font-weight:500; }
+      .segment-times{
+        margin-top:6px;
+        display:grid;
+        grid-template-columns:repeat(auto-fit, minmax(140px, 1fr));
+        gap:4px;
+        font-size:12px;
+        color:var(--muted);
+      }
+      .segment-connections{ margin-top:6px; font-size:12px; color:var(--muted); }
+      .segment-conn-title{
+        font-size:10px;
+        text-transform:uppercase;
+        letter-spacing:.1em;
+        color:var(--muted2);
+        font-weight:600;
+        margin-bottom:4px;
+      }
+      .segment-conn-row{
+        display:flex;
+        justify-content:space-between;
+        gap:8px;
+      }
+      .segment-conn-code{ font-weight:600; color:var(--ink); }
+      .segment-conn-meta{ text-align:right; flex:1; }
       .photo-grid{
         display:grid;
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns:repeat(2, minmax(0, 1fr));
         gap:8px;
       }
       .photo-cell{
-        border-radius:10px;
+        border:none;
+        border-radius:8px;
         overflow:hidden;
-        border:1px solid #eef2f7;
-        background:#f3f4f6;
+        background:transparent;
       }
       .photo-cell img{
-        display:block;
         width:100%;
-        height:170px;
+        height:180px;
         object-fit:cover;
+        display:block;
       }
-
-      .segments{
-        border:1px solid #eef2f7;
-        border-radius:12px;
-        overflow:hidden;
-      }
-      .seg-head, .seg-row{
-        display:grid;
-        grid-template-columns: 1.25fr 1.6fr 0.55fr;
-        gap:12px;
-        padding:10px 12px;
-      }
-      .seg-head{
-        background:var(--soft);
-        font-size:11px;
-        color:var(--muted2);
-        letter-spacing:.10em;
+      .extra-details{ margin-top:12px; }
+      .extra-title{
+        font-size:10px;
         text-transform:uppercase;
-        font-weight:600;
-      }
-      .seg-row{
-        border-top:1px solid #eef2f7;
-        font-size:13px;
-        align-items:start;
-      }
-      .seg-route{ font-weight:600; letter-spacing:-0.01em; }
-      .seg-time{ color:var(--muted); font-weight:500; }
-      .seg-extra{ margin-top:6px; color:var(--muted2); font-size:12.5px; font-weight:500; }
-      .conn{ margin-top:6px; color:var(--muted); font-size:12.5px; font-weight:500; }
-      .conn strong{ font-weight:600; }
-      .seg-right{ text-align:right; }
-      .seg-chip{
-        display:inline-block;
-        border:1px solid var(--line);
-        color:var(--muted);
-        padding:4px 10px;
-        border-radius:999px;
-        font-size:11px;
-        font-weight:600;
-        white-space:nowrap;
-        background:#fff;
-      }
-
-      .timeline{ overflow:hidden;  }
-      .t-row{
-        display:grid;
-        grid-template-columns: 140px 1fr;
-        gap:14px;
-        padding:12px 12px;
-        border-top:1px solid #eef2f7;
-      }
-      .t-row:first-child{ border-top:none; }
-      .t-day{
-        font-size:11px;
-        letter-spacing:.10em;
-        text-transform:uppercase;
-        font-weight:600;
-        color:var(--accent);
-      }
-      .t-date{ margin-top:6px; font-size:12.5px; font-weight:500; color:var(--muted2); }
-      .t-title{ font-size:14px; font-weight:600; letter-spacing:-0.01em; }
-      .t-text{ margin-top:6px; color:var(--muted); font-size:13px; font-weight:500; }
-      .t-list{ margin-top:8px; padding-left:18px; color:var(--muted); font-size:13px; font-weight:500; }
-      .t-list li{ margin:4px 0; }
-
-      .tbl-wrap{ border:1px solid #eef2f7; border-radius:12px; overflow:hidden; margin-top:8px; }
-      .tbl{ width:100%; border-collapse:collapse; font-size:12.5px; }
-      .tbl thead th{
-        background:var(--soft);
-        text-align:left;
-        padding:10px 10px;
+        letter-spacing:.12em;
         color:var(--muted2);
         font-weight:600;
+        margin-bottom:6px;
+      }
+      .extra-list{ display:flex; flex-direction:column; gap:6px; }
+      .extra-row{
+        display:grid;
+        grid-template-columns:140px 1fr;
+        gap:8px;
+        font-size:12px;
+      }
+      .extra-label{
+        color:var(--muted2);
         text-transform:uppercase;
         letter-spacing:.08em;
-        font-size:11px;
+        font-weight:600;
+        font-size:10px;
       }
-      .tbl tbody td{
-        padding:10px 10px;
-        border-top:1px solid #eef2f7;
-        color:var(--ink);
-        font-weight:500;
+      .extra-value{ color:var(--ink); font-weight:500; }
+      .itinerary-list{ display:flex; flex-direction:column; gap:10px; }
+      .itinerary-card{
+        border:none;
+        border-top:1px dashed var(--border);
+        border-radius:0;
+        padding:8px 0;
+        background:transparent;
+      }
+      .itinerary-card:first-child{
+        border-top:none;
+        padding-top:0;
+      }
+      .itinerary-day{ font-size:12px; font-weight:600; color:var(--ink); }
+      .itinerary-sub{ font-size:12px; color:var(--muted); margin-top:4px; }
+      .itinerary-table{ margin-top:8px; overflow-x:auto; }
+      .itinerary-table table{
+        width:100%;
+        border-collapse:collapse;
+        font-size:12px;
+      }
+      .itinerary-table thead th{
+        text-align:left;
+        font-size:10px;
+        text-transform:uppercase;
+        letter-spacing:.1em;
+        color:var(--muted2);
+        padding:6px 8px;
+      }
+      .itinerary-table tbody td{
+        padding:6px 8px;
+        border-top:1px solid var(--border);
         vertical-align:top;
       }
-
+      .itinerary-table tbody td:nth-child(2){
+        color:var(--muted);
+        width:90px;
+      }
       .notes{
-        margin-top:26px;
-        border:1px solid var(--line);
-        border-radius:14px;
-        padding:14px 16px;
+        margin-top:18px;
+        border:1px solid var(--border);
+        border-radius:12px;
+        padding:12px;
+        background:var(--soft);
       }
       .notes-title{
         font-size:11px;
-        letter-spacing:.12em;
         text-transform:uppercase;
-        color:var(--accent);
+        letter-spacing:.12em;
+        color:var(--muted);
         font-weight:600;
-        margin-bottom:10px;
+        margin-bottom:8px;
       }
       .notes-body{
-        font-size:13.5px;
+        font-size:12.5px;
         color:var(--ink);
-        line-height:1.65;
-        font-weight:500;
+        line-height:1.6;
+        white-space:pre-wrap;
       }
-
+      .totals-card{
+        margin-top:20px;
+        border:1px solid var(--border);
+        border-radius:12px;
+        padding:14px;
+        background:var(--soft);
+        max-width:420px;
+        margin-left:auto;
+      }
+      .totals-row{
+        display:flex;
+        justify-content:space-between;
+        font-size:13px;
+        color:var(--muted);
+        margin-top:8px;
+      }
+      .totals-row strong{ color:var(--ink); }
+      .totals-row:first-child{ margin-top:0; }
+      .totals-divider{
+        height:1px;
+        background:var(--border);
+        margin:12px 0;
+      }
+      .totals-final{
+        display:flex;
+        justify-content:space-between;
+        align-items:flex-end;
+        font-size:16px;
+        font-weight:700;
+      }
+      .totals-note{
+        margin-top:10px;
+        font-size:11px;
+        color:var(--muted);
+        display:flex;
+        gap:6px;
+        align-items:flex-start;
+      }
       .footer{
-        margin-top:26px;
-        padding-top:16px;
-        border-top:1px solid var(--line);
+        margin-top:18px;
         text-align:center;
-        color:var(--muted2);
         font-size:12px;
-        font-weight:500;
+        color:var(--muted);
       }
       .footer strong{ color:var(--ink); font-weight:600; }
-
+      .icon{
+        display:inline-block;
+        vertical-align:middle;
+        line-height:1;
+      }
+      .icon-xs{ width:12px; height:12px; }
+      .icon-sm{ width:14px; height:14px; }
+      .icon-lg{ width:20px; height:20px; }
+      .empty-state{
+        border:1px dashed var(--border);
+        border-radius:14px;
+        padding:18px;
+        text-align:center;
+        font-size:12.5px;
+        color:var(--muted);
+        background:var(--soft);
+      }
       @media print{
-        body{ print-color-adjust:exact; -webkit-print-color-adjust:exact; }
-        .container{ padding:26px; }
-        .service, .block{ break-inside:avoid; }
+        body{ background:#fff; print-color-adjust:exact; -webkit-print-color-adjust:exact; }
+        .page{ padding:12px; }
+        .sheet{ border:none; }
+        .service-card, .summary-card, .notes, .totals-card{ break-inside:avoid; }
       }
     </style>
   </head>
   <body>
-    <div class="container">
-
-      <div class="topbar">
-        <div>
-          ${logoSection}
+    <div class="page">
+      <div class="sheet">
+        <div class="hero">
+          <div class="hero-content">
+            <div class="hero-top">
+              <div class="agency">
+                ${logoSection}
+                <div>
+                  <div class="agency-name">${escapeHtml(agencyName)}</div>
+                  ${
+                    contactItemsHtml
+                      ? `<div class="agency-contact">${contactItemsHtml}</div>`
+                      : ""
+                  }
+                </div>
+              </div>
+              <div class="proposal-meta">
+                <div class="meta-line">
+                  ${renderIcon("ticket", "icon-sm")}
+                  <span>Proposta</span>
+                  <strong>#${escapeHtml(String(proposal.number || "—"))}</strong>
+                  ${
+                    createdAt
+                      ? `<span>Emitida em ${escapeHtml(createdAt)}</span>`
+                      : ""
+                  }
+                </div>
+              </div>
+            </div>
+            <div class="hero-bottom">
+              <div class="proposal-title">${escapeHtml(proposal.title || "Proposta")}</div>
+              ${servicesCountText ? `<span class="badge">${escapeHtml(servicesCountText)}</span>` : ""}
+            </div>
+          </div>
         </div>
 
-        <div class="docmeta">
-                  <div>Proposta comercial - ${agencyName}</div>
+        <div class="content">
+          <section class="summary">
+            <div class="summary-card">
+              <div class="summary-head">
+                <div>Resumo dos itens</div>
+                <div>${escapeHtml(pluralize(summaryRows.length, "item", "itens"))}</div>
+              </div>
+              ${
+                summaryRows.length === 0
+                  ? `<div class="summary-empty">Nenhum serviço adicionado.</div>`
+                  : `
+                    <table class="summary-table">
+                      <thead>
+                        <tr>
+                          <th>Item</th>
+                          <th style="text-align:center; width:90px;">Qtd</th>
+                          <th style="text-align:right; width:160px;">Valor</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        ${summaryRows
+                          .map(
+                            (row) => `
+                              <tr>
+                                <td>
+                                  <div class="summary-label">${escapeHtml(row.label)}</div>
+                                  ${
+                                    row.sublabel
+                                      ? `<div class="summary-sublabel">${escapeHtml(
+                                          row.sublabel
+                                        )}</div>`
+                                      : ""
+                                  }
+                                </td>
+                                <td class="summary-qty">
+                                  <div>${escapeHtml(String(row.qty))}</div>
+                                  ${
+                                    row.qty > 1
+                                      ? `<small>${escapeHtml(
+                                          formatCurrency(row.unit)
+                                        )} un.</small>`
+                                      : ""
+                                  }
+                                </td>
+                                <td class="summary-total">${escapeHtml(
+                                  formatCurrency(row.total)
+                                )}</td>
+                              </tr>
+                            `
+                          )
+                          .join("")}
+                      </tbody>
+                      <tfoot>
+                        <tr>
+                          <td colspan="2" style="text-align:right;">Total</td>
+                          <td style="text-align:right;">${escapeHtml(
+                            formatCurrency(summaryTotal)
+                          )}</td>
+                        </tr>
+                      </tfoot>
+                    </table>
+                  `
+              }
+            </div>
+          </section>
 
-        
+          ${
+            client?.name
+              ? `
+                <section style="margin-top:18px;">
+                  <div class="section-head">
+                    <div class="section-title">Preparada para</div>
+                  </div>
+                  <div class="client-card">
+                    <div class="client-name">${escapeHtml(client.name)}</div>
                     ${
-                      contactInfo.length
-                        ? `<div class="agency-contact">${contactInfo
-                            .map(escapeHtml)
-                            .join("<br>")}</div>`
+                      client?.email
+                        ? `<div class="client-email">${escapeHtml(client.email)}</div>`
                         : ""
                     }
-
-        </div>
-
-       
-      </div>
-
-      <div class="hero">
-        <div>
-          <h1>${escapeHtml(proposal.title || "Proposta")}</h1>
-          <div class="sub">
-            ${
-              client?.name
-                ? `<span style="font-weight:600">${escapeHtml(
-                    client.name
-                  )}</span>`
-                : `Proposta personalizada`
-            }
-          </div>
-        </div>
-
-        <div class="meta">
-          <div class="meta-row">
-            <div class="meta-k">Proposta</div>
-            <div class="meta-v">#${escapeHtml(proposal.number)}</div>
-          </div>
-          ${
-            tripPeriodText
-              ? `<div class="meta-row">
-                   <div class="meta-k">Período</div>
-                   <div class="meta-v">${escapeHtml(tripPeriodText)}</div>
-                 </div>`
+                  </div>
+                </section>
+              `
               : ""
           }
-        </div>
-      </div>
 
-      <div class="grid">
-        <div class="block totals">
-          <div class="block-title">Resumo financeiro</div>
-          <div class="row">
-            <div class="k">Subtotal</div>
-            <div class="v">${escapeHtml(formatCurrency(totalServices))}</div>
-          </div>
+          <section style="margin-top:18px;">
+            <div class="section-head">
+              <div class="section-title">Serviços inclusos</div>
+             
+            </div>
+            <div class="service-list">
+              ${servicesHtml}
+            </div>
+          </section>
+
           ${
-            discountPct > 0
+            !isBlank(notesValue)
               ? `
-                <div class="row">
-                  <div class="k">Desconto (${escapeHtml(discountPct)}%)</div>
-                  <div class="v">- ${escapeHtml(formatCurrency(discountValue))}</div>
+                <div class="notes">
+                  <div class="notes-title">Observações</div>
+                  <div class="notes-body">${escapeHtml(notesValue)}</div>
                 </div>
               `
               : ""
           }
-          <div class="final">
-            <div class="k">Valor total</div>
-            <div class="v">${escapeHtml(formatCurrency(finalValue))}</div>
-          </div>
-          <div class="note">
-            Valores sujeitos a disponibilidade e alteração até a confirmação da reserva.
-          </div>
-        </div>
-      </div>
 
-      <div class="section">
-        <div class="section-head">
-          <div class="section-title">Serviços incluídos</div>
-          <div class="section-sub">${escapeHtml(servicesCountText)}</div>
-        </div>
-
-        ${
-          services.length === 0
-            ? `<div class="muted">Nenhum serviço adicionado.</div>`
-            : services
-                .map((service) => {
-                  const label =
-                    serviceLabels[service.type] || translateCommonValuePT(service.type);
-                  const details: any = service.details || {};
-                  const { total, quantity, unitValue } = getServicePricing(service);
-
-                  const desc = safeStr(service.description);
-
-                  const metaPieces: string[] = [];
-                  if ((service as any).partners?.name)
-                    metaPieces.push(String((service as any).partners.name));
-                  const metaLine = metaPieces.filter(Boolean).join(" • ");
-
-                  const priceHtml =
-                    quantity && quantity > 1
-                      ? `
-                        <div class="price">${escapeHtml(formatCurrency(total))}</div>
-                        <div class="price-sub">${escapeHtml(
-                          String(quantity)
-                        )}x  ${escapeHtml(formatCurrency(unitValue))} por unidade</div>
-                      `
-                      : `
-                        <div class="price">${escapeHtml(formatCurrency(total))}</div>
-                        ${
-                          details?.unit_value || details?.quantity
-                            ? `<div class="price-sub">${
-                                details?.quantity
-                                  ? `${escapeHtml(String(details.quantity))}x`
-                                  : ""
-                              }${details?.quantity && details?.unit_value ? "  " : ""}${
-                                details?.unit_value
-                                  ? `${escapeHtml(
-                                      formatCurrency(Number(details.unit_value))
-                                    )} por unidade`
-                                  : ""
-                              }</div>`
-                            : `<div class="price-sub">&nbsp;</div>`
-                        }
-                      `;
-
-                  return `
-                    <div class="service">
-                      <div class="service-top">
-                        <div>
-                          <div class="type-chip">${escapeHtml(label)}</div>
-                          ${
-                            desc
-                              ? `<div class="service-desc">${escapeHtml(desc)}</div>`
-                              : ""
-                          }
-                          ${
-                            metaLine
-                              ? `<div class="service-meta">${escapeHtml(metaLine)}</div>`
-                              : ""
-                          }
-                        </div>
-                        <div>
-                          ${priceHtml}
-                        </div>
-                      </div>
-
-                      <div class="service-body">
-                        ${renderServiceDetails(service)}
-                      </div>
+          <section>
+            <div class="totals-card">
+              <div class="totals-row">
+                <span>Subtotal</span>
+                <strong>${escapeHtml(formatCurrency(totalServices))}</strong>
+              </div>
+              ${
+                discountPct > 0
+                  ? `
+                    <div class="totals-row">
+                      <span>Desconto (${escapeHtml(discountPct)}%)</span>
+                      <strong>- ${escapeHtml(formatCurrency(discountValue))}</strong>
                     </div>
-                  `;
-                })
-                .join("")
-        }
-      </div>
-
-      ${
-        !isBlank(notesValue)
-          ? `
-            <div class="notes">
-              <div class="notes-title">Observações</div>
-              <div class="notes-body">
-                ${escapeHtml(notesValue).replace(/\n/g, "<br>")}
+                  `
+                  : ""
+              }
+              <div class="totals-divider"></div>
+              <div class="totals-final">
+                <span>Valor total</span>
+                <span>${escapeHtml(formatCurrency(finalValue))}</span>
+              </div>
+              <div class="totals-note">
+                ${renderIcon("dot", "icon-sm")}
+                <span>Valores sujeitos a disponibilidade e alteração até a confirmação da reserva.</span>
               </div>
             </div>
-          `
-          : ""
-      }
+          </section>
 
-      <div class="footer">
-        <div><strong>${escapeHtml(agencyName)}</strong></div>
-        <div style="margin-top:6px;">
-          ${
-            contactInfo.length
-              ? `Contato: ${escapeHtml(contactInfo.join(" | "))}`
-              : "Entre em contato para confirmar disponibilidade e condições."
-          }
+          <div class="footer">
+            <div><strong>${escapeHtml(agencyName)}</strong></div>
+            <div style="margin-top:6px;">${footerLine}</div>
+          </div>
         </div>
       </div>
-
     </div>
   </body>
   </html>
