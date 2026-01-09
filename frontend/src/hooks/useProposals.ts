@@ -14,6 +14,7 @@ export interface Proposal {
   notes: string | null;
   status: string;
   stage_id: string | null;
+  stage_entered_at: string | null;
   total_value: number;
   discount: number;
   commission_type: string;
@@ -21,7 +22,15 @@ export interface Proposal {
   created_at: string;
   updated_at: string;
   clients?: { id: string; name: string; email: string | null; phone: string | null; cpf: string | null; passport: string | null } | null;
-  pipeline_stages?: { id: string; name: string; color: string; is_closed: boolean; is_lost: boolean } | null;
+  pipeline_stages?: {
+    id: string;
+    name: string;
+    color: string;
+    is_closed: boolean;
+    is_lost: boolean;
+    sla_minutes?: number | null;
+    templates?: { id: string; title: string; content: string }[] | null;
+  } | null;
   assigned_collaborator?: { id: string; name: string } | null;
   created_by?: { id: string; name: string; email: string | null; avatar_url?: string | null; avatarUrl?: string | null } | null;
 }
@@ -33,6 +42,7 @@ export interface ProposalInput {
   notes?: string;
   status?: string;
   stage_id?: string | null;
+  stage_entered_at?: string | null;
   total_value?: number;
   discount?: number;
   commission_type?: string;
@@ -50,6 +60,7 @@ export type BackendProposal = {
   notes: string | null;
   status: string;
   stageId: string | null;
+  stageEnteredAt: string | null;
   totalValue: number;
   discount: number;
   commissionType: string;
@@ -64,7 +75,7 @@ export type BackendProposal = {
 
 export const proposalInclude = {
   client: { select: { id: true, name: true, email: true, phone: true, cpf: true, passport: true } },
-  stage: { select: { id: true, name: true, color: true, isClosed: true, isLost: true } },
+  stage: { select: { id: true, name: true, color: true, isClosed: true, isLost: true, slaMinutes: true, templates: true } },
   assignedCollaborator: { select: { id: true, name: true } },
   createdBy: { select: { id: true, name: true, email: true, avatarUrl: true, profile: { select: { avatarUrl: true } } } },
 };
@@ -80,6 +91,7 @@ export const mapBackendProposalToFront = (p: BackendProposal): Proposal => ({
   notes: p.notes,
   status: p.status,
   stage_id: p.stageId,
+  stage_entered_at: p.stageEnteredAt ?? null,
   total_value: Number(p.totalValue || 0),
   discount: Number(p.discount || 0),
   commission_type: p.commissionType,
@@ -100,6 +112,8 @@ export const mapBackendProposalToFront = (p: BackendProposal): Proposal => ({
     color: p.stage.color,
     is_closed: p.stage.isClosed,
     is_lost: p.stage.isLost,
+    sla_minutes: p.stage.slaMinutes ?? null,
+    templates: Array.isArray(p.stage.templates) ? p.stage.templates : [],
   } : null,
   assigned_collaborator: p.assignedCollaborator ? {
     id: p.assignedCollaborator.id,
@@ -114,20 +128,28 @@ export const mapBackendProposalToFront = (p: BackendProposal): Proposal => ({
   } : null,
 });
 
-const mapFrontToBackend = (input: ProposalInput, agencyId: string, userId: string | null) => ({
-  clientId: input.client_id ?? null,
-  assignedCollaboratorId: input.assigned_collaborator_id ?? null,
-  title: input.title,
-  notes: input.notes ?? null,
-  status: input.status ?? 'new',
-  stageId: input.stage_id ?? null,
-  totalValue: input.total_value ?? 0,
-  discount: input.discount ?? 0,
-  commissionType: input.commission_type ?? 'percentage',
-  commissionValue: input.commission_value ?? 0,
-  agencyId,
-  userId,
-});
+const mapFrontToBackend = (input: ProposalInput, agencyId: string, userId: string | null) => {
+  const payload: Record<string, unknown> = {
+    clientId: input.client_id ?? null,
+    assignedCollaboratorId: input.assigned_collaborator_id ?? null,
+    title: input.title,
+    notes: input.notes ?? null,
+    status: input.status ?? 'new',
+    stageId: input.stage_id ?? null,
+    totalValue: input.total_value ?? 0,
+    discount: input.discount ?? 0,
+    commissionType: input.commission_type ?? 'percentage',
+    commissionValue: input.commission_value ?? 0,
+    agencyId,
+    userId,
+  };
+
+  if (input.stage_entered_at !== undefined) {
+    payload.stageEnteredAt = input.stage_entered_at;
+  }
+
+  return payload;
+};
 
 export function useProposals() {
   const { agency, isSuperAdmin, profile } = useAuth();
@@ -158,7 +180,14 @@ export function useProposals() {
     mutationFn: async (input: ProposalInput) => {
       if (!agency?.id) throw new Error('Agência não encontrada');
 
-      const payload = mapFrontToBackend(input, agency.id, profile?.id ?? null);
+      const payload = mapFrontToBackend(
+        {
+          ...input,
+          stage_entered_at: input.stage_entered_at ?? new Date().toISOString(),
+        },
+        agency.id,
+        profile?.id ?? null,
+      );
       const created = await apiFetch<BackendProposal>(`/api/proposal`, {
         method: 'POST',
         body: JSON.stringify(payload),
@@ -202,7 +231,11 @@ export function useProposals() {
     mutationFn: async ({ id, stage_id }: { id: string; stage_id: string }) => {
       const updated = await apiFetch<BackendProposal>(`/api/proposal/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({ stageId: stage_id, updatedAt: new Date().toISOString() }),
+        body: JSON.stringify({
+          stageId: stage_id,
+          stageEnteredAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        }),
       });
       return mapBackendProposalToFront(updated);
     },

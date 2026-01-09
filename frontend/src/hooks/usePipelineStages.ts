@@ -11,8 +11,16 @@ export interface PipelineStage {
   order: number;
   is_closed: boolean;
   is_lost: boolean;
+  sla_minutes?: number | null;
+  templates?: PipelineStageTemplate[] | null;
   created_at: string;
   updated_at: string;
+}
+
+export interface PipelineStageTemplate {
+  id: string;
+  title: string;
+  content: string;
 }
 
 export interface PipelineStageInput {
@@ -21,6 +29,8 @@ export interface PipelineStageInput {
   order?: number;
   is_closed?: boolean;
   is_lost?: boolean;
+  sla_minutes?: number | null;
+  templates?: PipelineStageTemplate[] | null;
 }
 
 export function usePipelineStages() {
@@ -47,6 +57,8 @@ export function usePipelineStages() {
         order: s.order,
         is_closed: s.isClosed,
         is_lost: s.isLost,
+        sla_minutes: s.slaMinutes ?? null,
+        templates: Array.isArray(s.templates) ? s.templates : [],
         created_at: s.createdAt,
         updated_at: s.updatedAt,
       })) as PipelineStage[];
@@ -69,6 +81,8 @@ export function usePipelineStages() {
           order: input.order ?? maxOrder + 1,
           isClosed: input.is_closed ?? false,
           isLost: input.is_lost ?? false,
+          slaMinutes: input.sla_minutes ?? null,
+          templates: input.templates ?? [],
           agencyId: agency.id,
         }),
       });
@@ -85,16 +99,25 @@ export function usePipelineStages() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...input }: PipelineStageInput & { id: string }) => {
+      const payload: Record<string, unknown> = {
+        name: input.name,
+        color: input.color,
+        order: input.order,
+        isClosed: input.is_closed,
+        isLost: input.is_lost,
+        updatedAt: new Date().toISOString(),
+      };
+
+      if (input.sla_minutes !== undefined) {
+        payload.slaMinutes = input.sla_minutes;
+      }
+      if (input.templates !== undefined) {
+        payload.templates = input.templates ?? [];
+      }
+
       const updated = await apiFetch(`/api/pipelineStage/${id}`, {
         method: 'PUT',
-        body: JSON.stringify({
-          name: input.name,
-          color: input.color,
-          order: input.order,
-          isClosed: input.is_closed,
-          isLost: input.is_lost,
-          updatedAt: new Date().toISOString(),
-        }),
+        body: JSON.stringify(payload),
       });
       return updated;
     },
@@ -109,14 +132,25 @@ export function usePipelineStages() {
 
   const reorderMutation = useMutation({
     mutationFn: async (stages: { id: string; order: number }[]) => {
-      const promises = stages.map(({ id, order }) =>
+      if (stages.length === 0) return;
+      const maxOrder = (query.data || []).reduce((max, stage) => Math.max(max, stage.order), 0);
+      const offset = maxOrder + 1000;
+
+      const tempUpdates = stages.map(({ id, order }) =>
+        apiFetch(`/api/pipelineStage/${id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ order: order + offset }),
+        }),
+      );
+      await Promise.all(tempUpdates);
+
+      const finalUpdates = stages.map(({ id, order }) =>
         apiFetch(`/api/pipelineStage/${id}`, {
           method: 'PUT',
           body: JSON.stringify({ order }),
         }),
       );
-
-      await Promise.all(promises);
+      await Promise.all(finalUpdates);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['pipeline-stages'] });

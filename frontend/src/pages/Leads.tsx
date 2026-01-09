@@ -20,6 +20,22 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Calendar } from '@/components/ui/calendar';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from '@/components/ui/table';
 import { 
   Dialog, 
   DialogContent,
@@ -44,7 +60,28 @@ import {
   DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { Plus, Search, Eye, Edit, Trash2, Calendar as CalendarIcon, MoreHorizontal, Loader2, AlertTriangle, CheckCircle, Filter, Building2, X, DollarSign, ExternalLink, History, Pencil } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  Eye,
+  Edit,
+  Trash2,
+  Calendar as CalendarIcon,
+  MoreHorizontal,
+  Loader2,
+  AlertTriangle,
+  CheckCircle,
+  Filter,
+  Building2,
+  X,
+  DollarSign,
+  ExternalLink,
+  History,
+  Pencil,
+  BarChart3,
+  FileText,
+  Copy,
+} from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import { format } from 'date-fns';
@@ -52,12 +89,46 @@ import { ptBR } from 'date-fns/locale';
 import { DateRange } from 'react-day-picker';
 import { apiFetch } from '@/lib/api';
 import { useToast } from '@/hooks/use-toast';
+import { formatDurationMinutes, formatSlaMinutes, parseSlaInput } from '@/utils/sla';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
     style: 'currency',
     currency: 'BRL',
   }).format(value);
+};
+
+const getStageElapsedMinutes = (proposal: Proposal, fallbackEnteredAt?: string | null) => {
+  const candidates = [proposal.stage_entered_at, fallbackEnteredAt].filter(Boolean) as string[];
+  let enteredAt = proposal.created_at;
+
+  if (candidates.length > 0) {
+    const dates = candidates
+      .map((value) => new Date(value))
+      .filter((date) => !Number.isNaN(date.getTime()));
+    if (dates.length > 0) {
+      const latest = dates.reduce((max, current) => (current > max ? current : max));
+      enteredAt = latest.toISOString();
+    }
+  }
+
+  if (!enteredAt) {
+    enteredAt = proposal.updated_at || proposal.created_at;
+  }
+  if (!enteredAt) return null;
+  const enteredDate = new Date(enteredAt);
+  if (Number.isNaN(enteredDate.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - enteredDate.getTime()) / 60000));
+};
+
+const getSlaStatus = (proposal: Proposal, fallbackEnteredAt?: string | null) => {
+  const stage = proposal.pipeline_stages;
+  if (!stage || stage.is_closed || stage.is_lost) return null;
+  const slaMinutes = stage.sla_minutes;
+  if (slaMinutes === null || slaMinutes === undefined) return null;
+  const elapsedMinutes = getStageElapsedMinutes(proposal, fallbackEnteredAt);
+  if (elapsedMinutes === null) return null;
+  return { remaining: slaMinutes - elapsedMinutes, sla: slaMinutes };
 };
 
 // Hook to fetch all proposal tags
@@ -107,12 +178,14 @@ interface ProposalCardProps {
   tags: { name: string; color: string }[];
   serviceTotals: { value: number; commission: number } | undefined;
   lastMovement?: { id: string; name: string; email?: string | null; avatar_url?: string | null } | null;
+  stageEnteredAt?: string | null;
   onView: () => void;
   onEdit: () => void;
   onDelete: () => void;
   onClose: () => void;
   onDragStart: (e: React.DragEvent) => void;
   onCopyLink: () => void;
+  onTemplates: () => void;
 }
 
 function ProposalCard({
@@ -120,16 +193,19 @@ function ProposalCard({
   tags,
   serviceTotals,
   lastMovement,
+  stageEnteredAt,
   onView,
   onEdit,
   onDelete,
   onClose,
   onDragStart,
   onCopyLink,
+  onTemplates,
 }: ProposalCardProps) {
   const client = proposal.clients;
   const totalValue = serviceTotals?.value || 0;
   const totalCommission = serviceTotals?.commission || 0;
+  const slaStatus = getSlaStatus(proposal, stageEnteredAt);
   
   const getInitials = (name: string) => {
     return name
@@ -191,6 +267,10 @@ function ProposalCard({
             <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onCopyLink(); }}>
               <ExternalLink className="w-4 h-4 mr-2" />
               Ver link
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={(e) => { e.stopPropagation(); onTemplates(); }}>
+              <FileText className="w-4 h-4 mr-2" />
+              Templates
             </DropdownMenuItem>
             <DropdownMenuItem className="text-destructive" onClick={(e) => { e.stopPropagation(); onDelete(); }}>
               <Trash2 className="w-4 h-4 mr-2" />
@@ -275,6 +355,22 @@ function ProposalCard({
           <span className="font-semibold ml-1 text-green-600">{formatCurrency(totalCommission)}</span>
         </div>
       </div>
+      
+      {slaStatus && (
+        <div className="flex items-center gap-2 mb-2">
+          <Badge
+            variant={slaStatus.remaining < 0 ? 'destructive' : 'secondary'}
+            className="text-xs"
+          >
+            {slaStatus.remaining < 0
+              ? `Atrasado ${formatDurationMinutes(Math.abs(slaStatus.remaining))}`
+              : `Restam ${formatDurationMinutes(slaStatus.remaining)}`}
+          </Badge>
+          <span className="text-[11px] text-muted-foreground">
+            SLA {formatSlaMinutes(slaStatus.sla)}
+          </span>
+        </div>
+      )}
 
       <div className="flex items-center justify-between text-xs text-muted-foreground">
         <div className="flex items-center gap-1">
@@ -298,6 +394,7 @@ interface KanbanColumnProps {
   proposalTags: Record<string, { name: string; color: string }[]>;
   serviceTotals: Record<string, { value: number; commission: number }>;
   lastMovements: Record<string, { id: string; name: string; email?: string | null } | null>;
+  stageEnteredAtByProposal: Record<string, string | null>;
   onProposalView: (proposal: Proposal) => void;
   onProposalEdit: (proposal: Proposal) => void;
   onProposalDelete: (proposal: Proposal) => void;
@@ -306,6 +403,7 @@ interface KanbanColumnProps {
   onAddProposal: (stageId: string) => void;
   onEditColumn: (stage: PipelineStage) => void;
   onProposalCopyLink: (proposal: Proposal) => void;
+  onStageTemplates: (stageId: string) => void;
 }
 
 function KanbanColumn({ 
@@ -314,6 +412,7 @@ function KanbanColumn({
   proposalTags,
   serviceTotals,
   lastMovements,
+  stageEnteredAtByProposal,
   onProposalView, 
   onProposalEdit, 
   onProposalDelete,
@@ -322,6 +421,7 @@ function KanbanColumn({
   onAddProposal,
   onEditColumn,
   onProposalCopyLink,
+  onStageTemplates,
 }: KanbanColumnProps) {
   const totalValue = proposals.reduce((sum, p) => sum + (serviceTotals[p.id]?.value || 0), 0);
   const [isDragOver, setIsDragOver] = useState(false);
@@ -377,6 +477,10 @@ function KanbanColumn({
                 <Pencil className="mr-2 h-4 w-4" />
                 Editar coluna
               </DropdownMenuItem>
+              <DropdownMenuItem onClick={() => onStageTemplates(stage.id)}>
+                <FileText className="mr-2 h-4 w-4" />
+                Templates da etapa
+              </DropdownMenuItem>
             </DropdownMenuContent>
           </DropdownMenu>
         </div>
@@ -396,13 +500,14 @@ function KanbanColumn({
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto px-3 pb-4">
-        {proposals.map((proposal) => (
+          {proposals.map((proposal) => (
           <ProposalCard 
             key={proposal.id} 
             proposal={proposal}
             tags={proposalTags[proposal.id] || []}
             serviceTotals={serviceTotals[proposal.id]}
             lastMovement={lastMovements[proposal.id] ?? null}
+            stageEnteredAt={stageEnteredAtByProposal[proposal.id]}
             onView={() => onProposalView(proposal)}
             onEdit={() => onProposalEdit(proposal)}
             onDelete={() => onProposalDelete(proposal)}
@@ -411,6 +516,7 @@ function KanbanColumn({
               e.dataTransfer.setData('proposalId', proposal.id);
             }}
             onCopyLink={() => onProposalCopyLink(proposal)}
+            onTemplates={() => onStageTemplates(proposal.stage_id || stage.id)}
           />
         ))}
       </div>
@@ -457,6 +563,10 @@ export default function Leads() {
   const [stageColor, setStageColor] = useState('#3B82F6');
   const [stageIsClosed, setStageIsClosed] = useState(false);
   const [stageIsLost, setStageIsLost] = useState(false);
+  const [stageSla, setStageSla] = useState('');
+  const [indicatorsOpen, setIndicatorsOpen] = useState(false);
+  const [templatesDrawerOpen, setTemplatesDrawerOpen] = useState(false);
+  const [templatesStageId, setTemplatesStageId] = useState<string | null>(null);
   
   // Financial confirmation dialogs
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
@@ -506,19 +616,53 @@ export default function Leads() {
     setStageColor(stage.color || '#3B82F6');
     setStageIsClosed(stage.is_closed);
     setStageIsLost(stage.is_lost);
+    setStageSla(formatSlaMinutes(stage.sla_minutes));
     setStageDialogOpen(true);
   };
 
   const handleSaveStage = () => {
     if (!editingStage) return;
+    const slaMinutes = parseSlaInput(stageSla);
+    if (stageSla.trim() && slaMinutes === null) {
+      toast({
+        title: 'SLA inválido',
+        description: 'Use o formato hh:mm (ex: 02:30).',
+        variant: 'destructive',
+      });
+      return;
+    }
     updateStage({
       id: editingStage.id,
       name: stageName.trim() || editingStage.name,
       color: stageColor,
       is_closed: stageIsClosed,
       is_lost: stageIsLost,
+      sla_minutes: stageSla.trim() ? slaMinutes : null,
     });
     setStageDialogOpen(false);
+  };
+
+  const handleOpenTemplates = (stageId?: string | null) => {
+    if (!stageId) {
+      toast({
+        title: 'Etapa não encontrada',
+        description: 'Defina a etapa para visualizar os templates.',
+        variant: 'destructive',
+      });
+      return;
+    }
+    setTemplatesStageId(stageId);
+    setTemplatesDrawerOpen(true);
+  };
+
+  const handleCopyTemplate = async (content: string) => {
+    if (!content) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      toast({ title: 'Template copiado!' });
+    } catch (error) {
+      toast({ title: 'Não foi possível copiar', variant: 'destructive' });
+    }
   };
 
   // Helpers para refletir serviços no calendário
@@ -673,33 +817,61 @@ export default function Leads() {
     return filteredProposals.filter(p => p.stage_id === stageId);
   };
   const proposalIds = useMemo(() => filteredProposals.map((proposal) => proposal.id), [filteredProposals]);
-  const { data: lastMovementsByProposal = {} } = useQuery({
+  const { data: proposalMovements = { lastMovements: {}, stageMoves: {} } } = useQuery({
     queryKey: ['proposal-last-movements', proposalIds],
     queryFn: async () => {
-      if (proposalIds.length === 0) return {};
+      if (proposalIds.length === 0) return { lastMovements: {}, stageMoves: {} };
       const params = new URLSearchParams({
         where: JSON.stringify({ proposalId: { in: proposalIds } }),
         include: JSON.stringify({ user: { select: { id: true, name: true, email: true, avatarUrl: true, profile: { select: { avatarUrl: true } } } } }),
         orderBy: JSON.stringify({ createdAt: 'desc' }),
       });
       const { data } = await apiFetch<{ data: any[] }>(`/api/proposalHistory?${params.toString()}`);
-      const map: Record<string, { id: string; name: string; email?: string | null; avatar_url?: string | null } | null> = {};
+      const lastMovements: Record<string, { id: string; name: string; email?: string | null; avatar_url?: string | null } | null> = {};
+      const stageMoves: Record<string, { stageName: string; createdAt: string }[]> = {};
       (data || []).forEach((history) => {
         const proposalId = history.proposalId;
-        if (!proposalId || map[proposalId]) return;
-        const user = history.user;
-        if (!user) return;
-        map[proposalId] = {
-          id: user.id,
-          name: user.name || user.email || 'Usuário',
-          email: user.email ?? null,
-          avatar_url: user.avatarUrl || user.profile?.avatarUrl || null,
-        };
+        if (!proposalId) return;
+
+        if (!lastMovements[proposalId]) {
+          const user = history.user;
+          if (user) {
+            lastMovements[proposalId] = {
+              id: user.id,
+              name: user.name || user.email || 'Usuário',
+              email: user.email ?? null,
+              avatar_url: user.avatarUrl || user.profile?.avatarUrl || null,
+            };
+          }
+        }
+
+        const action = String(history.action || '').toLowerCase();
+        if (action.includes('etapa')) {
+          let stageName: string | null = null;
+          if (typeof history.newValue === 'string') {
+            stageName = history.newValue;
+          } else if (history.newValue && typeof history.newValue === 'object' && typeof history.newValue.name === 'string') {
+            stageName = history.newValue.name;
+          } else if (typeof history.description === 'string') {
+            const match = history.description.match(/para\s+(.+)$/i);
+            stageName = match?.[1] ?? null;
+          }
+
+          if (stageName && history.createdAt) {
+            if (!stageMoves[proposalId]) stageMoves[proposalId] = [];
+            stageMoves[proposalId].push({
+              stageName,
+              createdAt: history.createdAt,
+            });
+          }
+        }
       });
-      return map;
+      return { lastMovements, stageMoves };
     },
     enabled: proposalIds.length > 0,
   });
+  const lastMovementsByProposal = proposalMovements.lastMovements ?? {};
+  const stageMovesByProposal = proposalMovements.stageMoves ?? {};
   const userAvatarById = useMemo(() => {
     const map = new Map<string, string>();
     agencyUsers.forEach((u) => {
@@ -723,6 +895,72 @@ export default function Leads() {
     });
     return next;
   }, [lastMovementsByProposal, userAvatarById]);
+  const stageEnteredAtByProposal = useMemo(() => {
+    const map: Record<string, string | null> = {};
+    filteredProposals.forEach((proposal) => {
+      const stageName = proposal.pipeline_stages?.name;
+      if (!stageName) {
+        map[proposal.id] = null;
+        return;
+      }
+      const moves = stageMovesByProposal[proposal.id] || [];
+      const match = moves.find((move) => move.stageName === stageName);
+      const fallbackMove = moves[0];
+      map[proposal.id] = match?.createdAt ?? fallbackMove?.createdAt ?? null;
+    });
+    return map;
+  }, [filteredProposals, stageMovesByProposal]);
+  const templatesStage = useMemo(
+    () => stages.find((stage) => stage.id === templatesStageId) || null,
+    [stages, templatesStageId],
+  );
+  const templatesList = useMemo(
+    () => (templatesStage?.templates && Array.isArray(templatesStage.templates) ? templatesStage.templates : []),
+    [templatesStage],
+  );
+  const stageIndicators = useMemo(() => {
+    const totalsMap = serviceTotals || {};
+    return stages.map((stage) => {
+      const stageProposals = filteredProposals.filter((proposal) => proposal.stage_id === stage.id);
+      const totals = stageProposals.reduce(
+        (acc, proposal) => {
+          const values = totalsMap[proposal.id] || { value: 0, commission: 0 };
+          acc.value += values.value || 0;
+          acc.commission += values.commission || 0;
+          return acc;
+        },
+        { value: 0, commission: 0 },
+      );
+      const durations = stageProposals
+        .map((proposal) => getStageElapsedMinutes(proposal, stageEnteredAtByProposal[proposal.id]))
+        .filter((value): value is number => value !== null);
+      const avgTimeMinutes =
+        durations.length > 0 ? Math.round(durations.reduce((sum, val) => sum + val, 0) / durations.length) : 0;
+      const slaMinutes = stage.sla_minutes ?? null;
+      const overdueCount =
+        slaMinutes !== null
+          ? stageProposals.filter((proposal) => {
+              const elapsed = getStageElapsedMinutes(proposal, stageEnteredAtByProposal[proposal.id]);
+              return elapsed !== null && elapsed > slaMinutes;
+            }).length
+          : 0;
+      return {
+        stage,
+        count: stageProposals.length,
+        totalValue: totals.value,
+        totalCommission: totals.commission,
+        avgTicket: stageProposals.length ? totals.value / stageProposals.length : 0,
+        avgTimeMinutes,
+        slaMinutes,
+        overdueCount,
+      };
+    });
+  }, [filteredProposals, serviceTotals, stages, stageEnteredAtByProposal]);
+  const lostStageOrder = useMemo(() => {
+    const lostStages = stages.filter((stage) => stage.is_lost);
+    if (lostStages.length === 0) return null;
+    return lostStages.reduce((max, stage) => Math.max(max, stage.order), lostStages[0].order);
+  }, [stages]);
   const sellerOptions = useMemo(() => {
     const map = new Map<string, string>();
     filteredProposals.forEach((p) => {
@@ -1114,6 +1352,11 @@ export default function Leads() {
               />
             </div>
 
+            <Button variant="outline" size="sm" onClick={() => setIndicatorsOpen(true)}>
+              <BarChart3 className="h-4 w-4 mr-1.5" />
+              Indicadores
+            </Button>
+
             <Button size="sm" onClick={() => handleAddProposal()}>
               <Plus className="h-4 w-4 mr-1.5" />
               Nova Proposta
@@ -1239,6 +1482,7 @@ export default function Leads() {
                   proposalTags={proposalTagsMap}
                   serviceTotals={serviceTotals || {}}
                   lastMovements={lastMovementsWithAvatars}
+                  stageEnteredAtByProposal={stageEnteredAtByProposal}
                   onProposalView={setViewingProposal}
                   onProposalEdit={handleEdit}
                   onProposalDelete={handleDelete}
@@ -1247,6 +1491,7 @@ export default function Leads() {
                   onAddProposal={handleAddProposal}
                   onEditColumn={openStageDialog}
                   onProposalCopyLink={(proposal) => handleCopyProposalLink(proposal.id)}
+                  onStageTemplates={handleOpenTemplates}
                 />
               ))}
             </div>
@@ -1272,14 +1517,196 @@ export default function Leads() {
               proposals={filteredProposals}
               proposalTags={proposalTagsMap}
               serviceTotals={serviceTotals || {}}
+              stageEnteredAtByProposal={stageEnteredAtByProposal}
               onProposalView={setViewingProposal}
               onProposalEdit={handleEdit}
               onProposalDelete={handleDelete}
               onProposalClose={handleCloseProposal}
+              onProposalCopyLink={(proposal) => handleCopyProposalLink(proposal.id)}
             />
           )}
         </div>
       )}
+
+      <Dialog open={indicatorsOpen} onOpenChange={setIndicatorsOpen}>
+        <DialogContent className="max-w-6xl w-[98vw]">
+          <DialogHeader>
+            <DialogTitle className="flex items-center gap-2">
+              <BarChart3 className="h-5 w-5 text-primary" />
+              Indicadores por etapa
+            </DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4">
+            <p className="text-sm text-muted-foreground">
+              Baseado em {filteredProposals.length} propostas filtradas.
+            </p>
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Etapa</TableHead>
+                  <TableHead className="w-[90px]">Leads</TableHead>
+                  <TableHead className="w-[140px]">Valor</TableHead>
+                  <TableHead className="w-[140px]">Lucro</TableHead>
+                  <TableHead className="w-[140px]">Ticket médio</TableHead>
+                  <TableHead className="w-[140px]">Tempo médio</TableHead>
+                  <TableHead className="w-[110px]">SLA</TableHead>
+                  <TableHead className="w-[110px]">Atrasados</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {stageIndicators.map((indicator) => {
+                  const isOverAvgSla =
+                    !indicator.stage.is_closed &&
+                    !indicator.stage.is_lost &&
+                    indicator.slaMinutes !== null &&
+                    indicator.count > 0 &&
+                    indicator.avgTimeMinutes > indicator.slaMinutes;
+                  const hideValueAfterLost =
+                    lostStageOrder !== null && indicator.stage.order > lostStageOrder;
+                  return (
+                    <TableRow key={indicator.stage.id}>
+                    <TableCell>
+                      <div className="flex items-start gap-2">
+                        <span
+                          className="mt-1 h-2.5 w-2.5 shrink-0 rounded-full"
+                          style={{ backgroundColor: indicator.stage.color }}
+                        />
+                        <span className="font-medium leading-snug">{indicator.stage.name}</span>
+                      </div>
+                    </TableCell>
+                    <TableCell>
+                      <Badge variant="secondary" className="text-xs">
+                        {indicator.count}
+                      </Badge>
+                    </TableCell>
+                    <TableCell>
+                      {hideValueAfterLost
+                        ? ''
+                        : indicator.count
+                          ? formatCurrency(indicator.totalValue)
+                          : '-'}
+                    </TableCell>
+                    <TableCell className="text-green-600">
+                      {hideValueAfterLost
+                        ? ''
+                        : indicator.count
+                          ? formatCurrency(indicator.totalCommission)
+                          : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {indicator.stage.is_closed
+                        ? ''
+                        : indicator.count
+                          ? formatCurrency(indicator.avgTicket)
+                          : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {indicator.stage.is_closed || indicator.stage.is_lost
+                        ? ''
+                        : indicator.count
+                          ? (
+                            <div className="flex flex-col gap-0">
+                              <span
+                                className={cn(
+                                  isOverAvgSla && 'text-destructive font-semibold'
+                                )}
+                              >
+                                {formatDurationMinutes(indicator.avgTimeMinutes)}
+                              </span>
+                              {isOverAvgSla && (
+                                <span className="text-[11px] text-destructive">Acima do SLA</span>
+                              )}
+                            </div>
+                          )
+                          : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {indicator.stage.is_closed || indicator.stage.is_lost
+                        ? ''
+                        : indicator.slaMinutes !== null
+                          ? formatSlaMinutes(indicator.slaMinutes)
+                          : '-'}
+                    </TableCell>
+                    <TableCell>
+                      {indicator.stage.is_closed || indicator.stage.is_lost ? (
+                        ''
+                      ) : indicator.slaMinutes !== null ? (
+                          <Badge
+                            variant={indicator.overdueCount > 0 ? 'destructive' : 'secondary'}
+                            className="text-xs"
+                          >
+                            {indicator.overdueCount}
+                          </Badge>
+                        ) : (
+                          '-'
+                        )}
+                    </TableCell>
+                  </TableRow>
+                  );
+                })}
+              </TableBody>
+            </Table>
+          </div>
+        </DialogContent>
+      </Dialog>
+
+      <Drawer
+        open={templatesDrawerOpen}
+        onOpenChange={(open) => {
+          setTemplatesDrawerOpen(open);
+          if (!open) {
+            setTemplatesStageId(null);
+          }
+        }}
+      >
+        <DrawerContent className="fixed right-0 top-0 left-auto bottom-0 h-full w-[420px] max-w-[92vw] rounded-none border-l bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right">
+          <div className="flex h-full flex-col">
+            <DrawerHeader className="border-b border-slate-100 px-6 py-4 text-left">
+              <DrawerTitle>Templates da etapa</DrawerTitle>
+              <DrawerDescription>
+                {templatesStage ? templatesStage.name : 'Selecione uma etapa para visualizar'}
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {templatesList.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-sm text-muted-foreground">
+                  Nenhum template cadastrado para esta etapa.
+                </div>
+              ) : (
+                templatesList.map((template) => (
+                  <div key={template.id} className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-slate-900">{template.title || 'Template'}</p>
+                        <p className="text-xs text-slate-500">Clique para copiar a mensagem</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => handleCopyTemplate(template.content)}
+                        disabled={!template.content}
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copiar
+                      </Button>
+                    </div>
+                    <div className="whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">
+                      {template.content || 'Sem conteúdo definido.'}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <DrawerFooter className="border-t border-slate-100 px-6">
+              <Button variant="outline" onClick={() => setTemplatesDrawerOpen(false)}>
+                Fechar
+              </Button>
+            </DrawerFooter>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       <Dialog open={stageDialogOpen} onOpenChange={setStageDialogOpen}>
         <DialogContent>
@@ -1312,6 +1739,19 @@ export default function Leads() {
                   className="h-9 w-28"
                 />
               </div>
+            </div>
+            <div className="space-y-2">
+              <Label htmlFor="stage-sla">SLA (hh:mm)</Label>
+              <Input
+                id="stage-sla"
+                value={stageSla}
+                onChange={(e) => setStageSla(e.target.value)}
+                placeholder="Ex: 02:30"
+                className="h-9 w-40"
+              />
+              <p className="text-xs text-muted-foreground">
+                Defina o tempo máximo esperado nesta etapa.
+              </p>
             </div>
             <div className="flex items-center justify-between">
               <Label htmlFor="stage-closed">Fechado</Label>
@@ -1356,7 +1796,7 @@ export default function Leads() {
 
       {/* View Proposal Dialog - Full Detail */}
       <Dialog open={!!viewingProposal} onOpenChange={() => setViewingProposal(null)}>
-        <DialogContent className="max-w-5xl max-h-[90vh] overflow-y-auto">
+        <DialogContent className="max-w-6xl w-[95vw] max-h-[90vh] overflow-y-auto overflow-x-hidden">
           <DialogHeader className="sr-only">
             <DialogTitle>Detalhes da proposta</DialogTitle>
           </DialogHeader>

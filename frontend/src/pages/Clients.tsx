@@ -66,6 +66,7 @@ export default function Clients() {
     const searchLower = searchTerm.toLowerCase();
     return (
       client.name.toLowerCase().includes(searchLower) ||
+      (client.preferred_name?.toLowerCase().includes(searchLower)) ||
       (client.email?.toLowerCase().includes(searchLower)) ||
       (client.phone?.includes(searchTerm))
     );
@@ -289,6 +290,11 @@ export default function Clients() {
                         </Avatar>
                         <div>
                           <p className="font-medium text-slate-900">{client.name}</p>
+                          {client.preferred_name && (
+                            <p className="text-sm text-muted-foreground">
+                              Como prefere ser chamado: {client.preferred_name}
+                            </p>
+                          )}
                           {client.address && (
                             <p className="text-sm text-muted-foreground truncate max-w-[200px]">
                               {client.address}

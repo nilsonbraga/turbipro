@@ -18,6 +18,14 @@ import { apiFetch } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import {
+  Drawer,
+  DrawerContent,
+  DrawerDescription,
+  DrawerFooter,
+  DrawerHeader,
+  DrawerTitle,
+} from '@/components/ui/drawer';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Separator } from '@/components/ui/separator';
@@ -66,6 +74,7 @@ import {
   Eye,
   ArrowRight,
   FileText,
+  Copy,
   StickyNote,
   FolderOpen,
   FileUp,
@@ -404,6 +413,7 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
   const [closeDialogOpen, setCloseDialogOpen] = useState(false);
   const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
   const [isCreatingTransaction, setIsCreatingTransaction] = useState(false);
+  const [templatesOpen, setTemplatesOpen] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -846,6 +856,16 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
     return publicUrl;
   };
 
+  const handleCopyTemplate = async (content: string) => {
+    if (!content) return;
+    try {
+      await navigator.clipboard.writeText(content);
+      toast({ title: 'Template copiado!' });
+    } catch (error) {
+      toast({ title: 'Não foi possível copiar', variant: 'destructive' });
+    }
+  };
+
   const handleAddTag = (tagId: string) => {
     const tag = availableTags.find((t) => t.id === tagId);
     addTag(tagId);
@@ -872,43 +892,48 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
 
   const usedTagIds = proposalTags.map((t) => t.tag_id);
   const availableTagsToAdd = availableTags.filter((t) => !usedTagIds.includes(t.id));
+  const selectedStage = stages.find((stage) => stage.id === currentStageId) || null;
+  const stageTemplates =
+    selectedStage?.templates && Array.isArray(selectedStage.templates) ? selectedStage.templates : [];
 
   return (
     <div className="space-y-6">
       {/* HEADER (menos linhas / tipografia melhor) */}
-      <div className="flex items-start justify-between gap-4">
-        <div className="flex items-start gap-3 min-w-0 flex-1">
-         
+      <div className="space-y-3">
+        <div className="flex items-start justify-between gap-4">
+          {/* Linha 1: etapa + progresso (compacto) */}
+          <div className="max-w-[680px] min-w-0 flex-1">
+            <StageSwitcher stages={stages} currentStageId={currentStageId} onChange={handleStageChange} />
+          </div>
 
-          <div className="min-w-0 flex-1">
-            {/* Linha 1: etapa + progresso (compacto) */}
-            <div className="max-w-[680px]">
-              <StageSwitcher stages={stages} currentStageId={currentStageId} onChange={handleStageChange} />
-            </div>
-
-            {/* Linha 2: título + número (mesma linha) */}
-            <div className="mt-2 flex items-baseline gap-3 min-w-0">
-              <h2 className="text-2xl font-semibold tracking-tight truncate">{proposal.title}</h2>
-              <span className="text-sm text-muted-foreground whitespace-nowrap">
-                Proposta #{proposal.number}
-              </span>
-            </div>
+          <div className="flex flex-wrap justify-end gap-2 pr-12">
+            <Button variant="outline" size="sm" onClick={() => handleCopyLink()} disabled={isCreatingLink}>
+              <Link className="w-4 h-4 mr-2" />
+              Copiar link
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => setTemplatesOpen(true)}
+              disabled={!selectedStage}
+            >
+              <FileText className="w-4 h-4 mr-2" />
+              Templates
+            </Button>
+            <Button variant="outline" size="sm" onClick={handleExportPDF}>
+              <Download className="w-4 h-4 mr-2" />
+              Exportar PDF
+            </Button>
+            <Button size="sm" onClick={onEdit} aria-label="Editar">
+              <Edit className="w-4 h-4" />
+            </Button>
           </div>
         </div>
 
-        <div className="flex gap-2 shrink-0">
-          <Button variant="outline" size="sm" onClick={() => handleCopyLink()} disabled={isCreatingLink}>
-            <Link className="w-4 h-4 mr-2" />
-            Copiar link
-          </Button>
-          <Button variant="outline" size="sm" onClick={handleExportPDF}>
-            <Download className="w-4 h-4 mr-2" />
-            Exportar PDF
-          </Button>
-          <Button size="sm" onClick={onEdit}>
-            <Edit className="w-4 h-4 mr-2" />
-            Editar
-          </Button>
+        {/* Linha 2: título + número (mesma linha) */}
+        <div className="flex items-baseline gap-3 min-w-0">
+          <h2 className="text-2xl font-semibold tracking-tight truncate">{proposal.title}</h2>
+          <span className="text-sm text-muted-foreground whitespace-nowrap">Proposta #{proposal.number}</span>
         </div>
       </div>
 
@@ -1264,6 +1289,56 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
           </Card>
         </div>
       </div>
+
+      <Drawer open={templatesOpen} onOpenChange={setTemplatesOpen}>
+        <DrawerContent className="fixed right-0 top-0 left-auto bottom-0 h-full w-[420px] max-w-[92vw] rounded-none border-l bg-background data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:slide-in-from-right data-[state=closed]:slide-out-to-right">
+          <div className="flex h-full flex-col">
+            <DrawerHeader className="border-b border-slate-100 px-6 py-4 text-left">
+              <DrawerTitle>Templates da etapa</DrawerTitle>
+              <DrawerDescription>
+                {selectedStage ? selectedStage.name : 'Selecione uma etapa para visualizar'}
+              </DrawerDescription>
+            </DrawerHeader>
+            <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+              {stageTemplates.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-sm text-muted-foreground">
+                  Nenhum template cadastrado para esta etapa.
+                </div>
+              ) : (
+                stageTemplates.map((template) => (
+                  <div key={template.id} className="rounded-xl border border-slate-200 bg-white p-4 space-y-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <div>
+                        <p className="font-medium text-slate-900">{template.title || 'Template'}</p>
+                        <p className="text-xs text-slate-500">Clique para copiar a mensagem</p>
+                      </div>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        className="h-8"
+                        onClick={() => handleCopyTemplate(template.content)}
+                        disabled={!template.content}
+                      >
+                        <Copy className="h-4 w-4 mr-2" />
+                        Copiar
+                      </Button>
+                    </div>
+                    <div className="whitespace-pre-wrap rounded-lg border border-slate-100 bg-slate-50 p-3 text-sm text-slate-700">
+                      {template.content || 'Sem conteúdo definido.'}
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+            <DrawerFooter className="border-t border-slate-100 px-6">
+              <Button variant="outline" onClick={() => setTemplatesOpen(false)}>
+                Fechar
+              </Button>
+            </DrawerFooter>
+          </div>
+        </DrawerContent>
+      </Drawer>
 
       <ServiceDialog
         open={serviceDialogOpen}

@@ -37,6 +37,7 @@ import {
 } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { formatDurationMinutes } from '@/utils/sla';
 
 const formatCurrency = (value: number) => {
   return new Intl.NumberFormat('pt-BR', {
@@ -54,11 +55,45 @@ function getInitials(name: string) {
     .slice(0, 2);
 }
 
+const getStageElapsedMinutes = (proposal: Proposal, fallbackEnteredAt?: string | null) => {
+  const candidates = [proposal.stage_entered_at, fallbackEnteredAt].filter(Boolean) as string[];
+  let enteredAt = proposal.created_at;
+
+  if (candidates.length > 0) {
+    const dates = candidates
+      .map((value) => new Date(value))
+      .filter((date) => !Number.isNaN(date.getTime()));
+    if (dates.length > 0) {
+      const latest = dates.reduce((max, current) => (current > max ? current : max));
+      enteredAt = latest.toISOString();
+    }
+  }
+
+  if (!enteredAt) {
+    enteredAt = proposal.updated_at || proposal.created_at;
+  }
+  if (!enteredAt) return null;
+  const enteredDate = new Date(enteredAt);
+  if (Number.isNaN(enteredDate.getTime())) return null;
+  return Math.max(0, Math.floor((Date.now() - enteredDate.getTime()) / 60000));
+};
+
+const getSlaStatus = (proposal: Proposal, fallbackEnteredAt?: string | null) => {
+  const stage = proposal.pipeline_stages;
+  if (!stage || stage.is_closed || stage.is_lost) return null;
+  const slaMinutes = stage.sla_minutes;
+  if (slaMinutes === null || slaMinutes === undefined) return null;
+  const elapsedMinutes = getStageElapsedMinutes(proposal, fallbackEnteredAt);
+  if (elapsedMinutes === null) return null;
+  return { remaining: slaMinutes - elapsedMinutes };
+};
+
 interface LeadListViewProps {
   stages: PipelineStage[];
   proposals: Proposal[];
   proposalTags: Record<string, { name: string; color: string }[]>;
   serviceTotals: Record<string, { value: number; commission: number }>;
+  stageEnteredAtByProposal: Record<string, string | null>;
   onProposalView: (proposal: Proposal) => void;
   onProposalEdit: (proposal: Proposal) => void;
   onProposalDelete: (proposal: Proposal) => void;
@@ -71,6 +106,7 @@ interface StageSectionProps {
   proposals: Proposal[];
   proposalTags: Record<string, { name: string; color: string }[]>;
   serviceTotals: Record<string, { value: number; commission: number }>;
+  stageEnteredAtByProposal: Record<string, string | null>;
   onProposalView: (proposal: Proposal) => void;
   onProposalEdit: (proposal: Proposal) => void;
   onProposalDelete: (proposal: Proposal) => void;
@@ -83,6 +119,7 @@ function StageSection({
   proposals,
   proposalTags,
   serviceTotals,
+  stageEnteredAtByProposal,
   onProposalView,
   onProposalEdit,
   onProposalDelete,
@@ -130,6 +167,7 @@ function StageSection({
                 <TableHead className="w-[150px]">Tags</TableHead>
                 <TableHead className="w-[120px]">Valor</TableHead>
                 <TableHead className="w-[120px]">Lucro</TableHead>
+                <TableHead className="w-[140px]">SLA</TableHead>
                 <TableHead className="w-[100px]">Data</TableHead>
                 <TableHead className="w-[40px]"></TableHead>
               </TableRow>
@@ -139,6 +177,8 @@ function StageSection({
                 const tags = proposalTags[proposal.id] || [];
                 const totals = serviceTotals[proposal.id] || { value: 0, commission: 0 };
                 const client = proposal.clients;
+                const stageEnteredAt = stageEnteredAtByProposal[proposal.id];
+                const slaStatus = getSlaStatus(proposal, stageEnteredAt);
 
                 return (
                   <TableRow
@@ -198,6 +238,20 @@ function StageSection({
                       <span className="font-medium text-sm text-green-600">
                         {formatCurrency(totals.commission)}
                       </span>
+                    </TableCell>
+                    <TableCell>
+                      {slaStatus ? (
+                        <Badge
+                          variant={slaStatus.remaining < 0 ? 'destructive' : 'secondary'}
+                          className="text-xs"
+                        >
+                          {slaStatus.remaining < 0
+                            ? `Atrasado ${formatDurationMinutes(Math.abs(slaStatus.remaining))}`
+                            : `Restam ${formatDurationMinutes(slaStatus.remaining)}`}
+                        </Badge>
+                      ) : (
+                        <span className="text-xs text-muted-foreground">-</span>
+                      )}
                     </TableCell>
                     <TableCell>
                       <div className="flex items-center gap-1 text-muted-foreground">
@@ -288,10 +342,12 @@ export function LeadListView({
   proposals,
   proposalTags,
   serviceTotals,
+  stageEnteredAtByProposal,
   onProposalView,
   onProposalEdit,
   onProposalDelete,
   onProposalClose,
+  onProposalCopyLink,
 }: LeadListViewProps) {
   return (
     <div className="p-6 space-y-2">
@@ -302,10 +358,12 @@ export function LeadListView({
           proposals={proposals.filter((p) => p.stage_id === stage.id)}
           proposalTags={proposalTags}
           serviceTotals={serviceTotals}
+          stageEnteredAtByProposal={stageEnteredAtByProposal}
           onProposalView={onProposalView}
           onProposalEdit={onProposalEdit}
           onProposalDelete={onProposalDelete}
           onProposalClose={onProposalClose}
+          onProposalCopyLink={onProposalCopyLink}
         />
       ))}
     </div>

@@ -46,7 +46,7 @@ export function ProposalDialog({
   collaborators = [],
   isAdmin = false,
   onSubmit, 
-  isLoading 
+  isLoading,
 }: ProposalDialogProps) {
   const [formData, setFormData] = useState<ProposalInput>({
     title: '',
@@ -78,6 +78,7 @@ export function ProposalDialog({
     }
     setErrors({});
   }, [proposal, open, stages]);
+
 
   const clientOptions = clients.map((client) => ({
     value: client.id,
@@ -119,11 +120,11 @@ export function ProposalDialog({
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-lg">
-        <DialogHeader>
-          <DialogTitle>{proposal ? 'Editar Proposta' : 'Nova Proposta'}</DialogTitle>
-        </DialogHeader>
-        <form onSubmit={handleSubmit} className="space-y-4">
+        <DialogContent className="max-w-lg">
+          <DialogHeader>
+            <DialogTitle>{proposal ? 'Editar Proposta' : 'Nova Proposta'}</DialogTitle>
+          </DialogHeader>
+          <form onSubmit={handleSubmit} className="space-y-4">
           <div className="space-y-2">
             <Label htmlFor="title">Título *</Label>
             <Input

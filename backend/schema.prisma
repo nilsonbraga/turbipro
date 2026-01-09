@@ -144,6 +144,7 @@ model Client {
   id        String    @id @default(uuid()) @db.Uuid
   agencyId  String    @db.Uuid
   name      String
+  preferredName String?
   email     String?
   phone     String?
   cpf       String?
@@ -189,6 +190,8 @@ model PipelineStage {
   order     Int      @default(0)
   isClosed  Boolean  @default(false)
   isLost    Boolean  @default(false)
+  slaMinutes Int?
+  templates Json?
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 
@@ -218,6 +221,7 @@ model Proposal {
   commissionValue Decimal @default(0) @db.Decimal(12, 2)
 
   notes     String?
+  stageEnteredAt DateTime? @db.Timestamptz(6)
   createdAt DateTime @default(now()) @db.Timestamptz(6)
   updatedAt DateTime @updatedAt @db.Timestamptz(6)
 

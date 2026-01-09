@@ -463,7 +463,7 @@ export function TaskDialog({
             <DialogTitle>{task ? 'Editar Tarefa' : 'Nova Tarefa'}</DialogTitle>
           </div>
           {task && (
-            <div className="flex gap-2 items-center">
+            <div className="flex gap-2 items-center pr-12">
               {comments.length > 0 && (
                 <TooltipProvider delayDuration={0}>
                   <Tooltip>

@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { usePipelineStages, PipelineStage, PipelineStageInput } from '@/hooks/usePipelineStages';
+import { usePipelineStages, PipelineStage, PipelineStageInput, PipelineStageTemplate } from '@/hooks/usePipelineStages';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { Textarea } from '@/components/ui/textarea';
 import { Switch } from '@/components/ui/switch';
 import { Badge } from '@/components/ui/badge';
+import { formatSlaMinutes, parseSlaInput } from '@/utils/sla';
 import {
   Dialog,
   DialogContent,
@@ -23,7 +25,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Palette, Plus, Edit, Trash2, GripVertical, Loader2 } from 'lucide-react';
+import { Palette, Plus, Edit, Trash2, GripVertical, Loader2, ChevronUp, ChevronDown } from 'lucide-react';
 import {
   DndContext,
   closestCenter,
@@ -90,6 +92,11 @@ function SortableStageItem({ stage, onEdit, onDelete }: SortableStageItemProps) 
           {stage.is_lost && (
             <Badge variant="destructive" className="text-xs">Perdido</Badge>
           )}
+          {stage.sla_minutes !== null && stage.sla_minutes !== undefined && (
+            <Badge variant="outline" className="text-xs text-slate-500">
+              SLA {formatSlaMinutes(stage.sla_minutes)}
+            </Badge>
+          )}
         </div>
       </div>
       <div className="flex gap-2">
@@ -123,6 +130,8 @@ export default function PipelineSettings() {
   const [stageColor, setStageColor] = useState('#3B82F6');
   const [stageIsClosed, setStageIsClosed] = useState(false);
   const [stageIsLost, setStageIsLost] = useState(false);
+  const [stageSla, setStageSla] = useState('');
+  const [stageTemplates, setStageTemplates] = useState<PipelineStageTemplate[]>([]);
   
   const [deleteStageDialog, setDeleteStageDialog] = useState(false);
   const [stageToDelete, setStageToDelete] = useState<PipelineStage | null>(null);
@@ -134,22 +143,65 @@ export default function PipelineSettings() {
       setStageColor(stage.color);
       setStageIsClosed(stage.is_closed);
       setStageIsLost(stage.is_lost);
+      setStageSla(formatSlaMinutes(stage.sla_minutes));
+      setStageTemplates(Array.isArray(stage.templates) ? stage.templates : []);
     } else {
       setEditingStage(null);
       setStageName('');
       setStageColor('#3B82F6');
       setStageIsClosed(false);
       setStageIsLost(false);
+      setStageSla('');
+      setStageTemplates([]);
     }
     setStageDialogOpen(true);
   };
 
+  const handleAddTemplate = () => {
+    const id = typeof crypto !== 'undefined' && 'randomUUID' in crypto ? crypto.randomUUID() : `${Date.now()}`;
+    setStageTemplates((current) => [
+      ...current,
+      { id, title: 'Novo template', content: '' },
+    ]);
+  };
+
+  const handleRemoveTemplate = (id: string) => {
+    setStageTemplates((current) => current.filter((template) => template.id !== id));
+  };
+
+  const handleUpdateTemplate = (id: string, data: Partial<PipelineStageTemplate>) => {
+    setStageTemplates((current) =>
+      current.map((template) => (template.id === id ? { ...template, ...data } : template)),
+    );
+  };
+
+  const handleMoveTemplate = (id: string, direction: 'up' | 'down') => {
+    setStageTemplates((current) => {
+      const index = current.findIndex((template) => template.id === id);
+      if (index === -1) return current;
+      const nextIndex = direction === 'up' ? index - 1 : index + 1;
+      if (nextIndex < 0 || nextIndex >= current.length) return current;
+      return arrayMove(current, index, nextIndex);
+    });
+  };
+
   const handleSaveStage = () => {
+    const slaMinutes = parseSlaInput(stageSla);
+    const cleanedTemplates = stageTemplates
+      .map((template) => ({
+        ...template,
+        title: template.title.trim(),
+        content: template.content.trim(),
+      }))
+      .filter((template) => template.title || template.content);
+
     const data: PipelineStageInput = {
       name: stageName,
       color: stageColor,
       is_closed: stageIsClosed,
       is_lost: stageIsLost,
+      sla_minutes: slaMinutes,
+      templates: cleanedTemplates,
     };
     
     if (editingStage) {
@@ -245,11 +297,11 @@ export default function PipelineSettings() {
 
       {/* Stage Dialog */}
       <Dialog open={stageDialogOpen} onOpenChange={setStageDialogOpen}>
-        <DialogContent className="max-w-md">
+        <DialogContent className="max-w-md max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle>{editingStage ? 'Editar Estágio' : 'Novo Estágio'}</DialogTitle>
           </DialogHeader>
-          <div className="space-y-4">
+          <div className="flex-1 min-h-0 overflow-y-auto space-y-4 pr-1">
             <div className="space-y-2">
               <Label>Nome do Estágio</Label>
               <Input
@@ -275,6 +327,84 @@ export default function PipelineSettings() {
                   />
                 ))}
               </div>
+            </div>
+
+            <div className="space-y-2">
+              <Label>SLA da etapa (hh:mm)</Label>
+              <Input
+                value={stageSla}
+                onChange={(e) => setStageSla(e.target.value)}
+                placeholder="Ex: 24:00"
+                className="h-10 bg-white border-slate-200"
+              />
+              <p className="text-xs text-muted-foreground">
+                Defina o tempo máximo que um lead deve ficar nesta etapa.
+              </p>
+            </div>
+
+            <div className="space-y-3">
+              <div className="flex items-center justify-between">
+                <Label>Templates de mensagem</Label>
+                <Button type="button" variant="outline" size="sm" onClick={handleAddTemplate}>
+                  <Plus className="w-4 h-4 mr-2" />
+                  Adicionar template
+                </Button>
+              </div>
+              {stageTemplates.length === 0 ? (
+                <div className="rounded-xl border border-dashed border-slate-200 bg-slate-50/60 px-4 py-6 text-center text-sm text-muted-foreground">
+                  Nenhum template cadastrado para esta etapa.
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  {stageTemplates.map((template, index) => (
+                    <div key={template.id} className="rounded-xl border border-slate-200 bg-white p-3 space-y-2">
+                      <div className="flex items-center gap-2">
+                        <Input
+                          value={template.title}
+                          onChange={(e) => handleUpdateTemplate(template.id, { title: e.target.value })}
+                          placeholder="Título do template"
+                          className="h-9 bg-white border-slate-200"
+                        />
+                        <div className="flex items-center gap-1">
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={index === 0}
+                            onClick={() => handleMoveTemplate(template.id, 'up')}
+                          >
+                            <ChevronUp className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            disabled={index === stageTemplates.length - 1}
+                            onClick={() => handleMoveTemplate(template.id, 'down')}
+                          >
+                            <ChevronDown className="w-4 h-4" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className="text-destructive hover:text-destructive"
+                            onClick={() => handleRemoveTemplate(template.id)}
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </Button>
+                        </div>
+                      </div>
+                      <Textarea
+                        value={template.content}
+                        onChange={(e) => handleUpdateTemplate(template.id, { content: e.target.value })}
+                        placeholder="Mensagem pronta para copiar..."
+                        className="min-h-[90px] bg-white border-slate-200"
+                      />
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
             
             <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 space-y-3">

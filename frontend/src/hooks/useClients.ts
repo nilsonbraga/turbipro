@@ -7,6 +7,7 @@ export interface Client {
   id: string;
   agency_id: string;
   name: string;
+  preferred_name: string | null;
   email: string | null;
   phone: string | null;
   cpf: string | null;
@@ -26,6 +27,7 @@ export interface ClientFavoriteDestination {
 
 export interface ClientInput {
   name: string;
+  preferred_name?: string;
   email?: string;
   phone?: string;
   cpf?: string;
@@ -40,6 +42,7 @@ const mapBackendToFront = (c: any): Client => ({
   id: c.id,
   agency_id: c.agencyId,
   name: c.name,
+  preferred_name: c.preferredName ?? null,
   email: c.email,
   phone: c.phone,
   cpf: c.cpf,
@@ -86,6 +89,7 @@ const mapFrontToBackend = (input: ClientInput, options?: { agencyId?: string; mo
 
   const payload: Record<string, unknown> = {
     name: input.name,
+    preferredName: input.preferred_name ?? null,
     email: input.email ?? null,
     phone: input.phone ?? null,
     cpf: input.cpf ?? null,
