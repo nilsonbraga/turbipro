@@ -52,7 +52,10 @@ import {
   Building2,
   Goal,
   CalendarDays,
-  Clock
+  Clock,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown
 } from 'lucide-react';
 
 import { useTeams, Team } from '@/hooks/useTeams';
@@ -123,6 +126,14 @@ export default function TeamOperations() {
   const [teamFilter, setTeamFilter] = useState<string>('');
   const [statusFilter, setStatusFilter] = useState<string>('');
   const [agencyFilter, setAgencyFilter] = useState<string>('');
+  const [collaboratorSort, setCollaboratorSort] = useState<{
+    key: 'name' | 'contact' | 'employment' | 'position' | 'team' | 'commission' | 'status';
+    direction: 'asc' | 'desc';
+  }>({ key: 'name', direction: 'asc' });
+  const [timeOffSort, setTimeOffSort] = useState<{
+    key: 'collaborator' | 'type' | 'period' | 'status' | 'reason';
+    direction: 'asc' | 'desc';
+  }>({ key: 'period', direction: 'asc' });
   
   // Performance filters
   const currentDate = new Date();
@@ -204,6 +215,72 @@ export default function TeamOperations() {
   const filteredTeams = teams.filter(t =>
     t.name.toLowerCase().includes(searchTerm.toLowerCase())
   );
+
+  const toggleCollaboratorSort = (key: 'name' | 'contact' | 'employment' | 'position' | 'team' | 'commission' | 'status') => {
+    setCollaboratorSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' },
+    );
+  };
+
+  const toggleTimeOffSort = (key: 'collaborator' | 'type' | 'period' | 'status' | 'reason') => {
+    setTimeOffSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' },
+    );
+  };
+
+  const sortedCollaborators = useMemo(() => {
+    const sorted = [...filteredCollaborators].sort((a, b) => {
+      if (collaboratorSort.key === 'contact') {
+        const aContact = (a.email || a.phone || '').toLowerCase();
+        const bContact = (b.email || b.phone || '').toLowerCase();
+        return aContact.localeCompare(bContact, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (collaboratorSort.key === 'employment') {
+        return a.employment_type.localeCompare(b.employment_type, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (collaboratorSort.key === 'position') {
+        const aPosition = `${a.position || ''} ${a.level || ''}`.trim();
+        const bPosition = `${b.position || ''} ${b.level || ''}`.trim();
+        return aPosition.localeCompare(bPosition, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (collaboratorSort.key === 'team') {
+        return (a.team?.name || '').localeCompare(b.team?.name || '', 'pt-BR', { sensitivity: 'base' });
+      }
+      if (collaboratorSort.key === 'commission') {
+        return (a.commission_percentage || 0) - (b.commission_percentage || 0);
+      }
+      if (collaboratorSort.key === 'status') {
+        return a.status.localeCompare(b.status, 'pt-BR', { sensitivity: 'base' });
+      }
+      return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+    });
+    return collaboratorSort.direction === 'asc' ? sorted : sorted.reverse();
+  }, [filteredCollaborators, collaboratorSort]);
+
+  const sortedTimeOffs = useMemo(() => {
+    const sorted = [...timeOffs].sort((a, b) => {
+      if (timeOffSort.key === 'collaborator') {
+        return (a.collaborator?.name || '').localeCompare(b.collaborator?.name || '', 'pt-BR', { sensitivity: 'base' });
+      }
+      if (timeOffSort.key === 'type') {
+        return (timeOffTypeLabels[a.type] || a.type).localeCompare(timeOffTypeLabels[b.type] || b.type, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (timeOffSort.key === 'status') {
+        return a.status.localeCompare(b.status, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (timeOffSort.key === 'reason') {
+        return (a.reason || '').localeCompare(b.reason || '', 'pt-BR', { sensitivity: 'base' });
+      }
+      const aDate = a.start_date ? new Date(a.start_date).getTime() : 0;
+      const bDate = b.start_date ? new Date(b.start_date).getTime() : 0;
+      return aDate - bDate;
+    });
+    return timeOffSort.direction === 'asc' ? sorted : sorted.reverse();
+  }, [timeOffs, timeOffSort]);
 
   const handleSaveTeam = (data: any) => {
     if (data.id) {
@@ -516,13 +593,132 @@ export default function TeamOperations() {
               <Table>
                 <TableHeader className="bg-slate-50/80">
                   <TableRow>
-                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Nome</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Contato</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Vínculo</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Cargo / Nível</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Equipe</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Comissão</TableHead>
-                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Status</TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        onClick={() => toggleCollaboratorSort('name')}
+                        className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                      >
+                        Nome
+                        {collaboratorSort.key === 'name' ? (
+                          collaboratorSort.direction === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3" />
+                        )}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        onClick={() => toggleCollaboratorSort('contact')}
+                        className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                      >
+                        Contato
+                        {collaboratorSort.key === 'contact' ? (
+                          collaboratorSort.direction === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3" />
+                        )}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        onClick={() => toggleCollaboratorSort('employment')}
+                        className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                      >
+                        Vínculo
+                        {collaboratorSort.key === 'employment' ? (
+                          collaboratorSort.direction === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3" />
+                        )}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        onClick={() => toggleCollaboratorSort('position')}
+                        className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                      >
+                        Cargo / Nível
+                        {collaboratorSort.key === 'position' ? (
+                          collaboratorSort.direction === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3" />
+                        )}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        onClick={() => toggleCollaboratorSort('team')}
+                        className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                      >
+                        Equipe
+                        {collaboratorSort.key === 'team' ? (
+                          collaboratorSort.direction === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3" />
+                        )}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        onClick={() => toggleCollaboratorSort('commission')}
+                        className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                      >
+                        Comissão
+                        {collaboratorSort.key === 'commission' ? (
+                          collaboratorSort.direction === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3" />
+                        )}
+                      </button>
+                    </TableHead>
+                    <TableHead>
+                      <button
+                        type="button"
+                        onClick={() => toggleCollaboratorSort('status')}
+                        className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                      >
+                        Status
+                        {collaboratorSort.key === 'status' ? (
+                          collaboratorSort.direction === 'asc' ? (
+                            <ArrowUp className="h-3 w-3" />
+                          ) : (
+                            <ArrowDown className="h-3 w-3" />
+                          )
+                        ) : (
+                          <ArrowUpDown className="h-3 w-3" />
+                        )}
+                      </button>
+                    </TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -533,14 +729,14 @@ export default function TeamOperations() {
                         Carregando...
                       </TableCell>
                     </TableRow>
-                  ) : filteredCollaborators.length === 0 ? (
+                  ) : sortedCollaborators.length === 0 ? (
                     <TableRow>
                       <TableCell colSpan={8} className="text-center py-8">
                         Nenhum colaborador encontrado
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredCollaborators.map((collaborator, index) => (
+                    sortedCollaborators.map((collaborator, index) => (
                       <TableRow 
                         key={collaborator.id} 
                         className={`cursor-pointer ${index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}`}
@@ -1041,23 +1237,108 @@ export default function TeamOperations() {
                 <CardTitle className="text-lg">Férias e Folgas</CardTitle>
               </CardHeader>
               <CardContent className="p-0">
-                {timeOffs.length === 0 ? (
+                {sortedTimeOffs.length === 0 ? (
                   <p className="text-muted-foreground px-6 pb-6">Nenhuma férias/folga cadastrada</p>
                 ) : (
                   <Table>
                     <TableHeader className="bg-slate-50/80">
                       <TableRow>
-                        <TableHead className="text-xs uppercase tracking-wide text-slate-500">Colaborador</TableHead>
-                        <TableHead className="text-xs uppercase tracking-wide text-slate-500">Tipo</TableHead>
-                        <TableHead className="text-xs uppercase tracking-wide text-slate-500">Período</TableHead>
-                        <TableHead className="text-xs uppercase tracking-wide text-slate-500">Status</TableHead>
-                        <TableHead className="text-xs uppercase tracking-wide text-slate-500">Motivo</TableHead>
+                        <TableHead>
+                          <button
+                            type="button"
+                            onClick={() => toggleTimeOffSort('collaborator')}
+                            className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                          >
+                            Colaborador
+                            {timeOffSort.key === 'collaborator' ? (
+                              timeOffSort.direction === 'asc' ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="h-3 w-3" />
+                            )}
+                          </button>
+                        </TableHead>
+                        <TableHead>
+                          <button
+                            type="button"
+                            onClick={() => toggleTimeOffSort('type')}
+                            className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                          >
+                            Tipo
+                            {timeOffSort.key === 'type' ? (
+                              timeOffSort.direction === 'asc' ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="h-3 w-3" />
+                            )}
+                          </button>
+                        </TableHead>
+                        <TableHead>
+                          <button
+                            type="button"
+                            onClick={() => toggleTimeOffSort('period')}
+                            className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                          >
+                            Período
+                            {timeOffSort.key === 'period' ? (
+                              timeOffSort.direction === 'asc' ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="h-3 w-3" />
+                            )}
+                          </button>
+                        </TableHead>
+                        <TableHead>
+                          <button
+                            type="button"
+                            onClick={() => toggleTimeOffSort('status')}
+                            className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                          >
+                            Status
+                            {timeOffSort.key === 'status' ? (
+                              timeOffSort.direction === 'asc' ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="h-3 w-3" />
+                            )}
+                          </button>
+                        </TableHead>
+                        <TableHead>
+                          <button
+                            type="button"
+                            onClick={() => toggleTimeOffSort('reason')}
+                            className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                          >
+                            Motivo
+                            {timeOffSort.key === 'reason' ? (
+                              timeOffSort.direction === 'asc' ? (
+                                <ArrowUp className="h-3 w-3" />
+                              ) : (
+                                <ArrowDown className="h-3 w-3" />
+                              )
+                            ) : (
+                              <ArrowUpDown className="h-3 w-3" />
+                            )}
+                          </button>
+                        </TableHead>
                         <TableHead className="text-xs uppercase tracking-wide text-slate-500">Ação</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {timeOffs.map((to, index) => (
+                      {sortedTimeOffs.map((to, index) => (
                         <TableRow key={to.id} className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}>
                           <TableCell>{to.collaborator?.name}</TableCell>
                           <TableCell><Badge variant="outline">{timeOffTypeLabels[to.type]}</Badge></TableCell>

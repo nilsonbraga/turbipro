@@ -19,6 +19,7 @@ import {
   UsersRound,
   Truck,
   Map,
+  MapPin,
   Bell,
   Settings2,
   Globe,
@@ -58,6 +59,7 @@ const productNavItems: NavItem[] = [
 
 const registerNavItems: NavItem[] = [
   { title: 'Clientes', url: '/clients', icon: Users, moduleKey: 'clients' },
+  { title: 'Destinos Favoritos', url: '/favorite-destinations', icon: MapPin, moduleKey: 'clients' },
   { title: 'Parceiros', url: '/partners', icon: Handshake, moduleKey: 'partners' },
   { title: 'Fornecedores', url: '/suppliers', icon: Truck, moduleKey: 'suppliers' },
   { title: 'Tags', url: '/tags', icon: Tags, moduleKey: 'tags' },

@@ -3,6 +3,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { Badge } from '@/components/ui/badge';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Dialog,
   DialogContent,
@@ -10,8 +12,9 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Search } from 'lucide-react';
 import { Client, ClientInput } from '@/hooks/useClients';
+import { useFavoriteDestinations } from '@/hooks/useFavoriteDestinations';
 
 interface ClientDialogProps {
   open: boolean;
@@ -31,9 +34,12 @@ export function ClientDialog({ open, onOpenChange, client, onSubmit, isLoading }
     birth_date: '',
     address: '',
     notes: '',
+    favorite_destination_ids: [],
   });
   const [errors, setErrors] = useState<{ name?: string }>({});
   const [birthInput, setBirthInput] = useState<string>('');
+  const [destinationSearch, setDestinationSearch] = useState('');
+  const { destinations, isLoading: isLoadingDestinations } = useFavoriteDestinations();
 
   useEffect(() => {
     if (client) {
@@ -51,6 +57,7 @@ export function ClientDialog({ open, onOpenChange, client, onSubmit, isLoading }
         birth_date: birthStr || '',
         address: client.address || '',
         notes: client.notes || '',
+        favorite_destination_ids: client.favorite_destinations?.map((destination) => destination.id) ?? [],
       });
       setBirthInput(birthStr || '');
     } else {
@@ -63,10 +70,12 @@ export function ClientDialog({ open, onOpenChange, client, onSubmit, isLoading }
         birth_date: '',
         address: '',
         notes: '',
+        favorite_destination_ids: [],
       });
       setBirthInput('');
     }
     setErrors({});
+    setDestinationSearch('');
   }, [client, open]);
 
   const formatDateInput = (value: string) => {
@@ -100,9 +109,28 @@ export function ClientDialog({ open, onOpenChange, client, onSubmit, isLoading }
     onOpenChange(false);
   };
 
+  const filteredDestinations = destinations.filter((destination) => {
+    if (!destinationSearch.trim()) return true;
+    const term = destinationSearch.toLowerCase();
+    return (
+      destination.name.toLowerCase().includes(term) ||
+      (destination.notes ?? '').toLowerCase().includes(term)
+    );
+  });
+
+  const toggleDestination = (destinationId: string, checked: boolean) => {
+    const current = formData.favorite_destination_ids ?? [];
+    const next = checked
+      ? current.includes(destinationId)
+        ? current
+        : [...current, destinationId]
+      : current.filter((id) => id !== destinationId);
+    setFormData({ ...formData, favorite_destination_ids: next });
+  };
+
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent className="max-w-md">
+      <DialogContent className="max-w-2xl">
         <DialogHeader>
           <DialogTitle>{client?.id ? 'Editar Cliente' : 'Novo Cliente'}</DialogTitle>
         </DialogHeader>
@@ -186,6 +214,58 @@ export function ClientDialog({ open, onOpenChange, client, onSubmit, isLoading }
               value={formData.notes}
               onChange={(e) => setFormData({ ...formData, notes: e.target.value })}
             />
+          </div>
+          <div className="space-y-2">
+            <Label>Destinos favoritos</Label>
+            <div className="rounded-lg border border-slate-200 bg-slate-50/60 p-3 space-y-3">
+              <div className="relative">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                <Input
+                  placeholder="Buscar destinos favoritos..."
+                  value={destinationSearch}
+                  onChange={(e) => setDestinationSearch(e.target.value)}
+                  className="pl-9 h-8 bg-white"
+                />
+              </div>
+              {isLoadingDestinations ? (
+                <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  Carregando destinos...
+                </div>
+              ) : filteredDestinations.length === 0 ? (
+                <p className="text-sm text-muted-foreground">
+                  Nenhum destino favorito cadastrado.
+                </p>
+              ) : (
+                <div className="max-h-40 overflow-y-auto pr-1 space-y-2">
+                  {filteredDestinations.map((destination) => {
+                    const checked = formData.favorite_destination_ids?.includes(destination.id) ?? false;
+                    return (
+                      <label key={destination.id} className="flex items-center gap-2 text-sm text-slate-700">
+                        <Checkbox
+                          checked={checked}
+                          onCheckedChange={(value) => toggleDestination(destination.id, value === true)}
+                        />
+                        <span className="flex-1">{destination.name}</span>
+                      </label>
+                    );
+                  })}
+                </div>
+              )}
+              {formData.favorite_destination_ids && formData.favorite_destination_ids.length > 0 && (
+                <div className="flex flex-wrap gap-2">
+                  {formData.favorite_destination_ids.map((destinationId) => {
+                    const destination = destinations.find((item) => item.id === destinationId);
+                    if (!destination) return null;
+                    return (
+                      <Badge key={destination.id} variant="secondary" className="rounded-full bg-white text-slate-600">
+                        {destination.name}
+                      </Badge>
+                    );
+                  })}
+                </div>
+              )}
+            </div>
           </div>
           <DialogFooter>
             <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>

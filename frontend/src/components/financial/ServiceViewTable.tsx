@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useMemo, useState } from "react";
 import { format } from "date-fns";
 import { ptBR } from "date-fns/locale";
 import { Badge } from "@/components/ui/badge";
@@ -14,6 +14,7 @@ import {
 import { FinancialService, useServiceTotals } from "@/hooks/useFinancialServices";
 import { ProposalDetail } from "@/components/proposals/ProposalDetail";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import { ArrowDown, ArrowUp, ArrowUpDown } from "lucide-react";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
 import { BackendProposal, Proposal, mapBackendProposalToFront, proposalInclude } from "@/hooks/useProposals";
@@ -49,6 +50,10 @@ export function ServiceViewTable({ services, isLoading, isSuperAdmin }: ServiceV
   
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [proposalDetailOpen, setProposalDetailOpen] = useState(false);
+  const [sort, setSort] = useState<{
+    key: "date" | "lead" | "client" | "agency" | "type" | "description" | "partner" | "value" | "commission";
+    direction: "asc" | "desc";
+  }>({ key: "date", direction: "desc" });
 
   const handleOpenProposal = async (proposalId: string) => {
     try {
@@ -69,6 +74,49 @@ export function ServiceViewTable({ services, isLoading, isSuperAdmin }: ServiceV
     }
     return service.commission_value || 0;
   };
+
+  const toggleSort = (key: "date" | "lead" | "client" | "agency" | "type" | "description" | "partner" | "value" | "commission") => {
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: "asc" },
+    );
+  };
+
+  const sortedServices = useMemo(() => {
+    const sorted = [...services].sort((a, b) => {
+      if (sort.key === "lead") {
+        const aLead = a.proposal?.number?.toString() || "";
+        const bLead = b.proposal?.number?.toString() || "";
+        return aLead.localeCompare(bLead, "pt-BR", { sensitivity: "base" });
+      }
+      if (sort.key === "client") {
+        return (a.proposal?.client?.name || "").localeCompare(b.proposal?.client?.name || "", "pt-BR", { sensitivity: "base" });
+      }
+      if (sort.key === "agency") {
+        return (a.proposal?.agency?.name || "").localeCompare(b.proposal?.agency?.name || "", "pt-BR", { sensitivity: "base" });
+      }
+      if (sort.key === "type") {
+        return (SERVICE_TYPE_LABELS[a.type] || a.type).localeCompare(SERVICE_TYPE_LABELS[b.type] || b.type, "pt-BR", { sensitivity: "base" });
+      }
+      if (sort.key === "description") {
+        return (a.description || "").localeCompare(b.description || "", "pt-BR", { sensitivity: "base" });
+      }
+      if (sort.key === "partner") {
+        return (a.partner?.name || "").localeCompare(b.partner?.name || "", "pt-BR", { sensitivity: "base" });
+      }
+      if (sort.key === "value") {
+        return (a.value || 0) - (b.value || 0);
+      }
+      if (sort.key === "commission") {
+        return calculateCommission(a) - calculateCommission(b);
+      }
+      const aDate = a.proposal?.updated_at ? new Date(a.proposal.updated_at).getTime() : 0;
+      const bDate = b.proposal?.updated_at ? new Date(b.proposal.updated_at).getTime() : 0;
+      return aDate - bDate;
+    });
+    return sort.direction === "asc" ? sorted : sorted.reverse();
+  }, [services, sort]);
 
   return (
     <>
@@ -109,17 +157,170 @@ export function ServiceViewTable({ services, isLoading, isSuperAdmin }: ServiceV
           <Table>
             <TableHeader className="bg-slate-50/80">
               <TableRow>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Data Fechamento</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Lead</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Cliente</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("date")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Data Fechamento
+                    {sort.key === "date" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("lead")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Lead
+                    {sort.key === "lead" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("client")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Cliente
+                    {sort.key === "client" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
                 {isSuperAdmin && (
-                  <TableHead className="text-xs uppercase tracking-wide text-slate-500">Agência</TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      onClick={() => toggleSort("agency")}
+                      className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                    >
+                      Agência
+                      {sort.key === "agency" ? (
+                        sort.direction === "asc" ? (
+                          <ArrowUp className="h-3 w-3" />
+                        ) : (
+                          <ArrowDown className="h-3 w-3" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3" />
+                      )}
+                    </button>
+                  </TableHead>
                 )}
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Tipo</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Descrição</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Fornecedor</TableHead>
-                <TableHead className="text-right text-xs uppercase tracking-wide text-slate-500">Valor</TableHead>
-                <TableHead className="text-right text-xs uppercase tracking-wide text-slate-500">Comissão</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("type")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Tipo
+                    {sort.key === "type" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("description")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Descrição
+                    {sort.key === "description" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("partner")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Fornecedor
+                    {sort.key === "partner" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("value")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Valor
+                    {sort.key === "value" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead className="text-right">
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("commission")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Comissão
+                    {sort.key === "commission" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -136,7 +337,7 @@ export function ServiceViewTable({ services, isLoading, isSuperAdmin }: ServiceV
                   </TableCell>
                 </TableRow>
               ) : (
-                services.map((service, index) => (
+                sortedServices.map((service, index) => (
                   <TableRow
                     key={service.id}
                     className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}

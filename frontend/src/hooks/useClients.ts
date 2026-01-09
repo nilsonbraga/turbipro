@@ -16,6 +16,12 @@ export interface Client {
   notes: string | null;
   created_at: string;
   updated_at: string;
+  favorite_destinations?: ClientFavoriteDestination[];
+}
+
+export interface ClientFavoriteDestination {
+  id: string;
+  name: string;
 }
 
 export interface ClientInput {
@@ -27,6 +33,7 @@ export interface ClientInput {
   birth_date?: string | Date;
   address?: string;
   notes?: string;
+  favorite_destination_ids?: string[];
 }
 
 const mapBackendToFront = (c: any): Client => ({
@@ -42,9 +49,15 @@ const mapBackendToFront = (c: any): Client => ({
   notes: c.notes,
   created_at: c.createdAt,
   updated_at: c.updatedAt,
+  favorite_destinations: Array.isArray(c.favoriteDestinations)
+    ? c.favoriteDestinations.map((destination: any) => ({
+        id: destination.id,
+        name: destination.name,
+      }))
+    : undefined,
 });
 
-const mapFrontToBackend = (input: ClientInput, agencyId?: string) => {
+const mapFrontToBackend = (input: ClientInput, options?: { agencyId?: string; mode: 'create' | 'update' }) => {
   let birthDate: string | null = null;
 
   const toIsoMiddayUTC = (dateObj: Date) => {
@@ -82,8 +95,14 @@ const mapFrontToBackend = (input: ClientInput, agencyId?: string) => {
     notes: input.notes ?? null,
   };
 
-  if (agencyId) {
-    payload.agencyId = agencyId;
+  if (options?.agencyId) {
+    payload.agencyId = options.agencyId;
+  }
+
+  if (input.favorite_destination_ids) {
+    const relation = input.favorite_destination_ids.map((id) => ({ id }));
+    payload.favoriteDestinations =
+      options?.mode === 'create' ? { connect: relation } : { set: relation };
   }
 
   return payload;
@@ -106,6 +125,10 @@ export function useClients() {
         where: JSON.stringify(where),
         orderBy: JSON.stringify({ createdAt: 'desc' }),
       });
+      searchParams.set(
+        'include',
+        JSON.stringify({ favoriteDestinations: { select: { id: true, name: true } } }),
+      );
 
       const { data } = await apiFetch<{ data: any[] }>(`/api/client?${searchParams.toString()}`);
       return (data || []).map(mapBackendToFront);
@@ -122,7 +145,7 @@ export function useClients() {
 
       const created = await apiFetch<any>(`/api/client`, {
         method: 'POST',
-        body: JSON.stringify(mapFrontToBackend(input, targetAgencyId)),
+        body: JSON.stringify(mapFrontToBackend(input, { agencyId: targetAgencyId, mode: 'create' })),
       });
 
       return mapBackendToFront(created);
@@ -138,7 +161,7 @@ export function useClients() {
 
   const updateMutation = useMutation({
     mutationFn: async ({ id, ...input }: ClientInput & { id: string }) => {
-      const payload = mapFrontToBackend(input, agency?.id);
+      const payload = mapFrontToBackend(input, { agencyId: agency?.id, mode: 'update' });
       const updated = await apiFetch<any>(`/api/client/${id}`, {
         method: 'PUT',
         body: JSON.stringify(payload),

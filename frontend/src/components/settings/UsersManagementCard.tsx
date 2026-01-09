@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -39,7 +39,7 @@ import {
 import { useAgencyUsers, AgencyUser } from '@/hooks/useAgencyUsers';
 import { useCollaborators } from '@/hooks/useCollaborators';
 import { useAuth } from '@/contexts/AuthContext';
-import { Plus, Loader2, Users, Trash2, Shield, User, Pencil } from 'lucide-react';
+import { Plus, Loader2, Users, Trash2, Shield, User, Pencil, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 import { useToast } from '@/hooks/use-toast';
 import { useQueryClient } from '@tanstack/react-query';
 import { useAgencies } from '@/hooks/useAgencies';
@@ -59,6 +59,10 @@ export function UsersManagementCard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [userToDelete, setUserToDelete] = useState<AgencyUser | null>(null);
   const [userToEdit, setUserToEdit] = useState<AgencyUser | null>(null);
+  const [sort, setSort] = useState<{
+    key: 'name' | 'email' | 'role';
+    direction: 'asc' | 'desc';
+  }>({ key: 'name', direction: 'asc' });
 
   const [selectedCollaboratorId, setSelectedCollaboratorId] = useState('');
   const [password, setPassword] = useState('');
@@ -140,6 +144,27 @@ export function UsersManagementCard() {
     updateUserRole({ userId, role: newRole });
   };
 
+  const toggleSort = (key: 'name' | 'email' | 'role') => {
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' },
+    );
+  };
+
+  const sortedUsers = useMemo(() => {
+    const sorted = [...users].sort((a, b) => {
+      if (sort.key === 'email') {
+        return (a.email || '').localeCompare(b.email || '', 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sort.key === 'role') {
+        return a.role.localeCompare(b.role, 'pt-BR', { sensitivity: 'base' });
+      }
+      return (a.name || '').localeCompare(b.name || '', 'pt-BR', { sensitivity: 'base' });
+    });
+    return sort.direction === 'asc' ? sorted : sorted.reverse();
+  }, [users, sort]);
+
   if (isLoading || loadingCollaborators) {
     return (
       <Card className="rounded-2xl border-0 shadow-none bg-white">
@@ -199,14 +224,65 @@ export function UsersManagementCard() {
             <Table>
               <TableHeader className="bg-slate-50/80">
                 <TableRow>
-                  <TableHead className="text-xs uppercase tracking-wide text-slate-500">Nome</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide text-slate-500">Email</TableHead>
-                  <TableHead className="text-xs uppercase tracking-wide text-slate-500">Perfil</TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('name')}
+                      className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                    >
+                      Nome
+                      {sort.key === 'name' ? (
+                        sort.direction === 'asc' ? (
+                          <ArrowUp className="h-3 w-3" />
+                        ) : (
+                          <ArrowDown className="h-3 w-3" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3" />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('email')}
+                      className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                    >
+                      Email
+                      {sort.key === 'email' ? (
+                        sort.direction === 'asc' ? (
+                          <ArrowUp className="h-3 w-3" />
+                        ) : (
+                          <ArrowDown className="h-3 w-3" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3" />
+                      )}
+                    </button>
+                  </TableHead>
+                  <TableHead>
+                    <button
+                      type="button"
+                      onClick={() => toggleSort('role')}
+                      className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                    >
+                      Perfil
+                      {sort.key === 'role' ? (
+                        sort.direction === 'asc' ? (
+                          <ArrowUp className="h-3 w-3" />
+                        ) : (
+                          <ArrowDown className="h-3 w-3" />
+                        )
+                      ) : (
+                        <ArrowUpDown className="h-3 w-3" />
+                      )}
+                    </button>
+                  </TableHead>
                   <TableHead className="w-[120px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((agencyUser, index) => (
+                {sortedUsers.map((agencyUser, index) => (
                   <TableRow key={agencyUser.id} className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}>
                     <TableCell className="font-medium">
                       {agencyUser.name || 'Sem nome'}

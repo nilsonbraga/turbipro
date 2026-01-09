@@ -78,6 +78,7 @@ model Agency {
 
   profiles                Profile[]
   clients                 Client[]
+  favoriteDestinations    FavoriteDestination[]
   pipelineStages          PipelineStage[]
   proposals               Proposal[]
   partners                Partner[]
@@ -158,10 +159,26 @@ model Client {
   tasks                 Task[]
   itineraries           CustomItinerary[]
   financialTransactions FinancialTransaction[]
+  favoriteDestinations  FavoriteDestination[]
 
   @@index([agencyId])
   @@index([cpf])
   @@index([email])
+}
+
+model FavoriteDestination {
+  id        String   @id @default(uuid()) @db.Uuid
+  agencyId  String   @db.Uuid
+  name      String
+  notes     String?
+  createdAt DateTime @default(now()) @db.Timestamptz(6)
+  updatedAt DateTime @updatedAt @db.Timestamptz(6)
+
+  agency  Agency   @relation(fields: [agencyId], references: [id], onDelete: Cascade)
+  clients Client[]
+
+  @@index([agencyId])
+  @@index([name])
 }
 
 model PipelineStage {

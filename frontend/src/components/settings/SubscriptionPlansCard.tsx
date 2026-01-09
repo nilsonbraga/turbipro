@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useSubscriptionPlans, SubscriptionPlan, SubscriptionPlanInput } from '@/hooks/useSubscriptionPlans';
 import { ALL_MODULES } from '@/hooks/useModuleAccess';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
@@ -35,7 +35,7 @@ import {
   TableHeader,
   TableRow,
 } from '@/components/ui/table';
-import { Plus, Edit, Trash2, Loader2, CreditCard, Package } from 'lucide-react';
+import { Plus, Edit, Trash2, Loader2, CreditCard, Package, ArrowUpDown, ArrowUp, ArrowDown } from 'lucide-react';
 
 interface FormData extends SubscriptionPlanInput {
   modules: string[];
@@ -47,6 +47,10 @@ export function SubscriptionPlansCard() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlan | null>(null);
   const [planToDelete, setPlanToDelete] = useState<SubscriptionPlan | null>(null);
+  const [sort, setSort] = useState<{
+    key: 'name' | 'price_monthly' | 'price_yearly' | 'limits' | 'modules' | 'status';
+    direction: 'asc' | 'desc';
+  }>({ key: 'name', direction: 'asc' });
   
   const [formData, setFormData] = useState<FormData>({
     name: '',
@@ -155,6 +159,42 @@ export function SubscriptionPlansCard() {
     return new Intl.NumberFormat('pt-BR', { style: 'currency', currency: 'BRL' }).format(value);
   };
 
+  const toggleSort = (key: 'name' | 'price_monthly' | 'price_yearly' | 'limits' | 'modules' | 'status') => {
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' },
+    );
+  };
+
+  const sortedPlans = useMemo(() => {
+    const sorted = [...plans].sort((a, b) => {
+      if (sort.key === 'price_monthly') {
+        return a.price_monthly - b.price_monthly;
+      }
+      if (sort.key === 'price_yearly') {
+        return a.price_yearly - b.price_yearly;
+      }
+      if (sort.key === 'limits') {
+        const aLimit = a.max_clients ?? Number.POSITIVE_INFINITY;
+        const bLimit = b.max_clients ?? Number.POSITIVE_INFINITY;
+        return aLimit - bLimit;
+      }
+      if (sort.key === 'modules') {
+        const aModules = (a as any).modules?.length ?? ALL_MODULES.length;
+        const bModules = (b as any).modules?.length ?? ALL_MODULES.length;
+        return aModules - bModules;
+      }
+      if (sort.key === 'status') {
+        const aStatus = a.is_active ? 0 : 1;
+        const bStatus = b.is_active ? 0 : 1;
+        return aStatus - bStatus;
+      }
+      return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+    });
+    return sort.direction === 'asc' ? sorted : sorted.reverse();
+  }, [plans, sort]);
+
   return (
     <Card className="rounded-2xl border-0 shadow-none bg-white overflow-hidden">
       <CardHeader className="border-b border-slate-100">
@@ -187,17 +227,119 @@ export function SubscriptionPlansCard() {
           <Table>
             <TableHeader className="bg-slate-50/80">
               <TableRow>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Plano</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Preço Mensal</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Preço Anual</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Limites</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Módulos</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Status</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('name')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Plano
+                    {sort.key === 'name' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('price_monthly')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Preço Mensal
+                    {sort.key === 'price_monthly' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('price_yearly')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Preço Anual
+                    {sort.key === 'price_yearly' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('limits')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Limites
+                    {sort.key === 'limits' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('modules')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Módulos
+                    {sort.key === 'modules' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('status')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Status
+                    {sort.key === 'status' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
                 <TableHead className="w-[100px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {plans.map((plan, index) => (
+              {sortedPlans.map((plan, index) => (
                 <TableRow key={plan.id} className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}>
                   <TableCell>
                     <div>

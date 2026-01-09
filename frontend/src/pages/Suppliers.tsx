@@ -6,6 +6,9 @@ import {
   Trash2,
   Building2,
   Search,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
 } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -58,6 +61,10 @@ export default function Suppliers() {
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>("");
   const [searchQuery, setSearchQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState<string>("all");
+  const [sort, setSort] = useState<{
+    key: "name" | "document" | "email" | "phone" | "address" | "status";
+    direction: "asc" | "desc";
+  }>({ key: "name", direction: "asc" });
 
   const [supplierDialogOpen, setSupplierDialogOpen] = useState(false);
   const [editingSupplier, setEditingSupplier] = useState<Supplier | null>(null);
@@ -91,6 +98,36 @@ export default function Suppliers() {
 
     return filtered;
   }, [suppliers, isSuperAdmin, selectedAgencyId, searchQuery, statusFilter]);
+
+  const toggleSort = (key: "name" | "document" | "email" | "phone" | "address" | "status") => {
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === "asc" ? "desc" : "asc" }
+        : { key, direction: "asc" },
+    );
+  };
+
+  const sortedSuppliers = useMemo(() => {
+    const sorted = [...filteredSuppliers].sort((a, b) => {
+      if (sort.key === "document") {
+        return (a.document || "").localeCompare(b.document || "", "pt-BR", { sensitivity: "base" });
+      }
+      if (sort.key === "email") {
+        return (a.email || "").localeCompare(b.email || "", "pt-BR", { sensitivity: "base" });
+      }
+      if (sort.key === "phone") {
+        return (a.phone || "").localeCompare(b.phone || "", "pt-BR", { sensitivity: "base" });
+      }
+      if (sort.key === "address") {
+        return (a.address || "").localeCompare(b.address || "", "pt-BR", { sensitivity: "base" });
+      }
+      if (sort.key === "status") {
+        return Number(a.is_active) - Number(b.is_active);
+      }
+      return a.name.localeCompare(b.name, "pt-BR", { sensitivity: "base" });
+    });
+    return sort.direction === "asc" ? sorted : sorted.reverse();
+  }, [filteredSuppliers, sort]);
 
   const handleCreateSupplier = (data: SupplierInput) => {
     const agencyId = isSuperAdmin && selectedAgencyId ? selectedAgencyId : agency?.id;
@@ -226,17 +263,119 @@ export default function Suppliers() {
           <Table>
             <TableHeader className="bg-slate-50/80">
               <TableRow>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Nome</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">CPF/CNPJ</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Email</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Telefone</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Endereço</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Status</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("name")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Nome
+                    {sort.key === "name" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("document")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    CPF/CNPJ
+                    {sort.key === "document" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("email")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Email
+                    {sort.key === "email" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("phone")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Telefone
+                    {sort.key === "phone" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("address")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Endereço
+                    {sort.key === "address" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort("status")}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Status
+                    {sort.key === "status" ? (
+                      sort.direction === "asc" ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredSuppliers.length === 0 ? (
+              {sortedSuppliers.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={7} className="text-center py-8 text-muted-foreground">
                     <Building2 className="mx-auto h-12 w-12 mb-4 opacity-50" />
@@ -245,7 +384,7 @@ export default function Suppliers() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredSuppliers.map((supplier, index) => (
+                sortedSuppliers.map((supplier, index) => (
                   <TableRow
                     key={supplier.id}
                     className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}

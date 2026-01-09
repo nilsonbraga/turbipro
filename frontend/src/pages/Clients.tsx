@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { useClients, Client } from '@/hooks/useClients';
 import { useAuth } from '@/contexts/AuthContext';
 import { ClientDialog } from '@/components/clients/ClientDialog';
@@ -30,7 +30,20 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Search, MoreHorizontal, Mail, Phone, Edit, Trash2, Users, Loader2 } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  MoreHorizontal,
+  Mail,
+  Phone,
+  Edit,
+  Trash2,
+  Users,
+  Loader2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
 
 const formatDate = (date: string) => {
   return new Date(date).toLocaleDateString('pt-BR');
@@ -44,6 +57,10 @@ export default function Clients() {
   const [editingClient, setEditingClient] = useState<Client | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [clientToDelete, setClientToDelete] = useState<Client | null>(null);
+  const [sort, setSort] = useState<{
+    key: 'name' | 'contact' | 'document' | 'created_at';
+    direction: 'asc' | 'desc';
+  }>({ key: 'created_at', direction: 'desc' });
 
   const filteredClients = clients.filter(client => {
     const searchLower = searchTerm.toLowerCase();
@@ -53,6 +70,34 @@ export default function Clients() {
       (client.phone?.includes(searchTerm))
     );
   });
+
+  const toggleSort = (key: 'name' | 'contact' | 'document' | 'created_at') => {
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' },
+    );
+  };
+
+  const sortedClients = useMemo(() => {
+    const sorted = [...filteredClients].sort((a, b) => {
+      if (sort.key === 'contact') {
+        const aContact = (a.email || a.phone || '').toLowerCase();
+        const bContact = (b.email || b.phone || '').toLowerCase();
+        return aContact.localeCompare(bContact, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sort.key === 'document') {
+        const aDoc = (a.cpf || a.passport || '').toLowerCase();
+        const bDoc = (b.cpf || b.passport || '').toLowerCase();
+        return aDoc.localeCompare(bDoc, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sort.key === 'created_at') {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+      return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+    });
+    return sort.direction === 'asc' ? sorted : sorted.reverse();
+  }, [filteredClients, sort]);
 
   const getInitials = (name: string) => {
     return name.split(' ').map((n) => n[0]).join('').toUpperCase().slice(0, 2);
@@ -147,22 +192,90 @@ export default function Clients() {
           <Table>
             <TableHeader className="bg-slate-50/80">
               <TableRow>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Cliente</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Contato</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Documento</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Cadastrado em</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('name')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Cliente
+                    {sort.key === 'name' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('contact')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Contato
+                    {sort.key === 'contact' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('document')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Documento
+                    {sort.key === 'document' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('created_at')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Cadastrado em
+                    {sort.key === 'created_at' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredClients.length === 0 ? (
+              {sortedClients.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     Nenhum cliente encontrado
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredClients.map((client, index) => (
+                sortedClients.map((client, index) => (
                   <TableRow
                     key={client.id}
                     className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}

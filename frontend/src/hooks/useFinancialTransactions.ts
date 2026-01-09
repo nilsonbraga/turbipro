@@ -75,6 +75,7 @@ interface TransactionFilters {
   type?: "income" | "expense";
   status?: string;
   dueToday?: boolean;
+  enabled?: boolean;
 }
 
 export function useFinancialTransactions(filters: TransactionFilters = {}) {
@@ -197,7 +198,7 @@ export function useFinancialTransactions(filters: TransactionFilters = {}) {
       const { data } = await apiFetch<{ data: any[] }>(`/api/financialTransaction?${params.toString()}`);
       return (data || []).map(mapBackendToFront);
     },
-    enabled: !!user,
+    enabled: !!user && (filters.enabled ?? true),
   });
 
   const createMutation = useMutation({

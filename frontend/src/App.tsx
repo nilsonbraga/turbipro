@@ -10,6 +10,7 @@ import Dashboard from "@/pages/Dashboard";
 import Leads from "@/pages/Leads";
 import Tasks from "@/pages/Tasks";
 import Clients from "@/pages/Clients";
+import FavoriteDestinations from "@/pages/FavoriteDestinations";
 import Partners from "@/pages/Partners";
 import CalendarPage from "@/pages/CalendarPage";
 import Agencies from "@/pages/Agencies";
@@ -185,6 +186,16 @@ function AppRoutes() {
           <ProtectedRoute>
             <AppLayout>
               <Clients />
+            </AppLayout>
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/favorite-destinations"
+        element={
+          <ProtectedRoute>
+            <AppLayout>
+              <FavoriteDestinations />
             </AppLayout>
           </ProtectedRoute>
         }

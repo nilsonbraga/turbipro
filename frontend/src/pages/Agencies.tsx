@@ -32,7 +32,26 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Search, MoreHorizontal, Mail, Phone, Edit, Trash2, Building2, CheckCircle, XCircle, Loader2, Power, Calendar, CreditCard, AlertTriangle } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  MoreHorizontal,
+  Mail,
+  Phone,
+  Edit,
+  Trash2,
+  Building2,
+  CheckCircle,
+  XCircle,
+  Loader2,
+  Power,
+  Calendar,
+  CreditCard,
+  AlertTriangle,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
 import { Navigate } from 'react-router-dom';
 import { apiFetch } from '@/lib/api';
 import { useQuery } from '@tanstack/react-query';
@@ -57,6 +76,10 @@ export default function Agencies() {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [agencyToDeactivate, setAgencyToDeactivate] = useState<Agency | null>(null);
   const [agencyToDelete, setAgencyToDelete] = useState<Agency | null>(null);
+  const [sort, setSort] = useState<{
+    key: 'name' | 'cnpj' | 'contact' | 'status' | 'plan' | 'subscription' | 'expiration';
+    direction: 'asc' | 'desc';
+  }>({ key: 'name', direction: 'asc' });
 
   // Fetch all subscriptions
   const { data: subscriptions } = useQuery({
@@ -143,6 +166,53 @@ export default function Agencies() {
 
     return result;
   }, [agencies, searchTerm, expirationFilter, subscriptions]);
+
+  const toggleSort = (key: 'name' | 'cnpj' | 'contact' | 'status' | 'plan' | 'subscription' | 'expiration') => {
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' },
+    );
+  };
+
+  const sortedAgencies = useMemo(() => {
+    const sorted = [...filteredAgencies].sort((a, b) => {
+      if (sort.key === 'cnpj') {
+        return (a.cnpj || '').localeCompare(b.cnpj || '', 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sort.key === 'contact') {
+        const aContact = (a.email || a.phone || '').toLowerCase();
+        const bContact = (b.email || b.phone || '').toLowerCase();
+        return aContact.localeCompare(bContact, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sort.key === 'status') {
+        const aStatus = a.is_active ? 0 : 1;
+        const bStatus = b.is_active ? 0 : 1;
+        return aStatus - bStatus;
+      }
+      if (sort.key === 'plan') {
+        const aPlan = getPlanName(getSubscriptionForAgency(a.id)?.plan_id || null);
+        const bPlan = getPlanName(getSubscriptionForAgency(b.id)?.plan_id || null);
+        return aPlan.localeCompare(bPlan, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sort.key === 'subscription') {
+        const aSub = getSubscriptionForAgency(a.id)?.status || '';
+        const bSub = getSubscriptionForAgency(b.id)?.status || '';
+        return aSub.localeCompare(bSub, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sort.key === 'expiration') {
+        const aDate = getSubscriptionForAgency(a.id)?.current_period_end
+          ? new Date(getSubscriptionForAgency(a.id)?.current_period_end as string).getTime()
+          : 0;
+        const bDate = getSubscriptionForAgency(b.id)?.current_period_end
+          ? new Date(getSubscriptionForAgency(b.id)?.current_period_end as string).getTime()
+          : 0;
+        return aDate - bDate;
+      }
+      return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+    });
+    return sort.direction === 'asc' ? sorted : sorted.reverse();
+  }, [filteredAgencies, sort, subscriptions, plans]);
 
   const handleEdit = (agency: Agency) => {
     setEditingAgency(agency);
@@ -320,25 +390,144 @@ export default function Agencies() {
           <Table>
             <TableHeader className="bg-slate-50/80">
               <TableRow>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Agência</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">CNPJ</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Contato</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Status</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Plano</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Assinatura</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Expira em</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('name')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Agência
+                    {sort.key === 'name' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('cnpj')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    CNPJ
+                    {sort.key === 'cnpj' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('contact')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Contato
+                    {sort.key === 'contact' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('status')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Status
+                    {sort.key === 'status' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('plan')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Plano
+                    {sort.key === 'plan' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('subscription')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Assinatura
+                    {sort.key === 'subscription' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('expiration')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Expira em
+                    {sort.key === 'expiration' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredAgencies.length === 0 ? (
+              {sortedAgencies.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                     Nenhuma agência encontrada
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredAgencies.map((agency, index) => {
+                sortedAgencies.map((agency, index) => {
                   const sub = getSubscriptionForAgency(agency.id);
                   const daysLeft = getDaysUntilExpiration(sub);
                   return (

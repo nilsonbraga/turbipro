@@ -37,6 +37,7 @@ export interface ServiceFilters {
   agencyId?: string;
   partnerId?: string;
   serviceType?: string;
+  enabled?: boolean;
 }
 
 type BackendFinancialService = {
@@ -161,7 +162,7 @@ export function useFinancialServices(filters: ServiceFilters = {}) {
       const { data } = await apiFetch<{ data: BackendFinancialService[] }>(`/api/proposalService?${params.toString()}`);
       return (data || []).map(mapBackendToFront);
     },
-    enabled: !!user,
+    enabled: !!user && (filters.enabled ?? true),
   });
 }
 

@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 import { usePartners, Partner } from '@/hooks/usePartners';
 import { useAuth } from '@/contexts/AuthContext';
 import { PartnerDialog } from '@/components/partners/PartnerDialog';
@@ -30,7 +30,24 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
-import { Plus, Search, MoreHorizontal, Mail, Phone, Edit, Trash2, Plane, Hotel, Car, Package, Handshake, Loader2 } from 'lucide-react';
+import {
+  Plus,
+  Search,
+  MoreHorizontal,
+  Mail,
+  Phone,
+  Edit,
+  Trash2,
+  Plane,
+  Hotel,
+  Car,
+  Package,
+  Handshake,
+  Loader2,
+  ArrowUpDown,
+  ArrowUp,
+  ArrowDown,
+} from 'lucide-react';
 
 const partnerTypeLabels: Record<string, string> = {
   airline: 'Companhia Aérea',
@@ -60,6 +77,10 @@ export default function Partners() {
   const [editingPartner, setEditingPartner] = useState<Partner | null>(null);
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [partnerToDelete, setPartnerToDelete] = useState<Partner | null>(null);
+  const [sort, setSort] = useState<{
+    key: 'name' | 'type' | 'contact' | 'created_at';
+    direction: 'asc' | 'desc';
+  }>({ key: 'created_at', direction: 'desc' });
 
   const filteredPartners = partners.filter(partner => {
     const searchLower = searchTerm.toLowerCase();
@@ -68,6 +89,34 @@ export default function Partners() {
       (partner.email?.toLowerCase().includes(searchLower))
     );
   });
+
+  const toggleSort = (key: 'name' | 'type' | 'contact' | 'created_at') => {
+    setSort((current) =>
+      current.key === key
+        ? { key, direction: current.direction === 'asc' ? 'desc' : 'asc' }
+        : { key, direction: 'asc' },
+    );
+  };
+
+  const sortedPartners = useMemo(() => {
+    const sorted = [...filteredPartners].sort((a, b) => {
+      if (sort.key === 'type') {
+        const aType = partnerTypeLabels[a.type || 'other'] || 'Outro';
+        const bType = partnerTypeLabels[b.type || 'other'] || 'Outro';
+        return aType.localeCompare(bType, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sort.key === 'contact') {
+        const aContact = (a.email || a.phone || '').toLowerCase();
+        const bContact = (b.email || b.phone || '').toLowerCase();
+        return aContact.localeCompare(bContact, 'pt-BR', { sensitivity: 'base' });
+      }
+      if (sort.key === 'created_at') {
+        return new Date(a.created_at).getTime() - new Date(b.created_at).getTime();
+      }
+      return a.name.localeCompare(b.name, 'pt-BR', { sensitivity: 'base' });
+    });
+    return sort.direction === 'asc' ? sorted : sorted.reverse();
+  }, [filteredPartners, sort]);
 
   const handleEdit = (partner: Partner) => {
     setEditingPartner(partner);
@@ -203,22 +252,90 @@ export default function Partners() {
           <Table>
             <TableHeader className="bg-slate-50/80">
               <TableRow>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Parceiro</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Tipo</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Contato</TableHead>
-                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Desde</TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('name')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Parceiro
+                    {sort.key === 'name' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('type')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Tipo
+                    {sort.key === 'type' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('contact')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Contato
+                    {sort.key === 'contact' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
+                <TableHead>
+                  <button
+                    type="button"
+                    onClick={() => toggleSort('created_at')}
+                    className="inline-flex items-center gap-1 text-xs uppercase tracking-wide text-slate-500 transition-colors hover:text-slate-700"
+                  >
+                    Desde
+                    {sort.key === 'created_at' ? (
+                      sort.direction === 'asc' ? (
+                        <ArrowUp className="h-3 w-3" />
+                      ) : (
+                        <ArrowDown className="h-3 w-3" />
+                      )
+                    ) : (
+                      <ArrowUpDown className="h-3 w-3" />
+                    )}
+                  </button>
+                </TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {filteredPartners.length === 0 ? (
+              {sortedPartners.length === 0 ? (
                 <TableRow>
                   <TableCell colSpan={5} className="text-center text-muted-foreground py-8">
                     Nenhum parceiro encontrado
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredPartners.map((partner, index) => {
+                sortedPartners.map((partner, index) => {
                   const Icon = partnerTypeIcons[partner.type || 'other'] || Handshake;
                   return (
                     <TableRow
