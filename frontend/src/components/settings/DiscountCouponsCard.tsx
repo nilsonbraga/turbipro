@@ -32,9 +32,62 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from '@/components/ui/alert-dialog';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Calendar } from '@/components/ui/calendar';
 import { Plus, Edit, Trash2, Ticket, Loader2 } from 'lucide-react';
+import { Calendar as CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
+import { cn } from '@/lib/utils';
+
+const DatePickerField = ({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+
+  const parseDate = (val?: string) => {
+    if (!val) return undefined;
+    const [y, m, d] = val.split('-').map(Number);
+    if (!y || !m || !d) return undefined;
+    return new Date(Date.UTC(y, m - 1, d, 12));
+  };
+
+  const dateObj = parseDate(value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            'w-full justify-start text-left font-normal h-10 bg-white border-slate-200',
+            !value && 'text-muted-foreground',
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {dateObj ? format(dateObj, 'dd/MM/yyyy') : (placeholder || 'Selecionar')}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={dateObj}
+          onSelect={(day) => {
+            onChange(day ? format(day, 'yyyy-MM-dd') : '');
+            setOpen(false);
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 export function DiscountCouponsCard() {
   const { coupons, createCoupon, updateCoupon, deleteCoupon, isCreating, isUpdating, isDeleting } = useDiscountCoupons();
@@ -126,11 +179,11 @@ export function DiscountCouponsCard() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+        <CardHeader className="pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Ticket className="w-5 h-5" />
                 Cupons de Desconto
               </CardTitle>
@@ -154,7 +207,7 @@ export function DiscountCouponsCard() {
               coupons.map((coupon) => (
                 <div
                   key={coupon.id}
-                  className="flex items-center justify-between p-4 bg-muted/50 rounded-lg"
+                  className="flex items-center justify-between p-4 bg-white border border-slate-100 rounded-2xl"
                 >
                   <div className="flex-1">
                     <div className="flex items-center gap-2">
@@ -216,7 +269,7 @@ export function DiscountCouponsCard() {
                 value={code}
                 onChange={(e) => setCode(e.target.value.toUpperCase())}
                 placeholder="EX: PROMO20"
-                className="uppercase font-mono"
+                className="h-10 bg-white border-slate-200 uppercase font-mono"
               />
             </div>
 
@@ -227,6 +280,7 @@ export function DiscountCouponsCard() {
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 placeholder="Descrição do cupom"
+                className="h-10 bg-white border-slate-200"
               />
             </div>
 
@@ -234,7 +288,7 @@ export function DiscountCouponsCard() {
               <div className="space-y-2">
                 <Label>Tipo de Desconto</Label>
                 <Select value={discountType} onValueChange={(v: 'percentage' | 'fixed') => setDiscountType(v)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-10 bg-white border-slate-200">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -253,6 +307,7 @@ export function DiscountCouponsCard() {
                   placeholder={discountType === 'percentage' ? '20' : '50.00'}
                   min="0"
                   step={discountType === 'percentage' ? '1' : '0.01'}
+                  className="h-10 bg-white border-slate-200"
                 />
               </div>
             </div>
@@ -260,20 +315,18 @@ export function DiscountCouponsCard() {
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label htmlFor="validFrom">Válido a partir de</Label>
-                <Input
-                  id="validFrom"
-                  type="date"
+                <DatePickerField
                   value={validFrom}
-                  onChange={(e) => setValidFrom(e.target.value)}
+                  onChange={setValidFrom}
+                  placeholder="Selecionar"
                 />
               </div>
               <div className="space-y-2">
                 <Label htmlFor="validUntil">Válido até</Label>
-                <Input
-                  id="validUntil"
-                  type="date"
+                <DatePickerField
                   value={validUntil}
-                  onChange={(e) => setValidUntil(e.target.value)}
+                  onChange={setValidUntil}
+                  placeholder="Selecionar"
                 />
               </div>
             </div>
@@ -287,12 +340,13 @@ export function DiscountCouponsCard() {
                 onChange={(e) => setMaxUses(e.target.value)}
                 placeholder="100"
                 min="1"
+                className="h-10 bg-white border-slate-200"
               />
             </div>
 
             <div className="space-y-2">
               <Label>Planos Aplicáveis (deixe vazio para todos)</Label>
-              <div className="space-y-2 max-h-32 overflow-y-auto">
+              <div className="space-y-2 max-h-32 overflow-y-auto rounded-xl border border-slate-100 p-3 bg-slate-50/80">
                 {plans.map((plan) => (
                   <div key={plan.id} className="flex items-center space-x-2">
                     <Checkbox

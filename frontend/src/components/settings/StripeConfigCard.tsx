@@ -23,11 +23,11 @@ export function StripeConfigCard() {
   const isConfigured = !!settings.stripe_secret_key && settings.stripe_secret_key.startsWith('sk_');
 
   return (
-    <Card>
-      <CardHeader>
-        <div className="flex items-center justify-between">
+    <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+      <CardHeader className="pb-2">
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <CardTitle className="flex items-center gap-2">
+            <CardTitle className="flex items-center gap-2 text-lg">
               <CreditCard className="w-5 h-5" />
               Configuração do Stripe
             </CardTitle>
@@ -51,7 +51,7 @@ export function StripeConfigCard() {
                 value={stripeKey}
                 onChange={(e) => setStripeKey(e.target.value)}
                 placeholder="sk_live_..."
-                className="pr-10"
+                className="h-10 bg-white border-slate-200 pr-10"
               />
               <Button
                 type="button"

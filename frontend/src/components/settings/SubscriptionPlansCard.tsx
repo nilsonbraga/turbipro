@@ -156,23 +156,25 @@ export function SubscriptionPlansCard() {
   };
 
   return (
-    <Card>
-      <CardHeader className="flex flex-row items-center justify-between">
-        <div>
-          <CardTitle className="flex items-center gap-2">
-            <CreditCard className="w-5 h-5" />
-            Planos de Assinatura
-          </CardTitle>
-          <CardDescription>
-            Gerencie os planos disponíveis para as agências
-          </CardDescription>
+    <Card className="rounded-2xl border-0 shadow-none bg-white overflow-hidden">
+      <CardHeader className="border-b border-slate-100">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <div>
+            <CardTitle className="flex items-center gap-2 text-lg">
+              <CreditCard className="w-5 h-5" />
+              Planos de Assinatura
+            </CardTitle>
+            <CardDescription>
+              Gerencie os planos disponíveis para as agências
+            </CardDescription>
+          </div>
+          <Button onClick={() => handleOpenDialog()}>
+            <Plus className="w-4 h-4 mr-2" />
+            Novo Plano
+          </Button>
         </div>
-        <Button onClick={() => handleOpenDialog()}>
-          <Plus className="w-4 h-4 mr-2" />
-          Novo Plano
-        </Button>
       </CardHeader>
-      <CardContent>
+      <CardContent className="p-0">
         {isLoading ? (
           <div className="flex items-center justify-center py-8">
             <Loader2 className="w-6 h-6 animate-spin" />
@@ -183,20 +185,20 @@ export function SubscriptionPlansCard() {
           </div>
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-slate-50/80">
               <TableRow>
-                <TableHead>Plano</TableHead>
-                <TableHead>Preço Mensal</TableHead>
-                <TableHead>Preço Anual</TableHead>
-                <TableHead>Limites</TableHead>
-                <TableHead>Módulos</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Plano</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Preço Mensal</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Preço Anual</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Limites</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Módulos</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Status</TableHead>
                 <TableHead className="w-[100px]"></TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
-              {plans.map((plan) => (
-                <TableRow key={plan.id}>
+              {plans.map((plan, index) => (
+                <TableRow key={plan.id} className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}>
                   <TableCell>
                     <div>
                       <p className="font-medium">{plan.name}</p>
@@ -254,18 +256,27 @@ export function SubscriptionPlansCard() {
 
       {/* Plan Dialog */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent className="max-w-3xl max-h-[90vh] overflow-hidden flex flex-col">
-          <DialogHeader className="flex-shrink-0">
-            <DialogTitle>{editingPlan ? 'Editar Plano' : 'Novo Plano'}</DialogTitle>
-          </DialogHeader>
-          <div className="flex-1 overflow-y-auto">
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
+        <DialogContent className="max-w-4xl max-h-[90vh] overflow-hidden p-0">
+          <div className="max-h-[90vh] overflow-y-auto">
+            <div className="border-b border-slate-100 bg-gradient-to-br from-[#fff1e0] via-white to-[#fef5e9]">
+              <DialogHeader className="p-6 space-y-2">
+                <DialogTitle className="text-2xl font-semibold text-slate-900">
+                  {editingPlan ? 'Editar Plano' : 'Novo Plano'}
+                </DialogTitle>
+                <p className="text-sm text-slate-600">
+                  Defina preços, limites e módulos disponíveis no plano.
+                </p>
+              </DialogHeader>
+            </div>
+            <div className="p-6">
+              <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pb-4">
               <div className="space-y-2">
                 <Label>Nome do Plano</Label>
                 <Input
                   value={formData.name}
                   onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                   placeholder="Ex: Básico"
+                  className="h-10 bg-white border-slate-200"
                 />
               </div>
               <div className="space-y-2 flex items-center gap-4 pt-6">
@@ -281,6 +292,7 @@ export function SubscriptionPlansCard() {
                   value={formData.description || ''}
                   onChange={(e) => setFormData({ ...formData, description: e.target.value })}
                   placeholder="Descrição do plano..."
+                  className="bg-white border-slate-200"
                 />
               </div>
               <div className="space-y-2">
@@ -289,6 +301,7 @@ export function SubscriptionPlansCard() {
                   type="number"
                   value={formData.price_monthly}
                   onChange={(e) => setFormData({ ...formData, price_monthly: parseFloat(e.target.value) || 0 })}
+                  className="h-10 bg-white border-slate-200"
                 />
               </div>
               <div className="space-y-2">
@@ -297,6 +310,7 @@ export function SubscriptionPlansCard() {
                   type="number"
                   value={formData.price_yearly}
                   onChange={(e) => setFormData({ ...formData, price_yearly: parseFloat(e.target.value) || 0 })}
+                  className="h-10 bg-white border-slate-200"
                 />
               </div>
               <div className="space-y-2">
@@ -305,6 +319,7 @@ export function SubscriptionPlansCard() {
                   value={formData.stripe_price_id_monthly || ''}
                   onChange={(e) => setFormData({ ...formData, stripe_price_id_monthly: e.target.value })}
                   placeholder="price_..."
+                  className="h-10 bg-white border-slate-200"
                 />
               </div>
               <div className="space-y-2">
@@ -313,6 +328,7 @@ export function SubscriptionPlansCard() {
                   value={formData.stripe_price_id_yearly || ''}
                   onChange={(e) => setFormData({ ...formData, stripe_price_id_yearly: e.target.value })}
                   placeholder="price_..."
+                  className="h-10 bg-white border-slate-200"
                 />
               </div>
               <div className="space-y-2">
@@ -322,6 +338,7 @@ export function SubscriptionPlansCard() {
                   value={formData.max_proposals ?? ''}
                   onChange={(e) => setFormData({ ...formData, max_proposals: e.target.value ? parseInt(e.target.value) : null })}
                   placeholder="Deixe vazio para ilimitado"
+                  className="h-10 bg-white border-slate-200"
                 />
               </div>
               <div className="space-y-2">
@@ -331,6 +348,7 @@ export function SubscriptionPlansCard() {
                   value={formData.max_clients ?? ''}
                   onChange={(e) => setFormData({ ...formData, max_clients: e.target.value ? parseInt(e.target.value) : null })}
                   placeholder="Deixe vazio para ilimitado"
+                  className="h-10 bg-white border-slate-200"
                 />
               </div>
               <div className="space-y-2">
@@ -340,6 +358,7 @@ export function SubscriptionPlansCard() {
                   value={formData.max_users ?? ''}
                   onChange={(e) => setFormData({ ...formData, max_users: e.target.value ? parseInt(e.target.value) : null })}
                   placeholder="Deixe vazio para ilimitado"
+                  className="h-10 bg-white border-slate-200"
                 />
               </div>
               <div className="space-y-2">
@@ -350,6 +369,7 @@ export function SubscriptionPlansCard() {
                   onChange={(e) => setFormData({ ...formData, trial_days: e.target.value ? parseInt(e.target.value) : null })}
                   placeholder="Ex: 14"
                   min="0"
+                  className="h-10 bg-white border-slate-200"
                 />
                 <p className="text-xs text-muted-foreground">
                   Quantos dias de teste grátis antes de cobrar
@@ -372,7 +392,7 @@ export function SubscriptionPlansCard() {
                     </Button>
                   </div>
                 </div>
-                <div className="border rounded-lg p-4 bg-muted/30">
+                <div className="border border-slate-100 rounded-xl p-4 bg-slate-50/80">
                   <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
                     {ALL_MODULES.map((module) => (
                       <div 
@@ -404,16 +424,17 @@ export function SubscriptionPlansCard() {
                 </p>
               </div>
             </div>
+            </div>
+            <DialogFooter className="pt-4 border-t px-6 pb-6">
+              <Button variant="outline" onClick={() => setDialogOpen(false)}>
+                Cancelar
+              </Button>
+              <Button onClick={handleSubmit} disabled={isCreating || isUpdating || !formData.name}>
+                {(isCreating || isUpdating) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
+                Salvar
+              </Button>
+            </DialogFooter>
           </div>
-          <DialogFooter className="flex-shrink-0 pt-4 border-t">
-            <Button variant="outline" onClick={() => setDialogOpen(false)}>
-              Cancelar
-            </Button>
-            <Button onClick={handleSubmit} disabled={isCreating || isUpdating || !formData.name}>
-              {(isCreating || isUpdating) && <Loader2 className="w-4 h-4 mr-2 animate-spin" />}
-              Salvar
-            </Button>
-          </DialogFooter>
         </DialogContent>
       </Dialog>
 

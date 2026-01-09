@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { format, startOfMonth, endOfMonth } from "date-fns";
+import { useEffect, useState } from "react";
+import { format, startOfMonth, endOfMonth, startOfYear, endOfYear } from "date-fns";
 import {
   TrendingUp,
   TrendingDown,
@@ -45,7 +45,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { Input } from "@/components/ui/input";
 import { ToggleGroup, ToggleGroupItem } from "@/components/ui/toggle-group";
 import { useAuth } from "@/contexts/AuthContext";
 import { useAgencies } from "@/hooks/useAgencies";
@@ -59,7 +58,7 @@ import { ProposalDetail } from "@/components/proposals/ProposalDetail";
 import { useToast } from "@/hooks/use-toast";
 import { apiFetch } from "@/lib/api";
 import { BackendProposal, Proposal, mapBackendProposalToFront, proposalInclude } from "@/hooks/useProposals";
-import { Dialog, DialogContent } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 
 function formatCurrency(value: number): string {
   return new Intl.NumberFormat("pt-BR", {
@@ -102,11 +101,13 @@ export default function Financial() {
   const [viewMode, setViewMode] = useState<"leads" | "services">("leads");
 
   // Date filters - default to current month
-  const [startDate, setStartDate] = useState<Date>(startOfMonth(new Date()));
-  const [endDate, setEndDate] = useState<Date>(endOfMonth(new Date()));
+  const [startDate, setStartDate] = useState<Date | null>(startOfMonth(new Date()));
+  const [endDate, setEndDate] = useState<Date | null>(endOfMonth(new Date()));
+  const [periodFilter, setPeriodFilter] = useState<"month" | "semester" | "year" | "all">("month");
   const [selectedAgencyId, setSelectedAgencyId] = useState<string>("");
   const [typeFilter, setTypeFilter] = useState<string>("");
   const [statusFilter, setStatusFilter] = useState<string>("");
+  const [dueTodayOnly, setDueTodayOnly] = useState(false);
   const [partnerFilter, setPartnerFilter] = useState<string>("");
   const [serviceTypeFilter, setServiceTypeFilter] = useState<string>("");
 
@@ -119,17 +120,18 @@ export default function Financial() {
     deleteTransaction,
     isCreating: isCreatingTransaction,
   } = useFinancialTransactions({
-    startDate,
-    endDate,
+    startDate: startDate ?? undefined,
+    endDate: endDate ?? undefined,
     agencyId: selectedAgencyId || undefined,
     type: typeFilter as "income" | "expense" | undefined,
     status: statusFilter || undefined,
+    dueToday: dueTodayOnly || undefined,
   });
 
   // Financial services (for service view)
   const { data: financialServices = [], isLoading: isLoadingServices } = useFinancialServices({
-    startDate,
-    endDate,
+    startDate: startDate ?? undefined,
+    endDate: endDate ?? undefined,
     agencyId: selectedAgencyId || undefined,
     partnerId: partnerFilter || undefined,
     serviceType: serviceTypeFilter || undefined,
@@ -141,10 +143,39 @@ export default function Financial() {
   const [defaultTransactionType, setDefaultTransactionType] = useState<"income" | "expense">("expense");
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
   const [transactionToDelete, setTransactionToDelete] = useState<string | null>(null);
+  const [transactionDetailOpen, setTransactionDetailOpen] = useState(false);
+  const [selectedTransaction, setSelectedTransaction] = useState<FinancialTransaction | null>(null);
 
   // Proposal detail modal state
   const [selectedProposal, setSelectedProposal] = useState<Proposal | null>(null);
   const [proposalDetailOpen, setProposalDetailOpen] = useState(false);
+
+  useEffect(() => {
+    const now = new Date();
+
+    if (periodFilter === "all") {
+      setStartDate(null);
+      setEndDate(null);
+      return;
+    }
+
+    if (periodFilter === "month") {
+      setStartDate(startOfMonth(now));
+      setEndDate(endOfMonth(now));
+      return;
+    }
+
+    if (periodFilter === "year") {
+      setStartDate(startOfYear(now));
+      setEndDate(endOfYear(now));
+      return;
+    }
+
+    const semesterStartMonth = now.getMonth() < 6 ? 0 : 6;
+    const semesterEndMonth = now.getMonth() < 6 ? 5 : 11;
+    setStartDate(new Date(now.getFullYear(), semesterStartMonth, 1));
+    setEndDate(endOfMonth(new Date(now.getFullYear(), semesterEndMonth, 1)));
+  }, [periodFilter]);
 
   const handleCreateTransaction = async (data: TransactionInput) => {
     const agencyId = isSuperAdmin && selectedAgencyId ? selectedAgencyId : agency?.id;
@@ -154,7 +185,12 @@ export default function Financial() {
 
   const handleUpdateTransaction = (data: TransactionInput) => {
     if (!editingTransaction) return;
-    updateTransaction({ ...data, id: editingTransaction.id });
+    updateTransaction({
+      ...data,
+      id: editingTransaction.id,
+      proposal_id: data.proposal_id ?? editingTransaction.proposal_id,
+      client_id: data.client_id ?? editingTransaction.client_id,
+    });
     setEditingTransaction(null);
   };
 
@@ -184,22 +220,32 @@ export default function Financial() {
     }
   };
 
+  const formatShortDate = (value?: string | null) => {
+    if (!value) return "-";
+    const dateOnly = value.slice(0, 10);
+    const [y, m, d] = dateOnly.split("-").map(Number);
+    if (!y || !m || !d) return "-";
+    const date = new Date(Date.UTC(y, m - 1, d, 12));
+    if (Number.isNaN(date.getTime())) return "-";
+    return format(date, "dd/MM/yyyy");
+  };
+
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-8">
         {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="text-2xl font-bold tracking-tight">Financeiro</h1>
-            <p className="text-muted-foreground">
+            <h1 className="text-2xl font-semibold text-foreground">Financeiro</h1>
+            <p className="text-sm text-muted-foreground">
               Gerencie receitas e despesas
             </p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline" onClick={() => openNewTransaction("expense")}>
+            <Button size="sm" variant="outline" onClick={() => openNewTransaction("expense")}>
               <TrendingDown className="mr-2 h-4 w-4" />
               Nova Despesa
             </Button>
-            <Button onClick={() => openNewTransaction("income")}>
+            <Button size="sm" onClick={() => openNewTransaction("income")}>
               <TrendingUp className="mr-2 h-4 w-4" />
               Nova Receita
             </Button>
@@ -207,14 +253,27 @@ export default function Financial() {
         </div>
 
         {/* View Mode Toggle */}
-        <div className="flex items-center gap-4">
+        <div className="flex flex-wrap items-center gap-3">
           <span className="text-sm font-medium text-muted-foreground">Visualização:</span>
-          <ToggleGroup type="single" value={viewMode} onValueChange={(val) => val && setViewMode(val as "leads" | "services")}>
-            <ToggleGroupItem value="leads" aria-label="Ver por Lead">
+          <ToggleGroup
+            type="single"
+            value={viewMode}
+            onValueChange={(val) => val && setViewMode(val as "leads" | "services")}
+            className="flex items-center gap-2 rounded-full bg-slate-100 p-1"
+          >
+            <ToggleGroupItem
+              value="leads"
+              aria-label="Ver por Lead"
+              className="rounded-full px-4 py-2 text-xs font-semibold text-slate-600 data-[state=on]:bg-white data-[state=on]:text-[#f06a12]"
+            >
               <LayoutList className="h-4 w-4 mr-2" />
               Por Lead
             </ToggleGroupItem>
-            <ToggleGroupItem value="services" aria-label="Ver por Serviço">
+            <ToggleGroupItem
+              value="services"
+              aria-label="Ver por Serviço"
+              className="rounded-full px-4 py-2 text-xs font-semibold text-slate-600 data-[state=on]:bg-white data-[state=on]:text-[#f06a12]"
+            >
               <Layers className="h-4 w-4 mr-2" />
               Por Serviço
             </ToggleGroupItem>
@@ -222,48 +281,59 @@ export default function Financial() {
         </div>
 
         {/* Filters */}
-        <Card>
-          <CardContent className="pt-6">
-            <div className="flex flex-wrap gap-4">
-              {isSuperAdmin && (
-                <div className="w-[200px]">
-                  <Select value={selectedAgencyId || "all"} onValueChange={(val) => setSelectedAgencyId(val === "all" ? "" : val)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Todas as Agências" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      <SelectItem value="all">Todas as Agências</SelectItem>
-                      {agencies?.map((ag) => (
-                        <SelectItem key={ag.id} value={ag.id}>
-                          {ag.name}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-              )}
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex flex-wrap items-center gap-3">
+                {isSuperAdmin && (
+                  <div className="w-[200px]">
+                    <Select value={selectedAgencyId || "all"} onValueChange={(val) => setSelectedAgencyId(val === "all" ? "" : val)}>
+                      <SelectTrigger className="h-9 bg-white border-slate-200">
+                        <SelectValue placeholder="Todas as Agências" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as Agências</SelectItem>
+                        {agencies?.map((ag) => (
+                          <SelectItem key={ag.id} value={ag.id}>
+                            {ag.name}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                )}
 
-              <div className="flex items-center gap-2">
-                <Input
-                  type="date"
-                  value={format(startDate, "yyyy-MM-dd")}
-                  onChange={(e) => setStartDate(new Date(e.target.value))}
-                  className="w-[150px]"
-                />
-                <span className="text-muted-foreground">até</span>
-                <Input
-                  type="date"
-                  value={format(endDate, "yyyy-MM-dd")}
-                  onChange={(e) => setEndDate(new Date(e.target.value))}
-                  className="w-[150px]"
-                />
+                <div className="flex flex-wrap items-center gap-2">
+                  {[
+                    { label: "Neste mês", value: "month" },
+                    { label: "Neste semestre", value: "semester" },
+                    { label: "Neste ano", value: "year" },
+                    { label: "Todos", value: "all" },
+                  ].map((option) => {
+                    const isActive = periodFilter === option.value;
+                    return (
+                      <button
+                        key={option.value}
+                        type="button"
+                        onClick={() => setPeriodFilter(option.value as typeof periodFilter)}
+                        className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                          isActive
+                            ? "bg-[#f06a12] text-white"
+                            : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                        }`}
+                      >
+                        {option.label}
+                      </button>
+                    );
+                  })}
+                </div>
               </div>
 
               {/* Filters for Leads view */}
               {viewMode === "leads" && (
-                <>
+                <div className="flex flex-wrap items-center gap-3">
                   <Select value={typeFilter || "all"} onValueChange={(val) => setTypeFilter(val === "all" ? "" : val)}>
-                    <SelectTrigger className="w-[150px]">
+                    <SelectTrigger className="w-[150px] h-9 bg-white border-slate-200">
                       <SelectValue placeholder="Tipo" />
                     </SelectTrigger>
                     <SelectContent>
@@ -274,7 +344,7 @@ export default function Financial() {
                   </Select>
 
                   <Select value={statusFilter || "all"} onValueChange={(val) => setStatusFilter(val === "all" ? "" : val)}>
-                    <SelectTrigger className="w-[150px]">
+                    <SelectTrigger className="w-[150px] h-9 bg-white border-slate-200">
                       <SelectValue placeholder="Status" />
                     </SelectTrigger>
                     <SelectContent>
@@ -285,14 +355,25 @@ export default function Financial() {
                       <SelectItem value="cancelled">Cancelado</SelectItem>
                     </SelectContent>
                   </Select>
-                </>
+                  <button
+                    type="button"
+                    onClick={() => setDueTodayOnly((prev) => !prev)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      dueTodayOnly
+                        ? "bg-[#f06a12] text-white"
+                        : "bg-white text-slate-600 border border-slate-200 hover:bg-slate-50"
+                    }`}
+                  >
+                    Vence Hoje
+                  </button>
+                </div>
               )}
 
               {/* Filters for Services view */}
               {viewMode === "services" && (
-                <>
+                <div className="flex flex-wrap items-center gap-3">
                   <Select value={partnerFilter || "all"} onValueChange={(val) => setPartnerFilter(val === "all" ? "" : val)}>
-                    <SelectTrigger className="w-[180px]">
+                    <SelectTrigger className="w-[180px] h-9 bg-white border-slate-200">
                       <SelectValue placeholder="Fornecedor" />
                     </SelectTrigger>
                     <SelectContent>
@@ -306,7 +387,7 @@ export default function Financial() {
                   </Select>
 
                   <Select value={serviceTypeFilter || "all"} onValueChange={(val) => setServiceTypeFilter(val === "all" ? "" : val)}>
-                    <SelectTrigger className="w-[150px]">
+                    <SelectTrigger className="w-[150px] h-9 bg-white border-slate-200">
                       <SelectValue placeholder="Tipo Serviço" />
                     </SelectTrigger>
                     <SelectContent>
@@ -322,7 +403,7 @@ export default function Financial() {
                       <SelectItem value="other">Outro</SelectItem>
                     </SelectContent>
                   </Select>
-                </>
+                </div>
               )}
             </div>
           </CardContent>
@@ -331,49 +412,49 @@ export default function Financial() {
         {/* Summary Cards - only show in leads view */}
         {viewMode === "leads" && (
           <div className="grid gap-4 md:grid-cols-4">
-            <Card>
+            <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Receitas</CardTitle>
+                <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Total Receitas</CardTitle>
                 <TrendingUp className="h-4 w-4 text-green-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-green-600">
+                <div className="text-2xl font-semibold text-green-600">
                   {formatCurrency(totals.totalIncome)}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Total Despesas</CardTitle>
+                <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Total Despesas</CardTitle>
                 <TrendingDown className="h-4 w-4 text-red-600" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-red-600">
+                <div className="text-2xl font-semibold text-red-600">
                   {formatCurrency(totals.totalExpense)}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Lucro</CardTitle>
+                <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Lucro</CardTitle>
                 <DollarSign className="h-4 w-4 text-primary" />
               </CardHeader>
               <CardContent>
-                <div className="text-2xl font-bold text-primary">
+                <div className="text-2xl font-semibold text-primary">
                   {formatCurrency(totals.totalProfit)}
                 </div>
               </CardContent>
             </Card>
 
-            <Card>
+            <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
               <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                <CardTitle className="text-sm font-medium">Saldo</CardTitle>
+                <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground">Saldo</CardTitle>
                 <DollarSign className="h-4 w-4 text-muted-foreground" />
               </CardHeader>
               <CardContent>
-                <div className={`text-2xl font-bold ${totals.totalIncome - totals.totalExpense >= 0 ? "text-green-600" : "text-red-600"}`}>
+                <div className={`text-2xl font-semibold ${totals.totalIncome - totals.totalExpense >= 0 ? "text-green-600" : "text-red-600"}`}>
                   {formatCurrency(totals.totalIncome - totals.totalExpense)}
                 </div>
               </CardContent>
@@ -392,20 +473,24 @@ export default function Financial() {
 
         {/* Leads View - Transactions Table */}
         {viewMode === "leads" && (
-          <Card>
-            <CardContent className="pt-6">
+          <Card className="rounded-2xl border-0 shadow-none bg-white overflow-hidden">
+            <CardContent className="p-0">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-50/80">
                   <TableRow>
-                    <TableHead>Data</TableHead>
-                    <TableHead>Lead</TableHead>
-                    <TableHead>Tipo</TableHead>
-                    <TableHead>Descrição</TableHead>
-                    {isSuperAdmin && <TableHead>Agência</TableHead>}
-                    <TableHead>Fornecedor</TableHead>
-                    <TableHead>Valor</TableHead>
-                    <TableHead>Status</TableHead>
-                    <TableHead>Pagamento</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Data</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Lead</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Tipo</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Descrição</TableHead>
+                    {isSuperAdmin && (
+                      <TableHead className="text-xs uppercase tracking-wide text-slate-500">
+                        Agência
+                      </TableHead>
+                    )}
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Fornecedor</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Valor</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Status</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Pagamento</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -423,26 +508,43 @@ export default function Financial() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    transactions.map((transaction) => (
-                      <TableRow key={transaction.id}>
+                    transactions.map((transaction, index) => (
+                      <TableRow
+                        key={transaction.id}
+                        className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}
+                        onClick={(event) => {
+                          const target = event.target as HTMLElement;
+                          if (target.closest('button') || target.closest('a') || target.closest('[data-row-action]')) {
+                            return;
+                          }
+                          setSelectedTransaction(transaction);
+                          setTransactionDetailOpen(true);
+                        }}
+                      >
                         <TableCell>
-                          {format(new Date(transaction.launch_date), "dd/MM/yyyy")}
+                          {formatShortDate(transaction.launch_date)}
                         </TableCell>
                         <TableCell>
-                          {transaction.proposals ? (
+                          {transaction.proposals || transaction.proposal_id ? (
                             <Badge
                               variant="outline"
                               className="cursor-pointer hover:bg-accent"
-                              onClick={() => handleOpenProposal(transaction.proposal_id!)}
+                              onClick={(event) => {
+                                event.stopPropagation();
+                                const proposalId = transaction.proposal_id || transaction.proposals?.id;
+                                if (proposalId) {
+                                  handleOpenProposal(proposalId);
+                                }
+                              }}
                             >
-                              #{transaction.proposals.number}
+                              #{transaction.proposals?.number ?? transaction.proposal_id}
                             </Badge>
                           ) : (
                             <span className="text-muted-foreground">-</span>
                           )}
                         </TableCell>
                         <TableCell>
-                          <Badge variant={transaction.type === "income" ? "default" : "secondary"}>
+                          <Badge variant="secondary" className={transaction.type === "income" ? "rounded-full bg-emerald-100 text-emerald-700" : "rounded-full bg-slate-100 text-slate-600"}>
                             {transaction.type === "income" ? "Receita" : "Despesa"}
                           </Badge>
                         </TableCell>
@@ -493,12 +595,13 @@ export default function Financial() {
                         <TableCell>
                           <DropdownMenu>
                             <DropdownMenuTrigger asChild>
-                              <Button variant="ghost" size="icon">
+                              <Button variant="ghost" size="icon" data-row-action>
                                 <MoreHorizontal className="h-4 w-4" />
                               </Button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end">
-                              <DropdownMenuItem onClick={() => {
+                              <DropdownMenuItem onClick={(event) => {
+                                event.stopPropagation();
                                 setEditingTransaction(transaction);
                                 setTransactionDialogOpen(true);
                               }}>
@@ -507,7 +610,8 @@ export default function Financial() {
                               </DropdownMenuItem>
                               <DropdownMenuItem
                                 className="text-destructive"
-                                onClick={() => {
+                                onClick={(event) => {
+                                  event.stopPropagation();
                                   setTransactionToDelete(transaction.id);
                                   setDeleteDialogOpen(true);
                                 }}
@@ -555,6 +659,202 @@ export default function Financial() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Transaction Detail Modal */}
+      <Dialog
+        open={transactionDetailOpen && !!selectedTransaction}
+        onOpenChange={(open) => {
+          if (!open) {
+            setTransactionDetailOpen(false);
+            setSelectedTransaction(null);
+          }
+        }}
+      >
+        <DialogContent className="max-w-4xl w-[95vw] p-0 overflow-hidden">
+          {selectedTransaction && (
+            <div className="flex flex-col">
+              <div className="relative border-b border-slate-100">
+                <div className="absolute inset-0 bg-gradient-to-br from-[#fff1e0] via-white to-[#fef5e9]" />
+                <div className="relative p-6 space-y-4">
+                  <DialogHeader className="space-y-3">
+                    <p className="text-xs uppercase tracking-[0.2em] text-slate-500">
+                      Detalhes da transação
+                    </p>
+                    <div className="flex flex-wrap items-start justify-between gap-4">
+                      <div className="space-y-2">
+                        <DialogTitle className="text-2xl font-semibold text-slate-900">
+                          {selectedTransaction.description}
+                        </DialogTitle>
+                        {selectedTransaction.details ? (
+                          <p className="text-sm text-slate-600">{selectedTransaction.details}</p>
+                        ) : (
+                          <p className="text-sm text-slate-400">Sem observações adicionais.</p>
+                        )}
+                      </div>
+                      <div className="flex flex-col items-end gap-3">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <Badge
+                            variant="secondary"
+                            className={selectedTransaction.type === "income"
+                              ? "rounded-full bg-emerald-100 text-emerald-700"
+                              : "rounded-full bg-slate-100 text-slate-600"}
+                          >
+                            {selectedTransaction.type === "income" ? "Receita" : "Despesa"}
+                          </Badge>
+                          <Badge className={STATUS_COLORS[selectedTransaction.status]}>
+                            {STATUS_LABELS[selectedTransaction.status]}
+                          </Badge>
+                        </div>
+                        <span className={`text-3xl font-semibold ${
+                          selectedTransaction.type === "income" ? "text-green-600" : "text-red-600"
+                        }`}>
+                          {formatCurrency(selectedTransaction.total_value)}
+                        </span>
+                        {selectedTransaction.installments ? (
+                          <span className="text-xs text-slate-500">
+                            Parcela {selectedTransaction.current_installment || 1} de {selectedTransaction.installments}
+                          </span>
+                        ) : null}
+                      </div>
+                    </div>
+                  </DialogHeader>
+                  <div className="grid gap-3 sm:grid-cols-3">
+                    <div className="rounded-xl border border-white/60 bg-white/80 px-3 py-2 shadow-sm">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400">Lançamento</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {formatShortDate(selectedTransaction.launch_date)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-white/60 bg-white/80 px-3 py-2 shadow-sm">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400">Vencimento</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {formatShortDate(selectedTransaction.due_date)}
+                      </p>
+                    </div>
+                    <div className="rounded-xl border border-white/60 bg-white/80 px-3 py-2 shadow-sm">
+                      <p className="text-[11px] uppercase tracking-wide text-slate-400">Pagamento</p>
+                      <p className="text-sm font-semibold text-slate-700">
+                        {formatShortDate(selectedTransaction.payment_date)}
+                      </p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="p-6 space-y-4 bg-white">
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                    <p className="text-xs uppercase tracking-wider text-slate-500">Envolvidos</p>
+                    <dl className="mt-3 divide-y divide-slate-100 text-sm text-slate-600">
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Cliente</dt>
+                        <dd className="font-medium text-slate-800">{selectedTransaction.clients?.name || "-"}</dd>
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">CPF</dt>
+                        <dd className="font-medium text-slate-800">{selectedTransaction.clients?.cpf || "-"}</dd>
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Fornecedor</dt>
+                        <dd className="font-medium text-slate-800">{selectedTransaction.suppliers?.name || "-"}</dd>
+                      </div>
+                      {isSuperAdmin && (
+                        <div className="flex items-center justify-between py-2">
+                          <dt className="text-slate-500">Agência</dt>
+                          <dd className="font-medium text-slate-800">{selectedTransaction.agencies?.name || "-"}</dd>
+                        </div>
+                      )}
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Lead</dt>
+                        <dd>
+                          {selectedTransaction.proposals || selectedTransaction.proposal_id ? (
+                            <Badge
+                              variant="outline"
+                              className="cursor-pointer hover:bg-accent"
+                              onClick={() => {
+                                const proposalId = selectedTransaction.proposal_id || selectedTransaction.proposals?.id;
+                                if (proposalId) {
+                                  handleOpenProposal(proposalId);
+                                }
+                              }}
+                            >
+                              #{selectedTransaction.proposals?.number ?? selectedTransaction.proposal_id}
+                            </Badge>
+                          ) : (
+                            <span className="text-slate-500">-</span>
+                          )}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                    <p className="text-xs uppercase tracking-wider text-slate-500">Pagamento</p>
+                    <dl className="mt-3 divide-y divide-slate-100 text-sm text-slate-600">
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Método</dt>
+                        <dd className="font-medium text-slate-800">
+                          {selectedTransaction.payment_method ? PAYMENT_METHOD_LABELS[selectedTransaction.payment_method] : "-"}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Documento</dt>
+                        <dd className="font-medium text-slate-800">{selectedTransaction.document_number || "-"}</dd>
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Nome do documento</dt>
+                        <dd className="font-medium text-slate-800">{selectedTransaction.document_name || "-"}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+
+                <div className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                    <p className="text-xs uppercase tracking-wider text-slate-500">Valores</p>
+                    <dl className="mt-3 divide-y divide-slate-100 text-sm text-slate-600">
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Total</dt>
+                        <dd className="font-semibold text-slate-800">{formatCurrency(selectedTransaction.total_value)}</dd>
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Lucro</dt>
+                        <dd className="font-semibold text-slate-800">
+                          {selectedTransaction.profit_value ? formatCurrency(selectedTransaction.profit_value) : "-"}
+                        </dd>
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Parcelas</dt>
+                        <dd className="font-semibold text-slate-800">
+                          {selectedTransaction.installments ? `${selectedTransaction.current_installment || 1}/${selectedTransaction.installments}` : "-"}
+                        </dd>
+                      </div>
+                    </dl>
+                  </div>
+
+                  <div className="rounded-2xl border border-slate-100 bg-slate-50/60 p-4">
+                    <p className="text-xs uppercase tracking-wider text-slate-500">Registro</p>
+                    <dl className="mt-3 divide-y divide-slate-100 text-sm text-slate-600">
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Criado em</dt>
+                        <dd className="font-medium text-slate-800">{formatShortDate(selectedTransaction.created_at)}</dd>
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Atualizado em</dt>
+                        <dd className="font-medium text-slate-800">{formatShortDate(selectedTransaction.updated_at)}</dd>
+                      </div>
+                      <div className="flex items-center justify-between py-2">
+                        <dt className="text-slate-500">Categoria</dt>
+                        <dd className="font-medium text-slate-800">{selectedTransaction.category || "-"}</dd>
+                      </div>
+                    </dl>
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
+        </DialogContent>
+      </Dialog>
 
       {/* Proposal Detail Modal */}
       <Dialog open={proposalDetailOpen && !!selectedProposal} onOpenChange={(open) => {

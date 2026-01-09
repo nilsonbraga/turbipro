@@ -117,16 +117,16 @@ export default function Suppliers() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-8">
       {/* Header */}
       <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
         <div>
-          <h1 className="text-2xl font-bold tracking-tight">Fornecedores</h1>
-          <p className="text-muted-foreground">
+          <h1 className="text-2xl font-semibold text-foreground">Fornecedores</h1>
+          <p className="text-sm text-muted-foreground">
             Gerencie seus fornecedores e parceiros comerciais
           </p>
         </div>
-        <Button onClick={() => {
+        <Button size="sm" onClick={() => {
           setEditingSupplier(null);
           setSupplierDialogOpen(true);
         }}>
@@ -135,14 +135,40 @@ export default function Suppliers() {
         </Button>
       </div>
 
+      {/* Summary */}
+      <div className="grid gap-4 md:grid-cols-3">
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Total de Fornecedores</div>
+            <div className="text-2xl font-semibold">{filteredSuppliers.length}</div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Fornecedores Ativos</div>
+            <div className="text-2xl font-semibold text-emerald-600">
+              {filteredSuppliers.filter(s => s.is_active).length}
+            </div>
+          </CardContent>
+        </Card>
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="text-xs uppercase tracking-wide text-muted-foreground">Fornecedores Inativos</div>
+            <div className="text-2xl font-semibold text-slate-500">
+              {filteredSuppliers.filter(s => !s.is_active).length}
+            </div>
+          </CardContent>
+        </Card>
+      </div>
+
       {/* Filters */}
-      <Card>
-        <CardContent className="pt-6">
-          <div className="flex flex-wrap gap-4">
+      <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+        <CardContent className="p-5">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             {isSuperAdmin && (
               <div className="w-[200px]">
                 <Select value={selectedAgencyId || "all"} onValueChange={(val) => setSelectedAgencyId(val === "all" ? "" : val)}>
-                  <SelectTrigger>
+                  <SelectTrigger className="h-9 bg-white border-slate-200">
                     <SelectValue placeholder="Todas as Agências" />
                   </SelectTrigger>
                   <SelectContent>
@@ -157,42 +183,55 @@ export default function Suppliers() {
               </div>
             )}
 
-            <div className="relative flex-1 min-w-[200px] max-w-[300px]">
+            <div className="relative w-full max-w-[320px]">
               <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
               <Input
                 placeholder="Buscar por nome, email ou documento..."
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                className="pl-9"
+                className="pl-9 h-9 bg-white"
               />
             </div>
 
-            <Select value={statusFilter} onValueChange={setStatusFilter}>
-              <SelectTrigger className="w-[150px]">
-                <SelectValue placeholder="Status" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todos</SelectItem>
-                <SelectItem value="active">Ativos</SelectItem>
-                <SelectItem value="inactive">Inativos</SelectItem>
-              </SelectContent>
-            </Select>
+            <div className="flex flex-wrap items-center gap-2">
+              {[
+                { label: "Todos", value: "all" },
+                { label: "Ativos", value: "active" },
+                { label: "Inativos", value: "inactive" },
+              ].map((option) => {
+                const isActive = statusFilter === option.value;
+                return (
+                  <button
+                    key={option.value}
+                    type="button"
+                    onClick={() => setStatusFilter(option.value)}
+                    className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                      isActive
+                        ? 'bg-[#f06a12] text-white'
+                        : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                    }`}
+                  >
+                    {option.label}
+                  </button>
+                );
+              })}
+            </div>
           </div>
         </CardContent>
       </Card>
 
       {/* Suppliers Table */}
-      <Card>
-        <CardContent className="pt-6">
+      <Card className="rounded-2xl border-0 shadow-none bg-white overflow-hidden">
+        <CardContent className="p-0">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-slate-50/80">
               <TableRow>
-                <TableHead>Nome</TableHead>
-                <TableHead>CPF/CNPJ</TableHead>
-                <TableHead>Email</TableHead>
-                <TableHead>Telefone</TableHead>
-                <TableHead>Endereço</TableHead>
-                <TableHead>Status</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Nome</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">CPF/CNPJ</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Email</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Telefone</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Endereço</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Status</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -206,15 +245,21 @@ export default function Suppliers() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredSuppliers.map((supplier) => (
-                  <TableRow key={supplier.id}>
-                    <TableCell className="font-medium">{supplier.name}</TableCell>
-                    <TableCell>{supplier.document || "-"}</TableCell>
-                    <TableCell>{supplier.email || "-"}</TableCell>
-                    <TableCell>{supplier.phone || "-"}</TableCell>
-                    <TableCell className="max-w-[200px] truncate">{supplier.address || "-"}</TableCell>
+                filteredSuppliers.map((supplier, index) => (
+                  <TableRow
+                    key={supplier.id}
+                    className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}
+                  >
+                    <TableCell className="font-medium text-slate-900">{supplier.name}</TableCell>
+                    <TableCell className="text-slate-600">{supplier.document || "-"}</TableCell>
+                    <TableCell className="text-slate-600">{supplier.email || "-"}</TableCell>
+                    <TableCell className="text-slate-600">{supplier.phone || "-"}</TableCell>
+                    <TableCell className="max-w-[200px] truncate text-slate-600">{supplier.address || "-"}</TableCell>
                     <TableCell>
-                      <Badge variant={supplier.is_active ? "default" : "secondary"}>
+                      <Badge
+                        variant="secondary"
+                        className={supplier.is_active ? 'rounded-full bg-emerald-100 text-emerald-700' : 'rounded-full bg-slate-100 text-slate-600'}
+                      >
                         {supplier.is_active ? "Ativo" : "Inativo"}
                       </Badge>
                     </TableCell>
@@ -253,32 +298,6 @@ export default function Suppliers() {
           </Table>
         </CardContent>
       </Card>
-
-      {/* Summary */}
-      <div className="grid gap-4 md:grid-cols-3">
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground">Total de Fornecedores</div>
-            <div className="text-2xl font-bold">{filteredSuppliers.length}</div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground">Fornecedores Ativos</div>
-            <div className="text-2xl font-bold text-green-600">
-              {filteredSuppliers.filter(s => s.is_active).length}
-            </div>
-          </CardContent>
-        </Card>
-        <Card>
-          <CardContent className="pt-6">
-            <div className="text-sm text-muted-foreground">Fornecedores Inativos</div>
-            <div className="text-2xl font-bold text-muted-foreground">
-              {filteredSuppliers.filter(s => !s.is_active).length}
-            </div>
-          </CardContent>
-        </Card>
-      </div>
 
       {/* Supplier Dialog */}
       <SupplierDialog

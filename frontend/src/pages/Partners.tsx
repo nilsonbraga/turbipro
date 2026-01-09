@@ -105,14 +105,14 @@ export default function Partners() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Parceiros</h1>
-          <p className="text-muted-foreground">Gerencie seus fornecedores e parceiros</p>
+          <h1 className="text-2xl font-semibold text-foreground">Parceiros</h1>
+          <p className="text-sm text-muted-foreground">Gerencie seus fornecedores e parceiros</p>
         </div>
-        <Button onClick={() => { setEditingPartner(null); setDialogOpen(true); }}>
+        <Button size="sm" onClick={() => { setEditingPartner(null); setDialogOpen(true); }}>
           <Plus className="w-4 h-4 mr-2" />
           Novo Parceiro
         </Button>
@@ -120,60 +120,60 @@ export default function Partners() {
 
       {/* Stats */}
       <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-                <Handshake className="w-6 h-6 text-primary" />
-              </div>
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold">{partners.length}</p>
-                <p className="text-sm text-muted-foreground">Total</p>
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Total</p>
+                <p className="text-2xl font-semibold">{partners.length}</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                <Handshake className="w-6 h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-blue-500/10 flex items-center justify-center">
-                <Plane className="w-6 h-6 text-blue-500" />
-              </div>
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Aéreas</p>
+                <p className="text-2xl font-semibold text-blue-600">
                   {partners.filter(p => p.type === 'airline').length}
                 </p>
-                <p className="text-sm text-muted-foreground">Aéreas</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center">
+                <Plane className="w-6 h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-green-500/10 flex items-center justify-center">
-                <Hotel className="w-6 h-6 text-green-500" />
-              </div>
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Hotéis</p>
+                <p className="text-2xl font-semibold text-emerald-600">
                   {partners.filter(p => p.type === 'hotel').length}
                 </p>
-                <p className="text-sm text-muted-foreground">Hotéis</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-emerald-100 text-emerald-600 flex items-center justify-center">
+                <Hotel className="w-6 h-6" />
               </div>
             </div>
           </CardContent>
         </Card>
-        <Card>
-          <CardContent className="p-6">
-            <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-lg bg-orange-500/10 flex items-center justify-center">
-                <Car className="w-6 h-6 text-orange-500" />
-              </div>
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+          <CardContent className="p-5">
+            <div className="flex items-center justify-between">
               <div>
-                <p className="text-2xl font-bold">
+                <p className="text-xs uppercase tracking-wide text-muted-foreground">Locadoras</p>
+                <p className="text-2xl font-semibold text-orange-600">
                   {partners.filter(p => p.type === 'car_rental').length}
                 </p>
-                <p className="text-sm text-muted-foreground">Locadoras</p>
+              </div>
+              <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                <Car className="w-6 h-6" />
               </div>
             </div>
           </CardContent>
@@ -181,32 +181,32 @@ export default function Partners() {
       </div>
 
       {/* Search */}
-      <div className="flex items-center gap-4">
-        <div className="relative flex-1 max-w-md">
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="relative w-full max-w-md">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground" />
           <Input
             placeholder="Buscar por nome ou email..."
             value={searchTerm}
             onChange={(e) => setSearchTerm(e.target.value)}
-            className="pl-9"
+            className="pl-9 h-9 bg-white"
           />
         </div>
       </div>
 
       {/* Table */}
-      <Card>
+      <Card className="rounded-2xl border-0 shadow-none bg-white overflow-hidden">
         {isLoading ? (
           <div className="p-8 flex items-center justify-center">
             <Loader2 className="w-6 h-6 animate-spin text-primary" />
           </div>
         ) : (
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-slate-50/80">
               <TableRow>
-                <TableHead>Parceiro</TableHead>
-                <TableHead>Tipo</TableHead>
-                <TableHead>Contato</TableHead>
-                <TableHead>Desde</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Parceiro</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Tipo</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Contato</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Desde</TableHead>
                 <TableHead className="w-[50px]"></TableHead>
               </TableRow>
             </TableHeader>
@@ -218,20 +218,23 @@ export default function Partners() {
                   </TableCell>
                 </TableRow>
               ) : (
-                filteredPartners.map((partner) => {
+                filteredPartners.map((partner, index) => {
                   const Icon = partnerTypeIcons[partner.type || 'other'] || Handshake;
                   return (
-                    <TableRow key={partner.id}>
+                    <TableRow
+                      key={partner.id}
+                      className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}
+                    >
                       <TableCell>
                         <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg bg-primary/10 flex items-center justify-center">
-                            <Icon className="w-5 h-5 text-primary" />
+                          <div className="w-10 h-10 rounded-xl bg-orange-100 text-orange-600 flex items-center justify-center">
+                            <Icon className="w-5 h-5" />
                           </div>
-                          <span className="font-medium">{partner.name}</span>
+                          <span className="font-medium text-slate-900">{partner.name}</span>
                         </div>
                       </TableCell>
                       <TableCell>
-                        <Badge variant="secondary">
+                        <Badge variant="secondary" className="rounded-full bg-slate-100 text-slate-600">
                           {partnerTypeLabels[partner.type || 'other'] || 'Outro'}
                         </Badge>
                       </TableCell>
@@ -239,20 +242,20 @@ export default function Partners() {
                         <div className="space-y-1">
                           {partner.email && (
                             <div className="flex items-center gap-2 text-sm">
-                              <Mail className="w-3 h-3 text-muted-foreground" />
+                              <Mail className="w-3 h-3 text-slate-400" />
                               <span>{partner.email}</span>
                             </div>
                           )}
                           {partner.phone && (
                             <div className="flex items-center gap-2 text-sm">
-                              <Phone className="w-3 h-3 text-muted-foreground" />
+                              <Phone className="w-3 h-3 text-slate-400" />
                               <span>{partner.phone}</span>
                             </div>
                           )}
                         </div>
                       </TableCell>
                       <TableCell>
-                        <span className="text-muted-foreground">{formatDate(partner.created_at)}</span>
+                        <span className="text-slate-500">{formatDate(partner.created_at)}</span>
                       </TableCell>
                       <TableCell>
                         <DropdownMenu>

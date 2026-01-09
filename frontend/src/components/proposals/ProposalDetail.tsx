@@ -1,5 +1,7 @@
 import { useState, useRef } from 'react';
 import { Proposal, useProposals } from '@/hooks/useProposals';
+import { useCollaborators } from '@/hooks/useCollaborators';
+import { useCollaboratorCommissions } from '@/hooks/useCollaboratorCommissions';
 import { useProposalServices, ProposalService, ServiceInput } from '@/hooks/useProposalServices';
 import { useProposalHistory } from '@/hooks/useProposalHistory';
 import { useProposalTags } from '@/hooks/useProposalTags';
@@ -11,6 +13,7 @@ import { useTags } from '@/hooks/useTags';
 import { useAuth } from '@/contexts/AuthContext';
 import { ServiceDialog } from './ServiceDialog';
 import { generateProposalPDF } from '@/utils/pdfExport';
+import { apiFetch } from '@/lib/api';
 
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -69,6 +72,8 @@ import {
   Check,
   ChevronDown,
   Link,
+  DollarSign,
+  AlertTriangle,
 } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
@@ -370,6 +375,8 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
   const { toast } = useToast();
 
   const { updateProposalStage } = useProposals();
+  const { collaborators } = useCollaborators();
+  const { createCommission, deleteCommission } = useCollaboratorCommissions();
   const { services, createService, updateService, deleteService, isCreating, isUpdating, isDeleting } =
     useProposalServices(proposal.id);
   const { history, addHistory } = useProposalHistory(proposal.id);
@@ -393,12 +400,14 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
 
   const [copiedLink, setCopiedLink] = useState(false);
   const [currentStageId, setCurrentStageId] = useState(proposal.stage_id);
+  const [pendingStageId, setPendingStageId] = useState<string | null>(null);
+  const [closeDialogOpen, setCloseDialogOpen] = useState(false);
+  const [reopenDialogOpen, setReopenDialogOpen] = useState(false);
+  const [isCreatingTransaction, setIsCreatingTransaction] = useState(false);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const client = proposal.clients;
-  const currentStage = stages.find((s) => s.id === currentStageId) || proposal.pipeline_stages;
-
   const totalServices = services.reduce((sum, s) => sum + (s.value || 0), 0);
 
   const totalCommission = services.reduce((sum, s) => {
@@ -416,6 +425,80 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
   const discountValue = (totalServices * (proposal.discount || 0)) / 100;
   const finalValue = totalServices - discountValue;
 
+  const deriveServiceDates = (service: any): { startDate: string | null; endDate: string | null } => {
+    const d = service.details || {};
+    const type = service.type;
+
+    const toLocalISO = (date?: string | null, time?: string | null, fallbackTime = '12:00') => {
+      if (!date) return null;
+      const hasTime = date.includes('T');
+      const base = hasTime ? date : `${date}T${time || fallbackTime}`;
+      const dt = new Date(base);
+      return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+    };
+
+    const toISO = (val?: string | null, time?: string | null) => {
+      if (!val) return null;
+      if (val.includes('T')) {
+        const dt = new Date(val);
+        return Number.isNaN(dt.getTime()) ? null : dt.toISOString();
+      }
+      return toLocalISO(val, time);
+    };
+
+    if (type === 'flight') {
+      const segments = Array.isArray(d.segments) ? d.segments : [];
+      const first = segments[0];
+      const last = segments[segments.length - 1];
+      return {
+        startDate: toISO(first?.departureAt) ?? toISO(service.startDate),
+        endDate: toISO(last?.arrivalAt) ?? toISO(service.endDate),
+      };
+    }
+    if (type === 'hotel') {
+      return {
+        startDate: toISO(d.checkIn, d.checkInTime),
+        endDate: toISO(d.checkOut, d.checkOutTime),
+      };
+    }
+    if (type === 'car') {
+      return {
+        startDate: toISO(d.pickupAt),
+        endDate: toISO(d.dropoffAt),
+      };
+    }
+    if (type === 'transfer') {
+      return {
+        startDate: toISO(d.pickupAt),
+        endDate: toISO(d.pickupAt),
+      };
+    }
+    if (type === 'package' || type === 'tour') {
+      return {
+        startDate: toLocalISO(d.startDate, '00:00'),
+        endDate: toLocalISO(d.endDate, '23:59'),
+      };
+    }
+    return { startDate: toISO(service.startDate), endDate: toISO(service.endDate) };
+  };
+
+  const syncServicesDatesForCalendar = async (clear = false) => {
+    const params = new URLSearchParams({
+      where: JSON.stringify({ proposalId: proposal.id }),
+      include: JSON.stringify({ partner: { select: { id: true } } }),
+    });
+    const { data } = await apiFetch<{ data: any[] }>(`/api/proposalService?${params.toString()}`);
+    await Promise.all(
+      (data || []).map(async (service) => {
+        const { startDate, endDate } = clear ? { startDate: null, endDate: null } : deriveServiceDates(service);
+        await apiFetch(`/api/proposalService/${service.id}`, {
+          method: 'PUT',
+          body: JSON.stringify({ startDate, endDate }),
+        });
+      }),
+    );
+  };
+
   const getInitials = (name: string) => {
     return name
       .split(' ')
@@ -431,6 +514,18 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
     const oldStage = stages.find((s) => s.id === currentStageId);
     const newStage = stages.find((s) => s.id === newStageId);
 
+    if (oldStage?.is_closed && !newStage?.is_closed) {
+      setPendingStageId(newStageId);
+      setReopenDialogOpen(true);
+      return;
+    }
+
+    if (!oldStage?.is_closed && newStage?.is_closed) {
+      setPendingStageId(newStageId);
+      setCloseDialogOpen(true);
+      return;
+    }
+
     setCurrentStageId(newStageId);
     updateProposalStage({ id: proposal.id, stage_id: newStageId });
 
@@ -441,6 +536,158 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
       old_value: oldStage?.name,
       new_value: newStage?.name,
     });
+    onProposalUpdate?.({ ...proposal, stage_id: newStageId });
+  };
+
+  const confirmCloseWithTransaction = async () => {
+    if (!pendingStageId) return;
+    setIsCreatingTransaction(true);
+
+    const oldStage = stages.find((s) => s.id === currentStageId);
+    const newStage = stages.find((s) => s.id === pendingStageId);
+
+    try {
+      updateProposalStage({ id: proposal.id, stage_id: pendingStageId });
+      setCurrentStageId(pendingStageId);
+      addHistory({
+        proposal_id: proposal.id,
+        action: 'Etapa alterada',
+        description: `Proposta movida para ${newStage?.name}`,
+        old_value: oldStage?.name,
+        new_value: newStage?.name,
+      });
+      onProposalUpdate?.({ ...proposal, stage_id: pendingStageId });
+
+      await syncServicesDatesForCalendar();
+
+      const totalValue = Number(totalServices || 0);
+      const profitValue = Number(totalCommission || 0);
+
+      if (totalValue > 0) {
+        const clientName = proposal.clients?.name || null;
+        const clientCpf = proposal.clients?.cpf || null;
+
+        await apiFetch('/api/financialTransaction', {
+          method: 'POST',
+          body: JSON.stringify({
+            agencyId: proposal.agency_id,
+            type: 'income',
+            category: 'Venda',
+            description: `Proposta #${proposal.number} - ${proposal.title}`,
+            proposalId: proposal.id,
+            clientId: proposal.client_id,
+            documentNumber: clientName,
+            documentName: clientCpf,
+            totalValue,
+            profitValue,
+            status: 'pending',
+            launchDate: new Date().toISOString(),
+          }),
+        });
+      }
+
+      const collaborator = proposal.assigned_collaborator_id
+        ? collaborators.find((c) => c.id === proposal.assigned_collaborator_id)
+        : collaborators.find((c) => c.user_id === profile?.id);
+
+      if (collaborator) {
+        const currentDate = new Date();
+        const commissionBase =
+          collaborator.commission_base === 'profit' ? profitValue : totalValue;
+        const commissionAmount = (commissionBase * collaborator.commission_percentage) / 100;
+
+        await createCommission({
+          collaborator_id: collaborator.id,
+          proposal_id: proposal.id,
+          sale_value: totalValue,
+          profit_value: profitValue,
+          commission_percentage: collaborator.commission_percentage,
+          commission_base: collaborator.commission_base,
+          commission_amount: commissionAmount,
+          period_month: currentDate.getMonth() + 1,
+          period_year: currentDate.getFullYear(),
+        });
+      }
+    } catch (error: any) {
+      toast({ title: 'Erro ao criar transação financeira', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsCreatingTransaction(false);
+      setCloseDialogOpen(false);
+      setPendingStageId(null);
+    }
+  };
+
+  const confirmCloseWithoutTransaction = async () => {
+    if (!pendingStageId) return;
+    setIsCreatingTransaction(true);
+
+    const oldStage = stages.find((s) => s.id === currentStageId);
+    const newStage = stages.find((s) => s.id === pendingStageId);
+
+    try {
+      updateProposalStage({ id: proposal.id, stage_id: pendingStageId });
+      setCurrentStageId(pendingStageId);
+      addHistory({
+        proposal_id: proposal.id,
+        action: 'Etapa alterada',
+        description: `Proposta movida para ${newStage?.name}`,
+        old_value: oldStage?.name,
+        new_value: newStage?.name,
+      });
+      onProposalUpdate?.({ ...proposal, stage_id: pendingStageId });
+
+      await syncServicesDatesForCalendar();
+    } catch (error: any) {
+      toast({ title: 'Erro ao fechar proposta', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsCreatingTransaction(false);
+      setCloseDialogOpen(false);
+      setPendingStageId(null);
+    }
+  };
+
+  const confirmReopenAndCancelTransaction = async () => {
+    if (!pendingStageId) return;
+    setIsCreatingTransaction(true);
+
+    const oldStage = stages.find((s) => s.id === currentStageId);
+    const newStage = stages.find((s) => s.id === pendingStageId);
+
+    try {
+      updateProposalStage({ id: proposal.id, stage_id: pendingStageId });
+      setCurrentStageId(pendingStageId);
+      addHistory({
+        proposal_id: proposal.id,
+        action: 'Etapa alterada',
+        description: `Proposta movida para ${newStage?.name}`,
+        old_value: oldStage?.name,
+        new_value: newStage?.name,
+      });
+      onProposalUpdate?.({ ...proposal, stage_id: pendingStageId });
+
+      await syncServicesDatesForCalendar(true);
+
+      const search = new URLSearchParams({
+        where: JSON.stringify({ proposalId: proposal.id, type: 'income' }),
+      });
+      const { data: transactions } = await apiFetch<{ data: any[] }>(`/api/financialTransaction?${search.toString()}`);
+      await Promise.all(
+        (transactions || []).map((tx) =>
+          apiFetch(`/api/financialTransaction/${tx.id}`, {
+            method: 'PUT',
+            body: JSON.stringify({ status: 'cancelled' }),
+          }),
+        ),
+      );
+
+      deleteCommission(proposal.id);
+    } catch (error: any) {
+      toast({ title: 'Erro ao cancelar transação financeira', description: error.message, variant: 'destructive' });
+    } finally {
+      setIsCreatingTransaction(false);
+      setReopenDialogOpen(false);
+      setPendingStageId(null);
+    }
   };
 
   const handleAddService = (type: string) => {
@@ -1029,6 +1276,91 @@ export function ProposalDetail({ proposal, onClose, onEdit, onProposalUpdate }: 
         initialType={editingService?.type || pendingServiceType}
         mode={serviceDialogMode}
       />
+
+      <AlertDialog
+        open={closeDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setCloseDialogOpen(false);
+            setPendingStageId(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <DollarSign className="w-5 h-5 text-green-600" />
+              Fechar Proposta
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Deseja adicionar esta venda como receita no financeiro?</p>
+              <div className="bg-muted p-3 rounded-md space-y-1">
+                <p className="font-medium text-foreground">Proposta #{proposal.number} - {proposal.title}</p>
+                <p>Valor: {formatCurrency(totalServices || 0)}</p>
+                <p>Lucro: {formatCurrency(totalCommission || 0)}</p>
+                {proposal.assigned_collaborator && (
+                  <p className="text-primary">Comissão será gerada para: {proposal.assigned_collaborator.name}</p>
+                )}
+              </div>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter className="flex-col sm:flex-row gap-2">
+            <AlertDialogCancel disabled={isCreatingTransaction}>Cancelar</AlertDialogCancel>
+            <Button variant="outline" onClick={confirmCloseWithoutTransaction} disabled={isCreatingTransaction}>
+              Não adicionar receita
+            </Button>
+            <AlertDialogAction
+              onClick={confirmCloseWithTransaction}
+              className="bg-green-600 hover:bg-green-700"
+              disabled={isCreatingTransaction}
+            >
+              {isCreatingTransaction ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              {proposal.assigned_collaborator ? 'Adicionar receita e comissão' : 'Adicionar receita'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      <AlertDialog
+        open={reopenDialogOpen}
+        onOpenChange={(open) => {
+          if (!open) {
+            setReopenDialogOpen(false);
+            setPendingStageId(null);
+          }
+        }}
+      >
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle className="flex items-center gap-2">
+              <AlertTriangle className="w-5 h-5 text-amber-500" />
+              Reabrir Proposta
+            </AlertDialogTitle>
+            <AlertDialogDescription className="space-y-2">
+              <p>Esta proposta está fechada. Ao movê-la para outro estágio:</p>
+              <ul className="list-disc list-inside text-sm space-y-1">
+                <li>A receita associada será <strong>cancelada</strong> no financeiro</li>
+                <li>A comissão do vendedor será <strong>removida</strong></li>
+              </ul>
+              <div className="bg-muted p-3 rounded-md">
+                <p className="font-medium text-foreground">Proposta #{proposal.number} - {proposal.title}</p>
+              </div>
+              <p>Deseja continuar?</p>
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isCreatingTransaction}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction
+              onClick={confirmReopenAndCancelTransaction}
+              className="bg-amber-600 hover:bg-amber-700"
+              disabled={isCreatingTransaction}
+            >
+              {isCreatingTransaction ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : null}
+              Reabrir e cancelar
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       <AlertDialog open={deleteServiceDialog} onOpenChange={setDeleteServiceDialog}>
         <AlertDialogContent>

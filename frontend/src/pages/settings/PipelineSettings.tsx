@@ -68,14 +68,14 @@ function SortableStageItem({ stage, onEdit, onDelete }: SortableStageItemProps) 
     <div 
       ref={setNodeRef}
       style={style}
-      className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg"
+      className="flex items-center gap-4 p-4 bg-white border border-slate-100 rounded-2xl shadow-sm"
     >
       <div
         {...attributes}
         {...listeners}
         className="cursor-grab active:cursor-grabbing"
       >
-        <GripVertical className="w-4 h-4 text-muted-foreground" />
+        <GripVertical className="w-4 h-4 text-slate-400" />
       </div>
       <div 
         className="w-4 h-4 rounded-full" 
@@ -85,7 +85,7 @@ function SortableStageItem({ stage, onEdit, onDelete }: SortableStageItemProps) 
         <p className="font-medium">{stage.name}</p>
         <div className="flex gap-2 mt-1">
           {stage.is_closed && (
-            <Badge variant="secondary" className="text-xs">Fechado</Badge>
+            <Badge variant="secondary" className="text-xs bg-emerald-100 text-emerald-700">Fechado</Badge>
           )}
           {stage.is_lost && (
             <Badge variant="destructive" className="text-xs">Perdido</Badge>
@@ -174,20 +174,20 @@ export default function PipelineSettings() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <Palette className="w-6 h-6" />
+        <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
+          <Palette className="w-5 h-5" />
           Pipeline
         </h1>
-        <p className="text-muted-foreground">Personalize os estágios do seu funil de vendas</p>
+        <p className="text-sm text-muted-foreground">Personalize os estágios do seu funil de vendas</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+        <CardHeader className="pb-2">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle>Estágios do Pipeline</CardTitle>
+              <CardTitle className="text-lg">Estágios do Pipeline</CardTitle>
               <CardDescription>
                 Arraste para reordenar os estágios
               </CardDescription>
@@ -198,7 +198,7 @@ export default function PipelineSettings() {
             </Button>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="space-y-4">
           <DndContext
             sensors={useSensors(
               useSensor(PointerSensor),
@@ -245,7 +245,7 @@ export default function PipelineSettings() {
 
       {/* Stage Dialog */}
       <Dialog open={stageDialogOpen} onOpenChange={setStageDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>{editingStage ? 'Editar Estágio' : 'Novo Estágio'}</DialogTitle>
           </DialogHeader>
@@ -256,6 +256,7 @@ export default function PipelineSettings() {
                 value={stageName}
                 onChange={(e) => setStageName(e.target.value)}
                 placeholder="Ex: Negociação"
+                className="h-10 bg-white border-slate-200"
               />
             </div>
             
@@ -267,7 +268,7 @@ export default function PipelineSettings() {
                     key={color}
                     type="button"
                     className={`w-8 h-8 rounded-full border-2 transition-all ${
-                      stageColor === color ? 'border-foreground scale-110' : 'border-transparent'
+                      stageColor === color ? 'border-slate-900 scale-110' : 'border-transparent'
                     }`}
                     style={{ backgroundColor: color }}
                     onClick={() => setStageColor(color)}
@@ -276,36 +277,38 @@ export default function PipelineSettings() {
               </div>
             </div>
             
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Estágio Fechado</p>
-                <p className="text-sm text-muted-foreground">
-                  Indica que a proposta foi ganha
-                </p>
+            <div className="rounded-xl border border-slate-100 bg-slate-50/80 p-3 space-y-3">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Estágio Fechado</p>
+                  <p className="text-sm text-muted-foreground">
+                    Indica que a proposta foi ganha
+                  </p>
+                </div>
+                <Switch 
+                  checked={stageIsClosed} 
+                  onCheckedChange={(checked) => {
+                    setStageIsClosed(checked);
+                    if (checked) setStageIsLost(false);
+                  }}
+                />
               </div>
-              <Switch 
-                checked={stageIsClosed} 
-                onCheckedChange={(checked) => {
-                  setStageIsClosed(checked);
-                  if (checked) setStageIsLost(false);
-                }}
-              />
-            </div>
-            
-            <div className="flex items-center justify-between">
-              <div>
-                <p className="font-medium">Estágio Perdido</p>
-                <p className="text-sm text-muted-foreground">
-                  Indica que a proposta foi perdida
-                </p>
+              
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="font-medium">Estágio Perdido</p>
+                  <p className="text-sm text-muted-foreground">
+                    Indica que a proposta foi perdida
+                  </p>
+                </div>
+                <Switch 
+                  checked={stageIsLost} 
+                  onCheckedChange={(checked) => {
+                    setStageIsLost(checked);
+                    if (checked) setStageIsClosed(false);
+                  }}
+                />
               </div>
-              <Switch 
-                checked={stageIsLost} 
-                onCheckedChange={(checked) => {
-                  setStageIsLost(checked);
-                  if (checked) setStageIsClosed(false);
-                }}
-              />
             </div>
           </div>
           <DialogFooter>

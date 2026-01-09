@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import {
   Select,
   SelectContent,
@@ -53,23 +52,24 @@ export default function PlatformSettings() {
   }, [platformSettings]);
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <Globe className="w-6 h-6" />
+        <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
+          <Globe className="w-5 h-5" />
           Plataforma
         </h1>
-        <p className="text-muted-foreground">Configurações globais da plataforma</p>
+        <p className="text-sm text-muted-foreground">Configurações globais da plataforma</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Identidade Visual da Plataforma</CardTitle>
+      <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Identidade Visual da Plataforma</CardTitle>
           <CardDescription>
             Personalize o nome e ícone da plataforma para todas as agências
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 space-y-6">
           <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
             <div className="space-y-2">
               <Label htmlFor="platformName">Nome da Plataforma</Label>
@@ -78,6 +78,7 @@ export default function PlatformSettings() {
                 value={platformName}
                 onChange={(e) => setPlatformName(e.target.value)}
                 placeholder="Tourbine"
+                className="h-10 bg-white border-slate-200"
               />
               <p className="text-sm text-muted-foreground">
                 Este nome será exibido na barra lateral de todas as agências
@@ -86,7 +87,7 @@ export default function PlatformSettings() {
             <div className="space-y-2">
               <Label>Ícone Pré-definido</Label>
               <Select value={platformIcon} onValueChange={setPlatformIcon}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10 bg-white border-slate-200">
                   <SelectValue placeholder="Selecione um ícone" />
                 </SelectTrigger>
                 <SelectContent>
@@ -105,29 +106,33 @@ export default function PlatformSettings() {
               </p>
             </div>
           </div>
+          </div>
 
-          <Separator />
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 space-y-4">
+            <PlatformIconUpload />
+          </div>
 
-          <PlatformIconUpload />
-
-          <div className="flex items-center gap-4 p-4 bg-muted/50 rounded-lg">
-            {platformSettings.platform_icon_url ? (
-              <img 
-                src={platformSettings.platform_icon_url} 
-                alt="Platform icon" 
-                className="w-10 h-10 object-contain"
-              />
-            ) : (
-              <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary">
-                {(() => {
-                  const IconComponent = availableIcons.find(i => i.value === platformIcon)?.icon || Plane;
-                  return <IconComponent className="w-6 h-6 text-primary-foreground" />;
-                })()}
+          <div className="rounded-2xl border border-slate-100 bg-white p-5">
+            <p className="text-xs uppercase tracking-wide text-slate-500 mb-3">Prévia da barra lateral</p>
+            <div className="flex items-center gap-4">
+              {platformSettings.platform_icon_url ? (
+                <img 
+                  src={platformSettings.platform_icon_url} 
+                  alt="Platform icon" 
+                  className="w-10 h-10 object-contain"
+                />
+              ) : (
+                <div className="flex items-center justify-center w-10 h-10 rounded-lg bg-primary">
+                  {(() => {
+                    const IconComponent = availableIcons.find(i => i.value === platformIcon)?.icon || Plane;
+                    return <IconComponent className="w-6 h-6 text-primary-foreground" />;
+                  })()}
+                </div>
+              )}
+              <div>
+                <h3 className="font-semibold">{platformName || 'Tourbine'}</h3>
+                <p className="text-sm text-muted-foreground">Prévia da barra lateral</p>
               </div>
-            )}
-            <div>
-              <h3 className="font-bold">{platformName || 'Tourbine'}</h3>
-              <p className="text-sm text-muted-foreground">Prévia da barra lateral</p>
             </div>
           </div>
 

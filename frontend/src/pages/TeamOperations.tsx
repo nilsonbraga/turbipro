@@ -399,109 +399,130 @@ export default function TeamOperations() {
   const years = Array.from({ length: 5 }, (_, i) => currentDate.getFullYear() - 2 + i);
 
   return (
-    <div className="p-6 space-y-6">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold">Time & Operação</h1>
-            <p className="text-muted-foreground">
-              Gerencie colaboradores, equipes e acompanhe a performance
-            </p>
-          </div>
-
-          {isSuperAdmin && (
-            <Select value={agencyFilter || 'all'} onValueChange={(v) => setAgencyFilter(v === 'all' ? '' : v)}>
-              <SelectTrigger className="w-[220px]">
-                <Building2 className="h-4 w-4 mr-2" />
-                <SelectValue placeholder="Todas as agências" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">Todas as agências</SelectItem>
-                {agencies?.map((agency) => (
-                  <SelectItem key={agency.id} value={agency.id}>
-                    {agency.name}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          )}
+    <div className="p-6 space-y-8">
+      <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div>
+          <h1 className="text-2xl font-semibold text-foreground">Time & Operação</h1>
+          <p className="text-sm text-muted-foreground">
+            Gerencie colaboradores, equipes e acompanhe a performance
+          </p>
         </div>
 
-        <Tabs value={activeTab} onValueChange={setActiveTab}>
-          <TabsList>
-            <TabsTrigger value="collaborators" className="gap-2">
-              <Users className="h-4 w-4" />
-              Colaboradores
-            </TabsTrigger>
-            <TabsTrigger value="teams" className="gap-2">
-              <Building2 className="h-4 w-4" />
-              Equipes
-            </TabsTrigger>
-            <TabsTrigger value="goals" className="gap-2">
-              <Target className="h-4 w-4" />
-              Metas
-            </TabsTrigger>
-            <TabsTrigger value="performance" className="gap-2">
-              <Trophy className="h-4 w-4" />
-              Performance
-            </TabsTrigger>
-            <TabsTrigger value="schedules" className="gap-2">
-              <CalendarDays className="h-4 w-4" />
-              Escalas
-            </TabsTrigger>
-          </TabsList>
+        {isSuperAdmin && (
+          <Select value={agencyFilter || 'all'} onValueChange={(v) => setAgencyFilter(v === 'all' ? '' : v)}>
+            <SelectTrigger className="w-[220px] h-9 bg-white border-slate-200">
+              <Building2 className="h-4 w-4 mr-2" />
+              <SelectValue placeholder="Todas as agências" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="all">Todas as agências</SelectItem>
+              {agencies?.map((agency) => (
+                <SelectItem key={agency.id} value={agency.id}>
+                  {agency.name}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        )}
+      </div>
+
+      <Tabs value={activeTab} onValueChange={setActiveTab}>
+        <TabsList className="flex flex-wrap items-center justify-start gap-4 bg-transparent p-0 border-b border-slate-200 w-full rounded-none h-auto">
+          <TabsTrigger
+            value="collaborators"
+            className="gap-2 rounded-none px-1 pb-3 text-sm font-semibold text-slate-500 transition-colors border-b-2 border-transparent shadow-none data-[state=active]:text-[#f06a12] data-[state=active]:border-[#f06a12] data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          >
+            <Users className="h-4 w-4" />
+            Colaboradores
+          </TabsTrigger>
+          <TabsTrigger
+            value="teams"
+            className="gap-2 rounded-none px-1 pb-3 text-sm font-semibold text-slate-500 transition-colors border-b-2 border-transparent shadow-none data-[state=active]:text-[#f06a12] data-[state=active]:border-[#f06a12] data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          >
+            <Building2 className="h-4 w-4" />
+            Equipes
+          </TabsTrigger>
+          <TabsTrigger
+            value="goals"
+            className="gap-2 rounded-none px-1 pb-3 text-sm font-semibold text-slate-500 transition-colors border-b-2 border-transparent shadow-none data-[state=active]:text-[#f06a12] data-[state=active]:border-[#f06a12] data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          >
+            <Target className="h-4 w-4" />
+            Metas
+          </TabsTrigger>
+          <TabsTrigger
+            value="performance"
+            className="gap-2 rounded-none px-1 pb-3 text-sm font-semibold text-slate-500 transition-colors border-b-2 border-transparent shadow-none data-[state=active]:text-[#f06a12] data-[state=active]:border-[#f06a12] data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          >
+            <Trophy className="h-4 w-4" />
+            Performance
+          </TabsTrigger>
+          <TabsTrigger
+            value="schedules"
+            className="gap-2 rounded-none px-1 pb-3 text-sm font-semibold text-slate-500 transition-colors border-b-2 border-transparent shadow-none data-[state=active]:text-[#f06a12] data-[state=active]:border-[#f06a12] data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+          >
+            <CalendarDays className="h-4 w-4" />
+            Escalas
+          </TabsTrigger>
+        </TabsList>
 
           {/* Collaborators Tab */}
-          <TabsContent value="collaborators" className="space-y-4">
-            <div className="flex flex-col md:flex-row gap-4">
-              <div className="relative flex-1">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar colaboradores..."
-                  className="pl-9"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              <Select value={teamFilter || 'all'} onValueChange={(v) => setTeamFilter(v === 'all' ? '' : v)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Todas as equipes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as equipes</SelectItem>
-                  {teams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-              <Select value={statusFilter || 'all'} onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Status" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todos</SelectItem>
-                  <SelectItem value="active">Ativos</SelectItem>
-                  <SelectItem value="inactive">Inativos</SelectItem>
-                </SelectContent>
-              </Select>
-              {isAdmin && (
-                <Button onClick={() => { setSelectedCollaborator(null); setCollaboratorDialogOpen(true); }}>
-                  <UserPlus className="h-4 w-4 mr-2" />
-                  Novo Colaborador
-                </Button>
-              )}
-            </div>
+          <TabsContent value="collaborators" className="space-y-6">
+            <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="flex flex-wrap items-center gap-3 flex-1">
+                    <div className="relative w-full max-w-md">
+                      <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                      <Input
+                        placeholder="Buscar colaboradores..."
+                        className="h-9 bg-white border-slate-200 pl-9"
+                        value={searchTerm}
+                        onChange={(e) => setSearchTerm(e.target.value)}
+                      />
+                    </div>
+                    <Select value={teamFilter || 'all'} onValueChange={(v) => setTeamFilter(v === 'all' ? '' : v)}>
+                      <SelectTrigger className="w-[180px] h-9 bg-white border-slate-200">
+                        <SelectValue placeholder="Todas as equipes" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todas as equipes</SelectItem>
+                        {teams.map((team) => (
+                          <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                    <Select value={statusFilter || 'all'} onValueChange={(v) => setStatusFilter(v === 'all' ? '' : v)}>
+                      <SelectTrigger className="w-[140px] h-9 bg-white border-slate-200">
+                        <SelectValue placeholder="Status" />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="all">Todos</SelectItem>
+                        <SelectItem value="active">Ativos</SelectItem>
+                        <SelectItem value="inactive">Inativos</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  {isAdmin && (
+                    <Button onClick={() => { setSelectedCollaborator(null); setCollaboratorDialogOpen(true); }}>
+                      <UserPlus className="h-4 w-4 mr-2" />
+                      Novo Colaborador
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
-            <Card>
+            <Card className="rounded-2xl border-0 shadow-none bg-white overflow-hidden">
               <Table>
-                <TableHeader>
+                <TableHeader className="bg-slate-50/80">
                   <TableRow>
-                    <TableHead>Nome</TableHead>
-                    <TableHead>Contato</TableHead>
-                    <TableHead>Vínculo</TableHead>
-                    <TableHead>Cargo / Nível</TableHead>
-                    <TableHead>Equipe</TableHead>
-                    <TableHead>Comissão</TableHead>
-                    <TableHead>Status</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Nome</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Contato</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Vínculo</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Cargo / Nível</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Equipe</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Comissão</TableHead>
+                    <TableHead className="text-xs uppercase tracking-wide text-slate-500">Status</TableHead>
                     <TableHead className="w-[50px]"></TableHead>
                   </TableRow>
                 </TableHeader>
@@ -519,10 +540,10 @@ export default function TeamOperations() {
                       </TableCell>
                     </TableRow>
                   ) : (
-                    filteredCollaborators.map((collaborator) => (
+                    filteredCollaborators.map((collaborator, index) => (
                       <TableRow 
                         key={collaborator.id} 
-                        className="cursor-pointer hover:bg-muted/50"
+                        className={`cursor-pointer ${index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}`}
                         onClick={() => handleOpenSalesDialog(collaborator)}
                       >
                         <TableCell>
@@ -616,24 +637,28 @@ export default function TeamOperations() {
           </TabsContent>
 
           {/* Teams Tab */}
-          <TabsContent value="teams" className="space-y-4">
-            <div className="flex justify-between">
-              <div className="relative w-full max-w-sm">
-                <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-                <Input
-                  placeholder="Buscar equipes..."
-                  className="pl-9"
-                  value={searchTerm}
-                  onChange={(e) => setSearchTerm(e.target.value)}
-                />
-              </div>
-              {isAdmin && (
-                <Button onClick={() => { setSelectedTeam(null); setTeamDialogOpen(true); }}>
-                  <Plus className="h-4 w-4 mr-2" />
-                  Nova Equipe
-                </Button>
-              )}
-            </div>
+          <TabsContent value="teams" className="space-y-6">
+            <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="relative w-full max-w-sm">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                      placeholder="Buscar equipes..."
+                      className="h-9 bg-white border-slate-200 pl-9"
+                      value={searchTerm}
+                      onChange={(e) => setSearchTerm(e.target.value)}
+                    />
+                  </div>
+                  {isAdmin && (
+                    <Button onClick={() => { setSelectedTeam(null); setTeamDialogOpen(true); }}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nova Equipe
+                    </Button>
+                  )}
+                </div>
+              </CardContent>
+            </Card>
 
             <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
               {teamsLoading ? (
@@ -644,7 +669,7 @@ export default function TeamOperations() {
                 filteredTeams.map((team) => {
                   const teamCollabs = collaborators.filter(c => c.team_id === team.id);
                   return (
-                    <Card key={team.id}>
+                    <Card key={team.id} className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
                       <CardHeader className="pb-3">
                         <div className="flex items-center justify-between">
                           <div className="flex items-center gap-2">
@@ -701,46 +726,48 @@ export default function TeamOperations() {
 
           {/* Goals Tab */}
           <TabsContent value="goals" className="space-y-6">
-            <div className="flex flex-wrap gap-4 items-center justify-between">
-              <div className="flex flex-wrap gap-4">
-                <Select value={String(performanceMonth)} onValueChange={(v) => setPerformanceMonth(Number(v))}>
-                  <SelectTrigger className="w-[140px]">
-                    <SelectValue placeholder="Mês" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {months.map((m) => (
-                      <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+            <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap gap-3 items-center">
+                  <Select value={String(performanceMonth)} onValueChange={(v) => setPerformanceMonth(Number(v))}>
+                    <SelectTrigger className="w-[140px] h-9 bg-white border-slate-200">
+                      <SelectValue placeholder="Mês" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {months.map((m) => (
+                        <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                <Select value={String(performanceYear)} onValueChange={(v) => setPerformanceYear(Number(v))}>
-                  <SelectTrigger className="w-[100px]">
-                    <SelectValue placeholder="Ano" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    {years.map((y) => (
-                      <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
+                  <Select value={String(performanceYear)} onValueChange={(v) => setPerformanceYear(Number(v))}>
+                    <SelectTrigger className="w-[100px] h-9 bg-white border-slate-200">
+                      <SelectValue placeholder="Ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map((y) => (
+                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-                <Select value={performanceTeamFilter || 'all'} onValueChange={(v) => setPerformanceTeamFilter(v === 'all' ? '' : v)}>
-                  <SelectTrigger className="w-[180px]">
-                    <SelectValue placeholder="Todas as equipes" />
-                  </SelectTrigger>
-                  <SelectContent>
-                    <SelectItem value="all">Todas as equipes</SelectItem>
-                    {teams.map((team) => (
-                      <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
-                    ))}
-                  </SelectContent>
-                </Select>
-              </div>
-            </div>
+                  <Select value={performanceTeamFilter || 'all'} onValueChange={(v) => setPerformanceTeamFilter(v === 'all' ? '' : v)}>
+                    <SelectTrigger className="w-[180px] h-9 bg-white border-slate-200">
+                      <SelectValue placeholder="Todas as equipes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as equipes</SelectItem>
+                      {teams.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
 
             {goals.length === 0 ? (
-              <Card>
+              <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
                 <CardContent className="py-12 text-center">
                   <Target className="w-12 h-12 mx-auto text-muted-foreground mb-4" />
                   <p className="text-muted-foreground mb-4">
@@ -804,86 +831,90 @@ export default function TeamOperations() {
 
           {/* Performance Tab */}
           <TabsContent value="performance" className="space-y-6">
-            <div className="flex flex-wrap gap-4">
-              <Select value={String(performanceMonth)} onValueChange={(v) => setPerformanceMonth(Number(v))}>
-                <SelectTrigger className="w-[140px]">
-                  <SelectValue placeholder="Mês" />
-                </SelectTrigger>
-                <SelectContent>
-                  {months.map((m) => (
-                    <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+            <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+              <CardContent className="p-4">
+                <div className="flex flex-wrap gap-3">
+                  <Select value={String(performanceMonth)} onValueChange={(v) => setPerformanceMonth(Number(v))}>
+                    <SelectTrigger className="w-[140px] h-9 bg-white border-slate-200">
+                      <SelectValue placeholder="Mês" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {months.map((m) => (
+                        <SelectItem key={m.value} value={String(m.value)}>{m.label}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-              <Select value={String(performanceYear)} onValueChange={(v) => setPerformanceYear(Number(v))}>
-                <SelectTrigger className="w-[100px]">
-                  <SelectValue placeholder="Ano" />
-                </SelectTrigger>
-                <SelectContent>
-                  {years.map((y) => (
-                    <SelectItem key={y} value={String(y)}>{y}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+                  <Select value={String(performanceYear)} onValueChange={(v) => setPerformanceYear(Number(v))}>
+                    <SelectTrigger className="w-[100px] h-9 bg-white border-slate-200">
+                      <SelectValue placeholder="Ano" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {years.map((y) => (
+                        <SelectItem key={y} value={String(y)}>{y}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
 
-              <Select value={performanceTeamFilter || 'all'} onValueChange={(v) => setPerformanceTeamFilter(v === 'all' ? '' : v)}>
-                <SelectTrigger className="w-[180px]">
-                  <SelectValue placeholder="Todas as equipes" />
-                </SelectTrigger>
-                <SelectContent>
-                  <SelectItem value="all">Todas as equipes</SelectItem>
-                  {teams.map((team) => (
-                    <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
-            </div>
+                  <Select value={performanceTeamFilter || 'all'} onValueChange={(v) => setPerformanceTeamFilter(v === 'all' ? '' : v)}>
+                    <SelectTrigger className="w-[180px] h-9 bg-white border-slate-200">
+                      <SelectValue placeholder="Todas as equipes" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="all">Todas as equipes</SelectItem>
+                      {teams.map((team) => (
+                        <SelectItem key={team.id} value={team.id}>{team.name}</SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </CardContent>
+            </Card>
 
             {/* Summary Cards */}
             <div className="grid gap-4 md:grid-cols-4">
-              <Card>
+              <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-2">
                     <DollarSign className="h-4 w-4" />
                     Total Vendido
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold">{formatCurrency(totals.totalSales)}</p>
+                  <p className="text-2xl font-semibold">{formatCurrency(totals.totalSales)}</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-2">
                     <TrendingUp className="h-4 w-4" />
                     Lucro Total
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold">{formatCurrency(totals.totalProfit)}</p>
+                  <p className="text-2xl font-semibold">{formatCurrency(totals.totalProfit)}</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-2">
                     <Trophy className="h-4 w-4" />
                     Vendas Fechadas
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold">{totals.totalDeals}</p>
+                  <p className="text-2xl font-semibold">{totals.totalDeals}</p>
                 </CardContent>
               </Card>
-              <Card>
+              <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
                 <CardHeader className="pb-2">
-                  <CardTitle className="text-sm font-medium text-muted-foreground flex items-center gap-2">
+                  <CardTitle className="text-xs uppercase tracking-wide text-muted-foreground flex items-center gap-2">
                     <Target className="h-4 w-4" />
                     Comissões Geradas
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
-                  <p className="text-2xl font-bold">{formatCurrency(totals.totalCommissions)}</p>
+                  <p className="text-2xl font-semibold">{formatCurrency(totals.totalCommissions)}</p>
                 </CardContent>
               </Card>
             </div>
@@ -894,7 +925,7 @@ export default function TeamOperations() {
                 <h3 className="text-lg font-semibold">Performance por Equipe</h3>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {teamPerformance.map((tp) => (
-                    <Card key={tp.team.id}>
+                    <Card key={tp.team.id} className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
                       <CardHeader className="pb-2">
                         <CardTitle className="text-base">{tp.team.name}</CardTitle>
                         <CardDescription>{tp.collaboratorsCount} colaboradores</CardDescription>
@@ -957,22 +988,28 @@ export default function TeamOperations() {
           {/* Schedules Tab */}
           <TabsContent value="schedules" className="space-y-6">
             {isAdmin && (
-              <div className="flex flex-col md:flex-row gap-4 justify-between">
-                <div className="flex gap-2 flex-wrap">
-                  <Button onClick={() => { setSelectedShiftType(null); setShiftTypeDialogOpen(true); }}>
-                    <Clock className="h-4 w-4 mr-2" />
-                    Novo Tipo de Plantão
-                  </Button>
-                  <Button variant="outline" onClick={() => handleAddTimeOff()}>
-                    <Plus className="h-4 w-4 mr-2" />
-                    Nova Férias/Folga
-                  </Button>
-                </div>
-              </div>
+              <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+                <CardContent className="p-4">
+                  <div className="flex flex-wrap items-center gap-3">
+                    <Button onClick={() => handleAddSchedule(new Date())}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nova Escala
+                    </Button>
+                    <Button onClick={() => { setSelectedShiftType(null); setShiftTypeDialogOpen(true); }}>
+                      <Clock className="h-4 w-4 mr-2" />
+                      Novo Tipo de Plantão
+                    </Button>
+                    <Button variant="outline" onClick={() => handleAddTimeOff()}>
+                      <Plus className="h-4 w-4 mr-2" />
+                      Nova Férias/Folga
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             )}
 
             {/* Shift Types */}
-            <Card>
+            <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
               <CardHeader>
                 <CardTitle className="text-lg">Tipos de Plantão</CardTitle>
                 <CardDescription>Configure os turnos disponíveis para escalas</CardDescription>
@@ -999,29 +1036,29 @@ export default function TeamOperations() {
             </Card>
 
             {/* Time Off List */}
-            <Card>
+            <Card className="rounded-2xl border-0 shadow-none bg-white overflow-hidden">
               <CardHeader>
                 <CardTitle className="text-lg">Férias e Folgas</CardTitle>
               </CardHeader>
-              <CardContent>
+              <CardContent className="p-0">
                 {timeOffs.length === 0 ? (
-                  <p className="text-muted-foreground">Nenhuma férias/folga cadastrada</p>
+                  <p className="text-muted-foreground px-6 pb-6">Nenhuma férias/folga cadastrada</p>
                 ) : (
                   <Table>
-                    <TableHeader>
+                    <TableHeader className="bg-slate-50/80">
                       <TableRow>
-                        <TableHead>Colaborador</TableHead>
-                        <TableHead>Tipo</TableHead>
-                        <TableHead>Período</TableHead>
-                        <TableHead>Status</TableHead>
-                        <TableHead>Motivo</TableHead>
-                        <TableHead>Ação</TableHead>
+                        <TableHead className="text-xs uppercase tracking-wide text-slate-500">Colaborador</TableHead>
+                        <TableHead className="text-xs uppercase tracking-wide text-slate-500">Tipo</TableHead>
+                        <TableHead className="text-xs uppercase tracking-wide text-slate-500">Período</TableHead>
+                        <TableHead className="text-xs uppercase tracking-wide text-slate-500">Status</TableHead>
+                        <TableHead className="text-xs uppercase tracking-wide text-slate-500">Motivo</TableHead>
+                        <TableHead className="text-xs uppercase tracking-wide text-slate-500">Ação</TableHead>
                         <TableHead className="w-[50px]"></TableHead>
                       </TableRow>
                     </TableHeader>
                     <TableBody>
-                      {timeOffs.map((to) => (
-                        <TableRow key={to.id}>
+                      {timeOffs.map((to, index) => (
+                        <TableRow key={to.id} className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}>
                           <TableCell>{to.collaborator?.name}</TableCell>
                           <TableCell><Badge variant="outline">{timeOffTypeLabels[to.type]}</Badge></TableCell>
                           <TableCell>{to.start_date} - {to.end_date}</TableCell>
@@ -1066,7 +1103,7 @@ export default function TeamOperations() {
             </Card>
 
             {/* Schedule Calendar */}
-            <Card>
+            <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
               <CardHeader>
                 <CardTitle className="text-lg">Calendário de Escalas</CardTitle>
               </CardHeader>

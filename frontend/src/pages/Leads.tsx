@@ -796,7 +796,37 @@ export default function Leads() {
 
   const handleSubmit = async (data: ProposalInput & { id?: string }) => {
     if (data.id) {
-      updateProposal(data as ProposalInput & { id: string });
+      const currentProposal = editingProposal ?? proposals.find((proposal) => proposal.id === data.id) ?? null;
+      const currentStageId = currentProposal?.stage_id ?? null;
+      const nextStageId = data.stage_id ?? currentStageId ?? null;
+      const stageChanged = !!currentStageId && !!nextStageId && currentStageId !== nextStageId;
+
+      if (currentProposal && stageChanged) {
+        const currentStage = stages.find((stage) => stage.id === currentStageId);
+        const targetStage = stages.find((stage) => stage.id === nextStageId);
+        const updatedProposal: Proposal = {
+          ...currentProposal,
+          title: data.title ?? currentProposal.title,
+          client_id: data.client_id ?? null,
+          assigned_collaborator_id: data.assigned_collaborator_id ?? null,
+          notes: data.notes ?? null,
+        };
+
+        updateProposal({ ...(data as ProposalInput), id: data.id, stage_id: currentStageId });
+
+        if (currentStage?.is_closed && !targetStage?.is_closed) {
+          setProposalToReopen({ proposal: updatedProposal, newStageId: nextStageId });
+          setReopenDialogOpen(true);
+        } else if (!currentStage?.is_closed && targetStage?.is_closed) {
+          setProposalToClose(updatedProposal);
+          setCloseDialogOpen(true);
+        } else {
+          updateProposalStage({ id: data.id, stage_id: nextStageId });
+          logStageHistory(updatedProposal, currentStageId, nextStageId);
+        }
+      } else {
+        updateProposal(data as ProposalInput & { id: string });
+      }
     } else {
       const submitData = { ...data };
       if (defaultStageId && !submitData.stage_id) {

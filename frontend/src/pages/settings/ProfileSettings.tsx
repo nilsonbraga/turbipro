@@ -1,10 +1,9 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useState } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { useToast } from '@/hooks/use-toast';
 import { User, Save, Shield, Loader2, Sun, Moon, Upload } from 'lucide-react';
@@ -39,11 +38,6 @@ export default function ProfileSettings() {
   }, [profile]);
 
   const isDark = themePreference === 'dark';
-  const surfaceCard = useMemo(
-    () => (isDark ? 'bg-gradient-to-br from-slate-900 via-emerald-950 to-slate-900 text-white' : 'bg-white text-slate-900'),
-    [isDark]
-  );
-  const subtleCard = isDark ? 'bg-white/5 border border-emerald-500/20' : 'bg-emerald-50/80 border border-emerald-100';
 
   const handleSave = async () => {
     if (!profile?.id) return;
@@ -121,145 +115,138 @@ export default function ProfileSettings() {
   }, [themePreference]);
 
   return (
-    <div className={`p-6 space-y-6 ${isDark ? 'bg-[#0c1613]' : 'bg-emerald-50/40'}`}>
-      <div className={`rounded-3xl border ${isDark ? 'border-emerald-500/20' : 'border-emerald-100'} ${surfaceCard} p-6 shadow-xl`}>
-        <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-4">
-          <div>
-            <h1 className="text-2xl font-bold flex items-center gap-2">
-              <User className="w-6 h-6" />
-              Perfil
-            </h1>
-            <p className={isDark ? 'text-white/70' : 'text-slate-600'}>Gerencie suas informações pessoais</p>
-          </div>
-        </div>
+    <div className="p-6 space-y-8">
+      <div>
+        <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
+          <User className="w-5 h-5" />
+          Perfil
+        </h1>
+        <p className="text-sm text-muted-foreground">Gerencie suas informações pessoais</p>
       </div>
 
-      <Card className={`border ${isDark ? 'border-emerald-500/20 bg-gradient-to-br from-emerald-900/40 via-slate-900 to-emerald-950' : 'border-emerald-100 bg-white'}`}>
-        <CardHeader>
-          <CardTitle className={isDark ? 'text-white' : 'text-slate-900'}>Seu Perfil</CardTitle>
-          <CardDescription className={isDark ? 'text-white/70' : ''}>Informações pessoais e segurança da conta</CardDescription>
+      <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Seu Perfil</CardTitle>
+          <CardDescription>Informações pessoais e segurança da conta</CardDescription>
         </CardHeader>
         <CardContent className="space-y-6">
-          <div className="flex items-center gap-4">
-            <div className="relative">
-              <div className={`w-20 h-20 rounded-full overflow-hidden border-2 ${isDark ? 'border-emerald-400/60' : 'border-emerald-300'}`}>
-                {avatarPreview ? (
-                  <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground bg-muted">Foto</div>
-                )}
-              </div>
-            </div>
-            <div className="space-y-2">
-              <Label>Foto de perfil</Label>
-              <div className="flex flex-wrap items-center gap-2">
-                <Button asChild variant="outline" size="sm">
-                  <label className="flex items-center gap-2 cursor-pointer">
-                    <Upload className="w-4 h-4" />
-                    Enviar foto
-                    <input
-                      type="file"
-                      accept="image/*"
-                      className="hidden"
-                      onChange={(e) => handleAvatarChange(e.target.files?.[0])}
-                    />
-                  </label>
-                </Button>
-                {avatarPreview && (
-                  <Button variant="ghost" size="sm" onClick={() => { setAvatarPreview(null); setAvatarFile(null); }}>
-                    Remover
-                  </Button>
-                )}
-              </div>
-              <p className="text-xs text-muted-foreground">Use uma imagem quadrada para melhor resultado.</p>
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>Nome Completo</Label>
-              <Input
-                value={profileName}
-                onChange={(e) => setProfileName(e.target.value)}
-                className={isDark ? 'bg-white/5 border-white/10 text-white' : ''}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Email</Label>
-              <Input value={user?.email || ''} type="email" disabled className={cn('bg-muted', isDark && 'bg-white/10 text-white/80')} />
-            </div>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label>Telefone</Label>
-              <Input
-                value={profilePhone}
-                onChange={(e) => setProfilePhone(e.target.value)}
-                placeholder="(00) 00000-0000"
-                className={isDark ? 'bg-white/5 border-white/10 text-white' : ''}
-              />
-            </div>
-            <div className="space-y-2">
-              <Label>Esquema de cores</Label>
-              <div className={`flex rounded-lg p-2 border ${isDark ? 'border-white/10 bg-white/5' : 'border-emerald-100 bg-emerald-50/70'}`}>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className={cn(
-                    'flex-1 border transition-colors',
-                    themePreference === 'light'
-                      ? 'bg-white text-emerald-700 border-emerald-200'
-                      : isDark
-                        ? 'text-white border-transparent hover:bg-white/10'
-                        : 'text-emerald-800 border-transparent hover:bg-emerald-100'
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 space-y-6">
+            <div className="flex flex-wrap items-center gap-4">
+              <div className="relative">
+                <div className="w-20 h-20 rounded-full overflow-hidden border border-slate-200 bg-slate-50">
+                  {avatarPreview ? (
+                    <img src={avatarPreview} alt="Avatar" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex items-center justify-center text-sm text-muted-foreground bg-slate-100">
+                      Foto
+                    </div>
                   )}
-                  onClick={() => setThemePreference('light')}
-                >
-                  <Sun className="w-4 h-4 mr-2" /> Claro
-                </Button>
-                <Button
-                  type="button"
-                  variant="ghost"
-                  className={cn(
-                    'flex-1 border transition-colors',
-                    themePreference === 'dark'
-                      ? 'bg-emerald-600 text-white border-emerald-400'
-                      : isDark
-                        ? 'text-white border-transparent hover:bg-white/10'
-                        : 'text-emerald-800 border-transparent hover:bg-emerald-100'
-                  )}
-                  onClick={() => setThemePreference('dark')}
-                >
-                  <Moon className="w-4 h-4 mr-2" /> Escuro
-                </Button>
-              </div>
-            </div>
-          </div>
-
-          <Separator className={isDark ? 'border-white/10' : ''} />
-
-          <div className={`${subtleCard} rounded-xl p-4`}>
-            <div className="flex items-center justify-between">
-              <div className="flex items-center gap-2">
-                <Shield className={isDark ? 'text-emerald-300' : 'text-emerald-700'} />
-                <div>
-                  <h3 className="font-medium">Segurança</h3>
-                  <p className="text-sm text-muted-foreground">Altere a senha da sua conta</p>
                 </div>
               </div>
-              <Button variant={isDark ? 'secondary' : 'outline'} onClick={() => setPasswordDialogOpen(true)}>
-                Alterar Senha
-              </Button>
+              <div className="space-y-2">
+                <Label>Foto de perfil</Label>
+                <div className="flex flex-wrap items-center gap-2">
+                  <Button asChild variant="outline" size="sm">
+                    <label className="flex items-center gap-2 cursor-pointer">
+                      <Upload className="w-4 h-4" />
+                      Enviar foto
+                      <input
+                        type="file"
+                        accept="image/*"
+                        className="hidden"
+                        onChange={(e) => handleAvatarChange(e.target.files?.[0])}
+                      />
+                    </label>
+                  </Button>
+                  {avatarPreview && (
+                    <Button variant="ghost" size="sm" onClick={() => { setAvatarPreview(null); setAvatarFile(null); }}>
+                      Remover
+                    </Button>
+                  )}
+                </div>
+                <p className="text-xs text-muted-foreground">Use uma imagem quadrada para melhor resultado.</p>
+              </div>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label>Nome Completo</Label>
+                <Input
+                  value={profileName}
+                  onChange={(e) => setProfileName(e.target.value)}
+                  className="h-10 bg-white border-slate-200"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Email</Label>
+                <Input
+                  value={user?.email || ''}
+                  type="email"
+                  disabled
+                  className={cn('h-10 bg-slate-100 border-slate-200 text-slate-600')}
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label>Telefone</Label>
+                <Input
+                  value={profilePhone}
+                  onChange={(e) => setProfilePhone(e.target.value)}
+                  placeholder="(00) 00000-0000"
+                  className="h-10 bg-white border-slate-200"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label>Esquema de cores</Label>
+                <div className="flex items-center gap-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      'h-9 rounded-full px-4 text-xs font-semibold transition-colors',
+                      themePreference === 'light'
+                        ? 'bg-[#f06a12] text-white border-transparent'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    )}
+                    onClick={() => setThemePreference('light')}
+                  >
+                    <Sun className="w-4 h-4 mr-2" /> Claro
+                  </Button>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    className={cn(
+                      'h-9 rounded-full px-4 text-xs font-semibold transition-colors',
+                      themePreference === 'dark'
+                        ? 'bg-[#f06a12] text-white border-transparent'
+                        : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                    )}
+                    onClick={() => setThemePreference('dark')}
+                  >
+                    <Moon className="w-4 h-4 mr-2" /> Escuro
+                  </Button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 flex flex-wrap items-center justify-between gap-4">
+            <div className="flex items-center gap-3">
+              <Shield className="text-slate-700" />
+              <div>
+                <h3 className="font-medium text-slate-900">Segurança</h3>
+                <p className="text-sm text-muted-foreground">Altere a senha da sua conta</p>
+              </div>
+            </div>
+            <Button variant="outline" onClick={() => setPasswordDialogOpen(true)}>
+              Alterar Senha
+            </Button>
           </div>
 
           <div className="flex justify-end">
-            <Button
-              onClick={handleSave}
-              disabled={isSaving}
-              className="bg-emerald-600 hover:bg-emerald-700 text-white border border-emerald-400/60"
-            >
+            <Button onClick={handleSave} disabled={isSaving}>
               {isSaving ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
               Salvar Alterações
             </Button>
@@ -269,7 +256,7 @@ export default function ProfileSettings() {
 
       {/* Change Password Dialog */}
       <Dialog open={passwordDialogOpen} onOpenChange={setPasswordDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-sm">
           <DialogHeader>
             <DialogTitle>Alterar Senha</DialogTitle>
           </DialogHeader>
@@ -281,6 +268,7 @@ export default function ProfileSettings() {
                 value={newPassword}
                 onChange={(e) => setNewPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
+                className="h-10 bg-white border-slate-200"
               />
             </div>
             <div className="space-y-2">
@@ -290,6 +278,7 @@ export default function ProfileSettings() {
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}
                 placeholder="Digite novamente a nova senha"
+                className="h-10 bg-white border-slate-200"
               />
             </div>
           </div>

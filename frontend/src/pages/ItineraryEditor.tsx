@@ -81,9 +81,11 @@ import {
 import { format } from 'date-fns';
 import { ptBR } from 'date-fns/locale';
 import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
 import { ImageUploader } from '@/components/itineraries/ImageUploader';
 import { MultiImageUploader } from '@/components/itineraries/MultiImageUploader';
 import { apiFetch } from '@/lib/api';
+import { cn } from '@/lib/utils';
 
 // Campo de hora com máscara HH:mm
 const TimeInputField = ({
@@ -277,12 +279,24 @@ interface FeedbackReplyProps {
   feedback: ItineraryItemFeedback | ItineraryDayFeedback;
   type: 'item' | 'day';
   onReply: (message: string) => void;
+  onEdit: (updates: { observation: string; isApproved?: boolean | null; createdAt?: string | null }) => void;
+  onDelete: () => void;
   isReplying: boolean;
+  isSaving?: boolean;
+  canManage: boolean;
 }
 
-function FeedbackCard({ feedback, type, onReply, isReplying }: FeedbackReplyProps) {
+function FeedbackCard({ feedback, onReply, onEdit, onDelete, isReplying, isSaving, canManage }: FeedbackReplyProps) {
   const [showReply, setShowReply] = useState(false);
   const [replyMessage, setReplyMessage] = useState('');
+  const [isEditing, setIsEditing] = useState(false);
+  const [editedObservation, setEditedObservation] = useState(feedback.observation || '');
+  const [editedApproval, setEditedApproval] = useState<boolean | null>(feedback.is_approved ?? null);
+
+  useEffect(() => {
+    setEditedObservation(feedback.observation || '');
+    setEditedApproval(feedback.is_approved ?? null);
+  }, [feedback.observation, feedback.is_approved]);
   
   const handleSendReply = () => {
     if (replyMessage.trim()) {
@@ -306,27 +320,122 @@ function FeedbackCard({ feedback, type, onReply, isReplying }: FeedbackReplyProp
             </p>
           </div>
         </div>
-        {feedback.is_approved !== null && (
-          <Badge className={feedback.is_approved ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}>
-            {feedback.is_approved ? (
-              <>
-                <ThumbsUp className="w-3 h-3 mr-1" />
-                Aprovado
-              </>
-            ) : (
-              <>
-                <ThumbsDown className="w-3 h-3 mr-1" />
-                Ajustes
-              </>
-            )}
-          </Badge>
-        )}
+        <div className="flex items-center gap-2">
+          {feedback.is_approved !== null && (
+            <Badge className={feedback.is_approved ? "bg-green-100 text-green-800" : "bg-amber-100 text-amber-800"}>
+              {feedback.is_approved ? (
+                <>
+                  <ThumbsUp className="w-3 h-3 mr-1" />
+                  Aprovado
+                </>
+              ) : (
+                <>
+                  <ThumbsDown className="w-3 h-3 mr-1" />
+                  Ajustes
+                </>
+              )}
+            </Badge>
+          )}
+          {canManage && (
+            <div className="flex items-center gap-1">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7"
+                onClick={() => {
+                  setIsEditing((prev) => !prev);
+                  setShowReply(false);
+                }}
+                title="Editar feedback"
+              >
+                <Pencil className="w-4 h-4" />
+              </Button>
+              <Button
+                variant="ghost"
+                size="icon"
+                className="h-7 w-7 text-destructive hover:text-destructive"
+                onClick={onDelete}
+                title="Excluir feedback"
+              >
+                <Trash2 className="w-4 h-4" />
+              </Button>
+            </div>
+          )}
+        </div>
       </div>
       {feedback.observation && (
         <p className="text-sm pl-10">{feedback.observation}</p>
       )}
-      
-      {!showReply ? (
+
+      {isEditing ? (
+        <div className="pl-10 space-y-2">
+          {feedback.is_approved !== null && (
+            <div className="flex flex-wrap gap-2">
+              <Button
+                type="button"
+                size="sm"
+                variant={editedApproval === true ? 'default' : 'outline'}
+                className={cn(
+                  'h-8 text-xs',
+                  editedApproval === true && 'bg-green-600 hover:bg-green-700',
+                )}
+                onClick={() => setEditedApproval(true)}
+              >
+                <ThumbsUp className="w-3 h-3 mr-1" />
+                Aprovado
+              </Button>
+              <Button
+                type="button"
+                size="sm"
+                variant={editedApproval === false ? 'default' : 'outline'}
+                className={cn(
+                  'h-8 text-xs',
+                  editedApproval === false && 'bg-amber-600 hover:bg-amber-700',
+                )}
+                onClick={() => setEditedApproval(false)}
+              >
+                <ThumbsDown className="w-3 h-3 mr-1" />
+                Ajustes
+              </Button>
+            </div>
+          )}
+          <Textarea
+            value={editedObservation}
+            onChange={(e) => setEditedObservation(e.target.value)}
+            placeholder="Atualize o feedback..."
+            rows={2}
+            className="text-sm"
+          />
+          <div className="flex gap-2">
+            <Button
+              size="sm"
+              onClick={() => {
+                onEdit({
+                  observation: editedObservation.trim(),
+                  isApproved: feedback.is_approved !== null ? editedApproval : undefined,
+                  createdAt: feedback.created_at,
+                });
+                setIsEditing(false);
+              }}
+              disabled={!editedObservation.trim() || isSaving}
+            >
+              <Save className="w-3 h-3 mr-1" />
+              Salvar
+            </Button>
+            <Button
+              size="sm"
+              variant="outline"
+              onClick={() => {
+                setIsEditing(false);
+                setEditedObservation(feedback.observation || '');
+                setEditedApproval(feedback.is_approved ?? null);
+              }}
+            >
+              Cancelar
+            </Button>
+          </div>
+        </div>
+      ) : !showReply ? (
         <div className="pl-10">
           <Button variant="ghost" size="sm" onClick={() => setShowReply(true)} className="text-xs h-7 px-2">
             <Reply className="w-3 h-3 mr-1" />
@@ -361,6 +470,7 @@ export default function ItineraryEditor() {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { isAdmin } = useAuth();
   const { updateItinerary } = useCustomItineraries();
   const { 
     itinerary, 
@@ -399,6 +509,9 @@ export default function ItineraryEditor() {
   const [deleteConfirm, setDeleteConfirm] = useState<{ type: 'day' | 'item'; id: string } | null>(null);
   const [expandedDays, setExpandedDays] = useState<string[]>([]);
   const [isReplying, setIsReplying] = useState(false);
+  const [feedbackToDelete, setFeedbackToDelete] = useState<{ id: string; type: 'day' | 'item' } | null>(null);
+  const [isFeedbackSaving, setIsFeedbackSaving] = useState(false);
+  const [isFeedbackDeleting, setIsFeedbackDeleting] = useState(false);
 
   const [dayForm, setDayForm] = useState<Partial<ItineraryDayInput>>({
     day_number: 1,
@@ -649,6 +762,47 @@ export default function ItineraryEditor() {
       toast({ title: 'Erro ao enviar resposta', description: err.message, variant: 'destructive' });
     } finally {
       setIsReplying(false);
+    }
+  };
+
+  const handleUpdateFeedback = async (
+    feedbackId: string,
+    type: 'day' | 'item',
+    updates: { observation: string; isApproved?: boolean | null; createdAt?: string | null },
+  ) => {
+    setIsFeedbackSaving(true);
+    try {
+      await apiFetch(`/api/${type === 'day' ? 'itineraryDayFeedback' : 'itineraryItemFeedback'}/${feedbackId}`, {
+        method: 'PUT',
+        body: JSON.stringify({
+          observation: updates.observation || null,
+          isApproved: updates.isApproved ?? null,
+          ...(updates.createdAt ? { createdAt: updates.createdAt } : {}),
+        }),
+      });
+      toast({ title: 'Feedback atualizado!' });
+      refetch();
+    } catch (err: any) {
+      toast({ title: 'Erro ao atualizar feedback', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsFeedbackSaving(false);
+    }
+  };
+
+  const handleDeleteFeedback = async () => {
+    if (!feedbackToDelete) return;
+    setIsFeedbackDeleting(true);
+    try {
+      await apiFetch(`/api/${feedbackToDelete.type === 'day' ? 'itineraryDayFeedback' : 'itineraryItemFeedback'}/${feedbackToDelete.id}`, {
+        method: 'DELETE',
+      });
+      toast({ title: 'Feedback excluído!' });
+      refetch();
+    } catch (err: any) {
+      toast({ title: 'Erro ao excluir feedback', description: err.message, variant: 'destructive' });
+    } finally {
+      setIsFeedbackDeleting(false);
+      setFeedbackToDelete(null);
     }
   };
 
@@ -1117,14 +1271,14 @@ export default function ItineraryEditor() {
 
       {/* Feedbacks Dialog */}
       <Dialog open={feedbacksOpen} onOpenChange={setFeedbacksOpen}>
-        <DialogContent className="max-w-2xl max-h-[85vh] flex flex-col">
+        <DialogContent className="max-w-2xl h-[85vh] max-h-[85vh] flex flex-col">
           <DialogHeader>
             <DialogTitle className="flex items-center gap-2">
               <MessageSquare className="w-5 h-5" />
               Feedbacks do Cliente ({totalFeedbacks})
             </DialogTitle>
           </DialogHeader>
-          <ScrollArea className="flex-1 -mx-6 px-6">
+          <ScrollArea className="flex-1 min-h-0 -mx-6 px-6">
             {totalFeedbacks === 0 ? (
               <div className="text-center py-12 text-muted-foreground">
                 <MessageSquare className="w-12 h-12 mx-auto mb-4 opacity-50" />
@@ -1134,10 +1288,8 @@ export default function ItineraryEditor() {
               <div className="space-y-6 pb-4">
                 {itinerary.days?.map((day) => {
                   const dayFeedbacks = day.feedbacks || [];
-                  const hasAnyFeedback = dayFeedbacks.length > 0 || 
-                    day.items?.some(item => (item.feedbacks?.length || 0) > 0);
-                  
-                  if (!hasAnyFeedback) return null;
+                  const hasDayFeedbacks = dayFeedbacks.length > 0;
+                  const hasItemFeedbacks = day.items?.some(item => (item.feedbacks?.length || 0) > 0);
                   
                   return (
                     <div key={day.id} className="space-y-4">
@@ -1149,23 +1301,31 @@ export default function ItineraryEditor() {
                       </h3>
                       
                       {/* Day feedbacks */}
-                      {dayFeedbacks.length > 0 && (
-                        <div className="ml-10 space-y-2">
-                          <p className="text-xs text-muted-foreground uppercase tracking-wider">Feedback do Dia</p>
-                          {dayFeedbacks.map((fb) => (
+                      <div className="ml-10 space-y-2">
+                        <p className="text-xs text-muted-foreground uppercase tracking-wider">Feedback do Dia</p>
+                        {hasDayFeedbacks ? (
+                          dayFeedbacks.map((fb) => (
                             <FeedbackCard
                               key={fb.id}
                               feedback={fb}
                               type="day"
                               onReply={(msg) => handleReplyToDayFeedback(day.id, msg)}
+                              onEdit={(updates) => handleUpdateFeedback(fb.id, 'day', updates)}
+                              onDelete={() => setFeedbackToDelete({ id: fb.id, type: 'day' })}
                               isReplying={isReplying}
+                              isSaving={isFeedbackSaving}
+                              canManage={isAdmin}
                             />
-                          ))}
-                        </div>
-                      )}
+                          ))
+                        ) : (
+                          <div className="text-sm text-muted-foreground bg-muted/40 border border-dashed rounded-lg px-3 py-2">
+                            Nenhum feedback neste dia.
+                          </div>
+                        )}
+                      </div>
                       
                       {/* Item feedbacks */}
-                      {day.items?.map((item) => {
+                      {hasItemFeedbacks && day.items?.map((item) => {
                         const itemFeedbacks = item.feedbacks || [];
                         if (itemFeedbacks.length === 0) return null;
                         
@@ -1180,7 +1340,11 @@ export default function ItineraryEditor() {
                                 feedback={fb}
                                 type="item"
                                 onReply={(msg) => handleReplyToItemFeedback(item.id, msg)}
+                                onEdit={(updates) => handleUpdateFeedback(fb.id, 'item', updates)}
+                                onDelete={() => setFeedbackToDelete({ id: fb.id, type: 'item' })}
                                 isReplying={isReplying}
+                                isSaving={isFeedbackSaving}
+                                canManage={isAdmin}
                               />
                             ))}
                           </div>
@@ -1472,6 +1636,24 @@ export default function ItineraryEditor() {
           </div>
         </DialogContent>
       </Dialog>
+
+      {/* Feedback Delete Confirmation */}
+      <AlertDialog open={!!feedbackToDelete} onOpenChange={() => setFeedbackToDelete(null)}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle>Excluir feedback?</AlertDialogTitle>
+            <AlertDialogDescription>
+              Esta ação não pode ser desfeita.
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel disabled={isFeedbackDeleting}>Cancelar</AlertDialogCancel>
+            <AlertDialogAction onClick={handleDeleteFeedback} disabled={isFeedbackDeleting}>
+              Excluir
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
 
       {/* Delete Confirmation */}
       <AlertDialog open={!!deleteConfirm} onOpenChange={() => setDeleteConfirm(null)}>

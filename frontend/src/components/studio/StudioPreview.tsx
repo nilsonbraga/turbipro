@@ -84,6 +84,7 @@ export const StudioPreview = forwardRef<HTMLDivElement, StudioPreviewProps>(
     const isVertical = aspectRatio < 1;
     const isStories = format.height > format.width * 1.5; // Stories format detection (1080x1920)
     const isInstagramPost = format.id === 'instagram-post'; // 1080x1440 (3:4)
+    const effectiveBlurLevel = isStories ? 0 : blurLevel;
     
     // Scale factor for Instagram Post format (larger than square but not stories)
     const scaleFactor = isInstagramPost ? 1.25 : 1;
@@ -92,8 +93,8 @@ export const StudioPreview = forwardRef<HTMLDivElement, StudioPreviewProps>(
     const displayWidth = format.width / 2;
     const displayHeight = format.height / 2;
 
-    const storySafeTop = 125;    
-const storySafeBottom = 170;
+    const storySafeTop = 125;
+    const storySafeBottom = 170;
 
     return (
       <div
@@ -136,16 +137,7 @@ const storySafeBottom = 170;
 
         {/* Template-specific blur overlay */}
         {templateId === 1 && (
-          <ModernBlurOverlay colors={safeColors} blurLevel={blurLevel} isVertical={isVertical} isStories={isStories} isExportMode={isExportMode} />
-        )}
-        {templateId === 2 && (
-          <ElegantBlurOverlay colors={safeColors} blurLevel={blurLevel} isVertical={isVertical} isStories={isStories} isExportMode={isExportMode} />
-        )}
-        {templateId === 3 && (
-          <VibrantBlurOverlay colors={safeColors} blurLevel={blurLevel} isVertical={isVertical} isStories={isStories} isExportMode={isExportMode} />
-        )}
-        {templateId === 4 && (
-          <NaturalBlurOverlay colors={safeColors} blurLevel={blurLevel} isVertical={isVertical} isStories={isStories} isExportMode={isExportMode} />
+          <ModernBlurOverlay colors={safeColors} blurLevel={effectiveBlurLevel} isVertical={isVertical} isStories={isStories} isExportMode={isExportMode} />
         )}
 
         {/* Content Layer - centered for Stories */}
@@ -177,7 +169,7 @@ const storySafeBottom = 170;
             <VooTemplate 
               data={data as VooData} 
               isVertical={isVertical}
-              colors={colors}
+              colors={safeColors}
               templateId={templateId}
               format={format}
               isStories={isStories}
@@ -189,7 +181,7 @@ const storySafeBottom = 170;
             <HospedagemTemplate 
               data={data as HospedagemData} 
               isVertical={isVertical}
-              colors={colors}
+              colors={safeColors}
               templateId={templateId}
               format={format}
               isStories={isStories}
@@ -216,7 +208,14 @@ interface BlurOverlayProps {
 
 // Modern: Blur from bottom
 function ModernBlurOverlay({ colors, blurLevel, isVertical, isStories, isExportMode }: BlurOverlayProps) {
-  const startPosition = isStories ? 35 : (isVertical ? 45 : 50);
+  const startPosition = isStories ? 58 : (isVertical ? 45 : 50);
+  const colorTop = isStories ? startPosition + 5 : startPosition + 8;
+  const exportGradient = isStories
+    ? `linear-gradient(180deg, ${hexToRgba(colors.primary, 0)} 0%, ${hexToRgba(colors.primary, 0.28)} 45%, ${hexToRgba(colors.secondary, 0.5)} 100%)`
+    : `linear-gradient(180deg, ${colors.primary}00 0%, ${colors.primary}55 35%, ${colors.secondary}88 100%)`;
+  const colorGradient = isStories
+    ? `linear-gradient(180deg, ${hexToRgba(colors.primary, 0)} 0%, ${hexToRgba(colors.primary, 0.38)} 45%, ${hexToRgba(colors.secondary, 0.6)} 100%)`
+    : `linear-gradient(180deg, ${colors.primary}00 0%, ${colors.primary}88 40%, ${colors.secondary}cc 100%)`;
   
   return (
     <>
@@ -230,7 +229,7 @@ function ModernBlurOverlay({ colors, blurLevel, isVertical, isStories, isExportM
           maskImage: 'linear-gradient(to bottom, transparent 0%, black 30%, black 100%)',
           ...(isExportMode 
             ? { 
-                background: `linear-gradient(180deg, ${colors.primary}00 0%, ${colors.primary}55 35%, ${colors.secondary}88 100%)`,
+                background: exportGradient,
                 filter: `blur(${blurLevel}px)`,
                 transform: 'scale(1.08)',
               }
@@ -245,127 +244,10 @@ function ModernBlurOverlay({ colors, blurLevel, isVertical, isStories, isExportM
       <div 
         className="absolute left-0 right-0 bottom-0 pointer-events-none studio-color-layer"
         style={{
-          top: `${startPosition + 8}%`,
-          background: `linear-gradient(180deg, ${colors.primary}00 0%, ${colors.primary}88 40%, ${colors.secondary}cc 100%)`,
+          top: `${colorTop}%`,
+          background: colorGradient,
           WebkitMaskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.4) 30%, rgba(0,0,0,0.8) 100%)',
           maskImage: 'linear-gradient(to bottom, transparent 0%, rgba(0,0,0,0.4) 30%, rgba(0,0,0,0.8) 100%)',
-        }}
-      />
-    </>
-  );
-}
-
-// Elegant: Blur from left side - gradient glass effect
-function ElegantBlurOverlay({ colors, blurLevel, isVertical, isStories, isExportMode }: BlurOverlayProps) {
-  const width = isStories ? '70%' : (isVertical ? '65%' : '60%');
-  
-  return (
-    <>
-      {/* Backdrop blur layer - from left with gradient mask */}
-      <div 
-        className="absolute top-0 bottom-0 left-0 pointer-events-none studio-blur-layer"
-        data-blur-fallback={`${colors.primary}50`}
-        style={{
-          width,
-          WebkitMaskImage: 'linear-gradient(to right, black 0%, black 40%, transparent 100%)',
-          maskImage: 'linear-gradient(to right, black 0%, black 40%, transparent 100%)',
-          ...(isExportMode 
-            ? { 
-                background: `linear-gradient(90deg, ${colors.primary}66 0%, ${colors.secondary}33 55%, transparent 100%)`,
-                filter: `blur(${blurLevel}px)`,
-                transform: 'scale(1.04)',
-              }
-            : {
-                backdropFilter: `blur(${blurLevel}px)`,
-                WebkitBackdropFilter: `blur(${blurLevel}px)`,
-              }
-          ),
-        }}
-      />
-      {/* Subtle color tint */}
-      <div 
-        className="absolute top-0 bottom-0 left-0 pointer-events-none studio-color-layer"
-        style={{
-          width: isStories ? '65%' : (isVertical ? '60%' : '55%'),
-          background: `linear-gradient(90deg, ${colors.primary}40 0%, ${colors.secondary}20 50%, transparent 100%)`,
-        }}
-      />
-    </>
-  );
-}
-
-// Vibrant: Blur from right side - gradient glass effect
-function VibrantBlurOverlay({ colors, blurLevel, isVertical, isStories, isExportMode }: BlurOverlayProps) {
-  const width = isStories ? '70%' : (isVertical ? '65%' : '60%');
-  
-  return (
-    <>
-      {/* Backdrop blur layer - from right with gradient mask */}
-      <div 
-        className="absolute top-0 bottom-0 right-0 pointer-events-none studio-blur-layer"
-        data-blur-fallback={`${colors.primary}50`}
-        style={{
-          width,
-          WebkitMaskImage: 'linear-gradient(to left, black 0%, black 40%, transparent 100%)',
-          maskImage: 'linear-gradient(to left, black 0%, black 40%, transparent 100%)',
-          ...(isExportMode 
-            ? { 
-                background: `linear-gradient(270deg, ${colors.primary || '#000000'}66 0%, ${colors.secondary || '#000000'}33 55%, transparent 100%)`,
-                filter: `blur(${blurLevel}px)`,
-                transform: 'scale(1.04)',
-              }
-            : {
-                backdropFilter: `blur(${blurLevel}px)`,
-                WebkitBackdropFilter: `blur(${blurLevel}px)`,
-              }
-          ),
-        }}
-      />
-      {/* Subtle color tint */}
-      <div 
-        className="absolute top-0 bottom-0 right-0 pointer-events-none studio-color-layer"
-        style={{
-          width: isStories ? '65%' : (isVertical ? '60%' : '55%'),
-          background: `linear-gradient(270deg, ${colors.primary || '#000000'}40 0%, ${colors.secondary || '#000000'}20 50%, transparent 100%)`,
-        }}
-      />
-    </>
-  );
-}
-
-// Natural: Blur from top - gradient glass effect
-function NaturalBlurOverlay({ colors, blurLevel, isVertical, isStories, isExportMode }: BlurOverlayProps) {
-  const height = isStories ? '45%' : (isVertical ? '55%' : '50%');
-  
-  return (
-    <>
-      {/* Backdrop blur layer - from top with gradient mask */}
-      <div 
-        className="absolute left-0 right-0 top-0 pointer-events-none studio-blur-layer"
-        data-blur-fallback={`${colors.primary}50`}
-        style={{
-          height,
-          WebkitMaskImage: 'linear-gradient(to bottom, black 0%, black 40%, transparent 100%)',
-          maskImage: 'linear-gradient(to bottom, black 0%, black 40%, transparent 100%)',
-          ...(isExportMode 
-            ? { 
-                background: `linear-gradient(180deg, ${colors.primary || '#000000'}66 0%, ${colors.secondary || '#000000'}33 55%, transparent 100%)`,
-                filter: `blur(${blurLevel}px)`,
-                transform: 'scale(1.04)',
-              }
-            : {
-                backdropFilter: `blur(${blurLevel}px)`,
-                WebkitBackdropFilter: `blur(${blurLevel}px)`,
-              }
-          ),
-        }}
-      />
-      {/* Subtle color tint */}
-      <div 
-        className="absolute left-0 right-0 top-0 pointer-events-none studio-color-layer"
-        style={{
-          height: isStories ? '40%' : (isVertical ? '50%' : '45%'),
-          background: `linear-gradient(180deg, ${colors.primary || '#000000'}40 0%, ${colors.secondary || '#000000'}20 50%, transparent 100%)`,
         }}
       />
     </>
@@ -399,18 +281,7 @@ function PacoteTemplate({ data, isVertical, colors, templateId, format, icons, i
     : [];
 
   const hasObs = Boolean(data.observacao?.trim());
-  // Determine content position based on template
-  const getContentPosition = () => {
-    switch (templateId) {
-      case 1: return 'bottom'; // Modern - content at bottom
-      case 2: return 'left'; // Elegant - content on left
-      case 3: return 'right'; // Vibrant - content on right
-      case 4: return 'top'; // Natural - content at top
-      default: return 'bottom';
-    }
-  };
-  
-  const position = getContentPosition();
+  const position = 'bottom';
 
   // Title side: left for bottom/left templates, right for right templates, center for top templates
   const titleSide: 'left' | 'right' | 'center' =
@@ -423,7 +294,8 @@ function PacoteTemplate({ data, isVertical, colors, templateId, format, icons, i
       {colors.logo && (
         <div
           className={cn(
-            'absolute z-20 top-4',
+            'absolute z-20',
+            isStories ? 'top-6' : 'top-4',
             logoSide === 'right' ? 'right-4' : 'left-4'
           )}
         >
@@ -720,23 +592,13 @@ function PacoteTemplate({ data, isVertical, colors, templateId, format, icons, i
 }
 
 function VooTemplate({ data, isVertical, colors, templateId, format, isStories, isExportMode, scaleFactor = 1 }: TemplateProps & { data: VooData }) {
-  const position = templateId === 2 ? 'left' : templateId === 3 ? 'right' : templateId === 4 ? 'top' : 'bottom';
-  const logoSide: 'left' | 'right' = position === 'right' ? 'left' : 'right';
-  
-  // For stories, center the content vertically
-  const storiesContentStyle = isStories ? {
-    display: 'flex',
-    flexDirection: 'column' as const,
-    justifyContent: 'center',
-    alignItems: position === 'right' ? 'flex-end' : position === 'top' ? 'center' : 'flex-start',
-    gap: '16px',
-  } : {};
+  const logoSide: 'left' | 'right' = 'right';
 
   return (
     <>
       {/* Logo - always opposite side of the title */}
       {colors.logo && (
-        <div className={cn('absolute z-20 top-4', logoSide === 'right' ? 'right-4' : 'left-4')}>
+        <div className={cn('absolute z-20', isStories ? 'top-6' : 'top-4', logoSide === 'right' ? 'right-4' : 'left-4')}>
           <img
             src={colors.logo}
             alt="Logo"
@@ -748,14 +610,9 @@ function VooTemplate({ data, isVertical, colors, templateId, format, isStories, 
 
       {/* Header */}
       <div
-        className={cn(
-          'z-10',
-          position === 'right' && 'ml-auto text-right',
-          position === 'left' && 'mr-auto',
-          position === 'top' && 'mx-auto text-center'
-        )}
+        className="z-10"
         style={{ 
-          maxWidth: position === 'left' || position === 'right' ? '70%' : '100%',
+          maxWidth: '70%',
           paddingTop: `${colors.headerTopSpacing ?? 20}px`,
         }}
       >
@@ -793,27 +650,32 @@ function VooTemplate({ data, isVertical, colors, templateId, format, isStories, 
                }}
              />
            )}
-          <div className={cn('flex items-center gap-3 relative z-10', position === 'right' && 'flex-row-reverse')}>
+          <div className="flex items-start gap-3 relative z-10">
             <Plane className="w-7 h-7" style={{ color: colors.headerTextColor || colors.fontPrimary }} />
-            <div className={position === 'right' ? 'text-right' : ''}>
+            <div>
               {data.companhia && (
                 <p className="text-xs opacity-80" style={{ color: colors.dateTextColor || colors.fontSecondary }}>
                   {truncate(data.companhia, 20)}
                 </p>
               )}
-              <p 
-                className="relative z-10" 
-                style={{ 
-                  color: colors.headerTextColor || colors.fontPrimary, 
-                  fontSize: `${Math.min(colors.titleFontSize, 60)}px`,
+              <p
+                className="relative z-10"
+                style={{
+                  color: colors.headerTextColor || colors.fontPrimary,
+                  fontSize: `${Math.max(Math.min(colors.titleFontSize * 0.85, 36), 28)}px`,
                   fontFamily: colors.titleFontFamily || 'Inter',
                   fontWeight: colors.titleFontWeight || 900,
                   fontStyle: colors.titleFontStyle || 'normal',
                   lineHeight: 1.1,
-                  whiteSpace: 'nowrap',
                 }}
               >
-                {truncate(data.origem || 'Origem', 15)} → {truncate(data.destino || 'Destino', 15)}
+                {truncate(data.destino || 'Destino', 24)}
+              </p>
+              <p
+                className="text-xs font-medium mt-1"
+                style={{ color: colors.dateTextColor || colors.fontSecondary }}
+              >
+                Saindo de {truncate(data.origem || 'origem', 24)}
               </p>
             </div>
           </div>
@@ -828,18 +690,15 @@ function VooTemplate({ data, isVertical, colors, templateId, format, isStories, 
         className={cn(
           "z-10",
           !isStories && "space-y-3",
-          position === 'right' && "text-right ml-auto",
-          position === 'left' && "mr-auto",
-          position === 'top' && !isStories && "mt-auto",
           isStories && "flex-1 flex flex-col justify-center"
         )}
         style={{ 
-          maxWidth: position === 'left' || position === 'right' ? '70%' : '100%',
+          maxWidth: '70%',
           ...(isStories && { gap: '12px' }),
         }}
       >
         {/* Flight details badges */}
-        <div className={cn("flex flex-wrap gap-2", position === 'right' && "justify-end")}>
+        <div className="flex flex-wrap gap-2">
           {data.datas && (
             <span 
               className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold shadow-md"
@@ -870,10 +729,7 @@ function VooTemplate({ data, isVertical, colors, templateId, format, isStories, 
         </div>
 
         {/* Price box */}
-        <div 
-          className={cn("inline-block p-4 shadow-lg", position === 'right' && "ml-auto")}
-          style={{ backgroundColor: 'white', borderRadius: `${colors.headerRadius}px` }}
-        >
+        <div className="inline-block p-4 shadow-lg" style={{ backgroundColor: 'white', borderRadius: `${colors.headerRadius}px` }}>
           {data.hasDiscount && data.precoOriginal ? (
             <>
               <p className="text-gray-400 text-xs line-through">De {formatCurrency(data.precoOriginal, data.currency)}</p>
@@ -898,7 +754,7 @@ function VooTemplate({ data, isVertical, colors, templateId, format, isStories, 
 
         {/* CTA */}
         {data.cta && (
-          <div className={position === 'right' ? 'text-right' : ''}>
+          <div>
             <span className="inline-flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg">
               <MessageCircle className="w-4 h-4" />
               {data.cta}
@@ -907,7 +763,7 @@ function VooTemplate({ data, isVertical, colors, templateId, format, isStories, 
         )}
         
         {/* Disclaimer */}
-        <p className={cn("text-[10px] pt-4 pb-3 opacity-60", position === 'right' && "text-right")} style={{ color: colors.fontPrimary }}>
+        <p className="text-[10px] pt-4 pb-3 opacity-60" style={{ color: colors.fontPrimary }}>
           {data.disclaimer || 'Valores sujeitos a reajuste e disponibilidade.'}
         </p>
       </div>
@@ -916,17 +772,13 @@ function VooTemplate({ data, isVertical, colors, templateId, format, isStories, 
 }
 
 function HospedagemTemplate({ data, isVertical, colors, templateId, format, isStories, isExportMode, scaleFactor = 1 }: TemplateProps & { data: HospedagemData }) {
-  const position = templateId === 2 ? 'left' : templateId === 3 ? 'right' : templateId === 4 ? 'top' : 'bottom';
-
-  const titleSide: 'left' | 'right' | 'center' =
-    position === 'right' ? 'right' : position === 'top' ? 'center' : 'left';
-  const logoSide: 'left' | 'right' = titleSide === 'right' ? 'left' : 'right';
+  const logoSide: 'left' | 'right' = 'right';
 
   return (
     <>
       {/* Logo - always opposite side of the title */}
       {colors.logo && (
-        <div className={cn('absolute z-20 top-4', logoSide === 'right' ? 'right-4' : 'left-4')}>
+        <div className={cn('absolute z-20', isStories ? 'top-6' : 'top-4', logoSide === 'right' ? 'right-4' : 'left-4')}>
           <img
             src={colors.logo}
             alt="Logo"
@@ -938,14 +790,9 @@ function HospedagemTemplate({ data, isVertical, colors, templateId, format, isSt
 
       {/* Header */}
       <div
-        className={cn(
-          'z-10',
-          position === 'right' && 'ml-auto text-right',
-          position === 'left' && 'mr-auto',
-          position === 'top' && 'mx-auto text-center'
-        )}
+        className="z-10"
         style={{ 
-          maxWidth: position === 'left' || position === 'right' ? '70%' : '100%',
+          maxWidth: '70%',
           paddingTop: `${colors.headerTopSpacing ?? 20}px`,
         }}
       >
@@ -983,9 +830,9 @@ function HospedagemTemplate({ data, isVertical, colors, templateId, format, isSt
                }}
              />
            )}
-          <div className={cn('flex items-center gap-3 relative z-10', position === 'right' && 'flex-row-reverse')}>
+          <div className="flex items-center gap-3 relative z-10">
             <Hotel className="w-7 h-7" style={{ color: colors.headerTextColor || colors.fontPrimary }} />
-            <div className={position === 'right' ? 'text-right' : ''}>
+            <div>
               {data.cidade && (
                 <p className="text-xs opacity-80 flex items-center gap-1" style={{ color: colors.dateTextColor || colors.fontSecondary }}>
                   <MapPin className="w-3 h-3" />
@@ -1001,7 +848,6 @@ function HospedagemTemplate({ data, isVertical, colors, templateId, format, isSt
                   fontWeight: colors.titleFontWeight || 900,
                   fontStyle: colors.titleFontStyle || 'normal',
                   lineHeight: 1.1,
-                  whiteSpace: 'nowrap',
                 }}
               >
                 {truncate(data.hotel || 'Nome do Hotel', 25)}
@@ -1024,18 +870,15 @@ function HospedagemTemplate({ data, isVertical, colors, templateId, format, isSt
         className={cn(
           "z-10",
           !isStories && "space-y-3",
-          position === 'right' && "text-right ml-auto",
-          position === 'left' && "mr-auto",
-          position === 'top' && !isStories && "mt-auto",
           isStories && "flex-1 flex flex-col justify-center"
         )}
         style={{ 
-          maxWidth: position === 'left' || position === 'right' ? '70%' : '100%',
+          maxWidth: '70%',
           ...(isStories && { gap: '12px' }),
         }}
       >
         {/* Info badges */}
-        <div className={cn("flex flex-wrap gap-2", position === 'right' && "justify-end")}>
+        <div className="flex flex-wrap gap-2">
           {data.checkIn && data.checkOut && (
             <span 
               className="inline-flex items-center gap-1 rounded-xl px-3 py-2 text-xs font-bold shadow-md"
@@ -1065,7 +908,7 @@ function HospedagemTemplate({ data, isVertical, colors, templateId, format, isSt
         </div>
 
         {/* Bottom row - Price and Nights */}
-        <div className={cn("flex items-end justify-between", position === 'right' && "flex-row-reverse")}>
+        <div className="flex items-end justify-between">
           {/* Nights box */}
           <div 
             className="px-4 py-3 text-center shadow-lg"
@@ -1080,7 +923,7 @@ function HospedagemTemplate({ data, isVertical, colors, templateId, format, isSt
           </div>
 
           {/* Price */}
-          <div className={position === 'right' ? 'text-left' : 'text-right'}>
+          <div className="text-right">
             {data.hasDiscount && data.precoOriginal ? (
               <>
                 <p className="text-xs opacity-70 line-through" style={{ color: colors.fontPrimary }}>
@@ -1108,7 +951,7 @@ function HospedagemTemplate({ data, isVertical, colors, templateId, format, isSt
 
         {/* CTA */}
         {data.cta && (
-          <div className={position === 'right' ? 'text-right' : ''}>
+          <div>
             <span className="inline-flex items-center gap-2 bg-green-500 text-white px-4 py-2 rounded-full font-bold text-sm shadow-lg">
               <MessageCircle className="w-4 h-4" />
               {data.cta}
@@ -1117,7 +960,7 @@ function HospedagemTemplate({ data, isVertical, colors, templateId, format, isSt
         )}
         
         {/* Disclaimer */}
-        <p className={cn("text-[10px] pt-4 pb-3 opacity-60", position === 'right' && "text-right")} style={{ color: colors.fontPrimary }}>
+        <p className="text-[10px] pt-4 pb-3 opacity-60" style={{ color: colors.fontPrimary }}>
           {data.disclaimer || 'Valores sujeitos a reajuste e disponibilidade.'}
         </p>
       </div>

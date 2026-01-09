@@ -289,7 +289,7 @@ export function StudioEditor({
   const [images, setImages] = useState<string[]>([]);
   const [colors, setColors] = useState<StudioColors>(getInitialColors);
   const [icons, setIcons] = useState<IconSelection>(defaultIcons);
-  const [blurLevel, setBlurLevel] = useState(18);
+  const [blurLevel, setBlurLevel] = useState(() => (format.id === 'instagram-stories' ? 0 : 18));
   const [isExporting, setIsExporting] = useState(false);
   const [pacoteData, setPacoteData] = useState<PacoteData>(defaultPacoteData);
   const [vooData, setVooData] = useState<VooData>(defaultVooData);
@@ -317,7 +317,7 @@ export function StudioEditor({
       setImages([]);
       setColors(defaultColors);
       setIcons(defaultIcons);
-      setBlurLevel(24);
+      setBlurLevel(format.id === 'instagram-stories' ? 0 : 24);
       setPacoteData(defaultPacoteData);
       setVooData(defaultVooData);
       setHospedagemData(defaultHospedagemData);
@@ -331,7 +331,7 @@ export function StudioEditor({
     setColors(defaultColors);
     setIcons(defaultIcons);
     setImages([]);
-    setBlurLevel(24);
+    setBlurLevel(format.id === 'instagram-stories' ? 0 : 24);
     setPacoteData(defaultPacoteData);
     setVooData(defaultVooData);
     setHospedagemData(defaultHospedagemData);
@@ -353,7 +353,10 @@ export function StudioEditor({
     setIcons(loadedTemplate.icons || defaultIcons);
     
     // Set blur level
-    setBlurLevel(loadedTemplate.blurLevel !== undefined ? loadedTemplate.blurLevel : 24);
+    {
+      const loadedBlur = loadedTemplate.blurLevel !== undefined ? loadedTemplate.blurLevel : 24;
+      setBlurLevel(format.id === 'instagram-stories' ? 0 : loadedBlur);
+    }
     
     // Set form data based on art type (fallback to pacote)
     const artTypeKey =
@@ -384,6 +387,12 @@ export function StudioEditor({
     
     setIsHydrated(true);
   }, [loadedTemplate]);
+
+  useEffect(() => {
+    if (format.id === 'instagram-stories') {
+      setBlurLevel(0);
+    }
+  }, [format.id]);
 
   const handleImageUpload = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
@@ -475,7 +484,7 @@ export function StudioEditor({
   return (
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
       {/* Form Panel */}
-      <Card>
+      <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle>Personalize sua arte</CardTitle>
           <Button variant="outline" size="sm" onClick={onReset}>
@@ -485,10 +494,40 @@ export function StudioEditor({
         </CardHeader>
         <CardContent>
           <Tabs defaultValue="content" className="space-y-4">
-            <TabsList className="grid w-full grid-cols-3">
-              <TabsTrigger value="content">Conteúdo</TabsTrigger>
-              <TabsTrigger value="images">Imagens</TabsTrigger>
-              <TabsTrigger value="colors">Cores</TabsTrigger>
+            <TabsList className="flex flex-wrap items-center gap-3 bg-transparent p-0 rounded-none h-auto">
+              <TabsTrigger
+                value="content"
+                className="group flex-1 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-left text-xs font-semibold text-slate-600 transition-colors data-[state=active]:border-[#f06a12] data-[state=active]:bg-[#fff4ec] data-[state=active]:text-[#f06a12]"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-[11px] font-bold text-slate-500 transition-colors group-data-[state=active]:border-[#f06a12] group-data-[state=active]:bg-[#f06a12] group-data-[state=active]:text-white">
+                    1
+                  </span>
+                  Conteúdo
+                </span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="images"
+                className="group flex-1 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-left text-xs font-semibold text-slate-600 transition-colors data-[state=active]:border-[#f06a12] data-[state=active]:bg-[#fff4ec] data-[state=active]:text-[#f06a12]"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-[11px] font-bold text-slate-500 transition-colors group-data-[state=active]:border-[#f06a12] group-data-[state=active]:bg-[#f06a12] group-data-[state=active]:text-white">
+                    2
+                  </span>
+                  Imagens
+                </span>
+              </TabsTrigger>
+              <TabsTrigger
+                value="colors"
+                className="group flex-1 rounded-xl border border-slate-200 bg-white/90 px-3 py-2 text-left text-xs font-semibold text-slate-600 transition-colors data-[state=active]:border-[#f06a12] data-[state=active]:bg-[#fff4ec] data-[state=active]:text-[#f06a12]"
+              >
+                <span className="flex items-center gap-3">
+                  <span className="inline-flex h-7 w-7 items-center justify-center rounded-full border border-slate-200 text-[11px] font-bold text-slate-500 transition-colors group-data-[state=active]:border-[#f06a12] group-data-[state=active]:bg-[#f06a12] group-data-[state=active]:text-white">
+                    3
+                  </span>
+                  Cores
+                </span>
+              </TabsTrigger>
             </TabsList>
 
             <TabsContent value="content" className="space-y-4">
@@ -996,9 +1035,12 @@ export function StudioEditor({
                   max={50}
                   step={1}
                   className="w-full"
+                  disabled={format.id === 'instagram-stories'}
                 />
                 <p className="text-xs text-muted-foreground">
-                  Ajuste a intensidade do efeito de desfoque
+                  {format.id === 'instagram-stories'
+                    ? 'Stories: blur desativado por padrão.'
+                    : 'Ajuste a intensidade do efeito de desfoque'}
                 </p>
               </div>
             </TabsContent>
@@ -1007,7 +1049,7 @@ export function StudioEditor({
       </Card>
 
       {/* Preview Panel */}
-      <Card>
+      <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
         <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-4">
           <CardTitle>Preview</CardTitle>
           <div className="flex gap-2">

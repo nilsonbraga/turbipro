@@ -72,20 +72,54 @@ export function ServiceViewTable({ services, isLoading, isSuperAdmin }: ServiceV
 
   return (
     <>
-      <Card>
-        <CardContent className="pt-6">
+      {/* Summary Cards */}
+      {services.length > 0 && (
+        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mb-4">
+          <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+            <CardContent className="p-5">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Total Serviços</div>
+              <div className="text-2xl font-semibold">{services.length}</div>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+            <CardContent className="p-5">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Valor Total</div>
+              <div className="text-2xl font-semibold">{formatCurrency(totals.totalValue)}</div>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+            <CardContent className="p-5">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Total Comissões</div>
+              <div className="text-2xl font-semibold text-green-600">{formatCurrency(totals.totalCommission)}</div>
+            </CardContent>
+          </Card>
+          <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+            <CardContent className="p-5">
+              <div className="text-xs uppercase tracking-wide text-muted-foreground">Ticket Médio</div>
+              <div className="text-2xl font-semibold">
+                {formatCurrency(services.length > 0 ? totals.totalValue / services.length : 0)}
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+      )}
+
+      <Card className="rounded-2xl border-0 shadow-none bg-white overflow-hidden">
+        <CardContent className="p-0">
           <Table>
-            <TableHeader>
+            <TableHeader className="bg-slate-50/80">
               <TableRow>
-                <TableHead>Data Fechamento</TableHead>
-                <TableHead>Lead</TableHead>
-                <TableHead>Cliente</TableHead>
-                {isSuperAdmin && <TableHead>Agência</TableHead>}
-                <TableHead>Tipo</TableHead>
-                <TableHead>Descrição</TableHead>
-                <TableHead>Fornecedor</TableHead>
-                <TableHead className="text-right">Valor</TableHead>
-                <TableHead className="text-right">Comissão</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Data Fechamento</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Lead</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Cliente</TableHead>
+                {isSuperAdmin && (
+                  <TableHead className="text-xs uppercase tracking-wide text-slate-500">Agência</TableHead>
+                )}
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Tipo</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Descrição</TableHead>
+                <TableHead className="text-xs uppercase tracking-wide text-slate-500">Fornecedor</TableHead>
+                <TableHead className="text-right text-xs uppercase tracking-wide text-slate-500">Valor</TableHead>
+                <TableHead className="text-right text-xs uppercase tracking-wide text-slate-500">Comissão</TableHead>
               </TableRow>
             </TableHeader>
             <TableBody>
@@ -102,8 +136,11 @@ export function ServiceViewTable({ services, isLoading, isSuperAdmin }: ServiceV
                   </TableCell>
                 </TableRow>
               ) : (
-                services.map((service) => (
-                  <TableRow key={service.id}>
+                services.map((service, index) => (
+                  <TableRow
+                    key={service.id}
+                    className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}
+                  >
                     <TableCell>
                       {service.proposal?.updated_at
                         ? format(new Date(service.proposal.updated_at), "dd/MM/yyyy", { locale: ptBR })
@@ -130,7 +167,7 @@ export function ServiceViewTable({ services, isLoading, isSuperAdmin }: ServiceV
                       <TableCell>{service.proposal?.agency?.name || "-"}</TableCell>
                     )}
                     <TableCell>
-                      <Badge variant="secondary">
+                      <Badge variant="secondary" className="rounded-full bg-slate-100 text-slate-600">
                         {SERVICE_TYPE_LABELS[service.type] || service.type}
                       </Badge>
                     </TableCell>
@@ -145,7 +182,7 @@ export function ServiceViewTable({ services, isLoading, isSuperAdmin }: ServiceV
                       </div>
                     </TableCell>
                     <TableCell>{service.partner?.name || "-"}</TableCell>
-                    <TableCell className="text-right font-medium">
+                    <TableCell className="text-right font-medium text-slate-700">
                       {formatCurrency(service.value || 0)}
                     </TableCell>
                     <TableCell className="text-right">
@@ -167,38 +204,6 @@ export function ServiceViewTable({ services, isLoading, isSuperAdmin }: ServiceV
           </Table>
         </CardContent>
       </Card>
-
-      {/* Summary Cards */}
-      {services.length > 0 && (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4 mt-4">
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-sm text-muted-foreground">Total Serviços</div>
-              <div className="text-2xl font-bold">{services.length}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-sm text-muted-foreground">Valor Total</div>
-              <div className="text-2xl font-bold">{formatCurrency(totals.totalValue)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-sm text-muted-foreground">Total Comissões</div>
-              <div className="text-2xl font-bold text-green-600">{formatCurrency(totals.totalCommission)}</div>
-            </CardContent>
-          </Card>
-          <Card>
-            <CardContent className="pt-6">
-              <div className="text-sm text-muted-foreground">Ticket Médio</div>
-              <div className="text-2xl font-bold">
-                {formatCurrency(services.length > 0 ? totals.totalValue / services.length : 0)}
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      )}
 
       {/* Proposal Detail Modal */}
       <Dialog

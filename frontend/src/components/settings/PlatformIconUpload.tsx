@@ -67,7 +67,7 @@ export function PlatformIconUpload() {
             <img
               src={currentImageUrl}
               alt="Platform icon"
-              className="w-16 h-16 object-contain rounded-lg border bg-muted"
+              className="w-16 h-16 object-contain rounded-2xl border border-slate-200 bg-slate-50"
             />
             <Button
               variant="destructive"
@@ -79,7 +79,7 @@ export function PlatformIconUpload() {
             </Button>
           </div>
         ) : (
-          <div className="w-16 h-16 rounded-lg border-2 border-dashed flex items-center justify-center bg-muted/50">
+          <div className="w-16 h-16 rounded-2xl border-2 border-dashed border-slate-200 flex items-center justify-center bg-slate-50">
             <Image className="w-6 h-6 text-muted-foreground" />
           </div>
         )}
@@ -95,6 +95,7 @@ export function PlatformIconUpload() {
             variant="outline"
             onClick={() => inputRef.current?.click()}
             disabled={isUploading}
+            className="h-9"
           >
             {isUploading ? (
               <Loader2 className="w-4 h-4 mr-2 animate-spin" />

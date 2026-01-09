@@ -594,7 +594,7 @@ export default function PublicItinerary() {
                     <CardContent className="pt-0 pb-8">
                   {/* Day Images - support for multiple images */}
                   {((day as any).images?.length > 0 || day.cover_image_url) && (
-                    <div className="mb-6 max-w-2xl mx-auto">
+                    <div className="mb-6 max-w-xl mx-auto">
                       {(() => {
                         const dayImages = (day as any).images?.length > 0 
                           ? (day as any).images 
@@ -704,7 +704,7 @@ export default function PublicItinerary() {
                           <Carousel className="w-full">
                             <CarouselContent>
                               {dayImages.map((img: string, idx: number) => (
-                                <CarouselItem key={idx} className="basis-2/3 md:basis-1/2">
+                                <CarouselItem key={idx} className="basis-1/2 md:basis-1/3">
                                   <button
                                     type="button"
                                     className="group w-full transition-transform duration-500 ease-out hover:-translate-y-1"
@@ -817,7 +817,7 @@ export default function PublicItinerary() {
                               </div>
                             )}
                             {itemImages.length > 0 && (
-                              <div className="mt-3 max-w-xl">
+                              <div className="mt-3 max-w-lg">
                                 {itemImages.length <= 4 ? (
                                   <div className={`grid gap-2 ${
                                     itemImages.length === 1 ? 'grid-cols-1' :
@@ -848,7 +848,7 @@ export default function PublicItinerary() {
                                   <Carousel className="w-full">
                                     <CarouselContent>
                                       {itemImages.map((img, idx) => (
-                                        <CarouselItem key={idx} className="basis-1/3">
+                                        <CarouselItem key={idx} className="basis-1/2 md:basis-1/4">
                                           <button
                                             type="button"
                                             className="group w-full transition-transform duration-500 ease-out hover:-translate-y-1"

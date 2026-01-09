@@ -4,13 +4,6 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from '@/components/ui/select';
-import { 
   AlertDialog,
   AlertDialogAction,
   AlertDialogCancel,
@@ -31,7 +24,6 @@ import {
   MessageCircle,
   Star,
   Search,
-  Filter,
   Play
 } from 'lucide-react';
 import { format } from 'date-fns';
@@ -71,6 +63,20 @@ const artTypeLabels: Record<ArtType, string> = {
   'voo': 'Voo',
   'hospedagem': 'Hospedagem',
 };
+
+const formatFilters = [
+  { label: 'Todos', value: 'all' },
+  { label: 'Instagram Post', value: 'instagram-post' },
+  { label: 'Stories', value: 'instagram-stories' },
+  { label: 'Quadrado', value: 'whatsapp-post' },
+];
+
+const artTypeFilters = [
+  { label: 'Todos', value: 'all' },
+  { label: 'Pacote', value: 'pacote' },
+  { label: 'Voo', value: 'voo' },
+  { label: 'Hospedagem', value: 'hospedagem' },
+];
 
 export function SavedTemplates({ onLoad, savedTemplates, deleteTemplate, toggleFavorite, isLoading }: SavedTemplatesProps) {
   const [search, setSearch] = useState('');
@@ -124,17 +130,17 @@ export function SavedTemplates({ onLoad, savedTemplates, deleteTemplate, toggleF
     );
   }
 
-const TemplateCard = ({ template }: { template: SavedTemplate }) => {
+  const TemplateCard = ({ template }: { template: SavedTemplate }) => {
     const FormatIcon = formatIcons[template.formatId as FormatType] || Instagram;
     const ArtTypeIcon = artTypeIcons[template.artTypeId as ArtType] || Package;
     const formatLabel = formatLabels[template.formatId as FormatType] || template.formatId || 'Formato';
     const artTypeLabel = artTypeLabels[template.artTypeId as ArtType] || template.artTypeId || 'Arte';
 
     return (
-      <Card className="group hover:shadow-lg transition-all duration-200 border-2 hover:border-primary/30">
+      <Card className="group rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg transition-colors hover:bg-white">
         <CardContent className="p-0">
           {/* Thumbnail */}
-          <div className="relative aspect-video bg-muted overflow-hidden rounded-t-lg">
+          <div className="relative aspect-video bg-muted overflow-hidden rounded-t-2xl">
             {template.images && template.images.length > 0 ? (
               <img 
                 src={template.images[0]} 
@@ -239,41 +245,56 @@ const TemplateCard = ({ template }: { template: SavedTemplate }) => {
   return (
     <div className="space-y-6">
       {/* Filters */}
-      <div className="flex flex-col sm:flex-row gap-3">
-        <div className="relative flex-1">
+      <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
+        <div className="relative w-full lg:w-80">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
           <Input
             placeholder="Buscar modelos..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
-            className="pl-9"
+            className="pl-9 h-9 bg-white border-slate-200"
           />
         </div>
-        <div className="flex gap-2">
-          <Select value={filterFormat} onValueChange={setFilterFormat}>
-            <SelectTrigger className="w-[160px]">
-              <Filter className="h-4 w-4 mr-2" />
-              <SelectValue placeholder="Formato" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos formatos</SelectItem>
-              <SelectItem value="instagram-post">Instagram Post</SelectItem>
-              <SelectItem value="instagram-stories">Instagram Stories</SelectItem>
-              <SelectItem value="whatsapp-status">WhatsApp Status</SelectItem>
-              <SelectItem value="whatsapp-post">WhatsApp Post</SelectItem>
-            </SelectContent>
-          </Select>
-          <Select value={filterArtType} onValueChange={setFilterArtType}>
-            <SelectTrigger className="w-[140px]">
-              <SelectValue placeholder="Tipo" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="all">Todos tipos</SelectItem>
-              <SelectItem value="pacote">Pacote</SelectItem>
-              <SelectItem value="voo">Voo</SelectItem>
-              <SelectItem value="hospedagem">Hospedagem</SelectItem>
-            </SelectContent>
-          </Select>
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
+            {formatFilters.map((option) => {
+              const isActive = filterFormat === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setFilterFormat(option.value)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    isActive
+                      ? 'bg-[#f06a12] text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
+          <div className="hidden sm:block h-5 w-px bg-border" />
+          <div className="flex flex-wrap items-center gap-2">
+            {artTypeFilters.map((option) => {
+              const isActive = filterArtType === option.value;
+              return (
+                <button
+                  key={option.value}
+                  type="button"
+                  onClick={() => setFilterArtType(option.value)}
+                  className={`rounded-full px-3 py-1.5 text-xs font-semibold transition-colors ${
+                    isActive
+                      ? 'bg-[#f06a12] text-white'
+                      : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50'
+                  }`}
+                >
+                  {option.label}
+                </button>
+              );
+            })}
+          </div>
         </div>
       </div>
 

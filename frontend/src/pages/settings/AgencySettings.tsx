@@ -4,7 +4,6 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Separator } from '@/components/ui/separator';
 import { useToast } from '@/hooks/use-toast';
 import { 
   Building2, 
@@ -251,229 +250,234 @@ export default function AgencySettings() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-8">
       <div>
-        <h1 className="text-2xl font-bold text-foreground flex items-center gap-2">
-          <Building2 className="w-6 h-6" />
+        <h1 className="text-2xl font-semibold text-foreground flex items-center gap-2">
+          <Building2 className="w-5 h-5" />
           Agência
         </h1>
-        <p className="text-muted-foreground">Atualize os dados da sua agência de viagens</p>
+        <p className="text-sm text-muted-foreground">Atualize os dados da sua agência de viagens</p>
       </div>
 
-      <Card>
-        <CardHeader>
-          <CardTitle>Informações da Agência</CardTitle>
+      <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+        <CardHeader className="pb-2">
+          <CardTitle className="text-lg">Informações da Agência</CardTitle>
           <CardDescription>
             Dados cadastrais e identidade visual
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="agencyName">Nome da Agência</Label>
-              <Input
-                id="agencyName"
-                value={agencyName}
-                onChange={(e) => setAgencyName(e.target.value)}
-                placeholder="Nome da sua agência"
-              />
+        <CardContent className="space-y-8">
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 space-y-6">
+            <div className="text-xs uppercase tracking-wide text-slate-500">Dados principais</div>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="agencyName">Nome da Agência</Label>
+                <Input
+                  id="agencyName"
+                  value={agencyName}
+                  onChange={(e) => setAgencyName(e.target.value)}
+                  placeholder="Nome da sua agência"
+                  className="h-10 bg-white border-slate-200"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="cnpj">CNPJ</Label>
+                <Input
+                  id="cnpj"
+                  value={agency?.cnpj || ''}
+                  disabled
+                  className="h-10 bg-slate-100 border-slate-200"
+                />
+              </div>
             </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="email">
+                  <Mail className="w-4 h-4 inline mr-2" />
+                  Email
+                </Label>
+                <Input
+                  id="email"
+                  type="email"
+                  value={agencyEmail}
+                  onChange={(e) => setAgencyEmail(e.target.value)}
+                  placeholder="contato@agencia.com"
+                  className="h-10 bg-white border-slate-200"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="phone">
+                  <Phone className="w-4 h-4 inline mr-2" />
+                  Telefone
+                </Label>
+                <Input
+                  id="phone"
+                  value={agencyPhone}
+                  onChange={(e) => setAgencyPhone(e.target.value)}
+                  placeholder="(00) 00000-0000"
+                  className="h-10 bg-white border-slate-200"
+                />
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-2">
+                <Label htmlFor="website">
+                  <Globe className="w-4 h-4 inline mr-2" />
+                  Site
+                </Label>
+                <Input
+                  id="website"
+                  value={agencyWebsite}
+                  onChange={(e) => setAgencyWebsite(e.target.value)}
+                  placeholder="https://suaagencia.com.br"
+                  className="h-10 bg-white border-slate-200"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="instagram">
+                  <Instagram className="w-4 h-4 inline mr-2" />
+                  Instagram
+                </Label>
+                <Input
+                  id="instagram"
+                  value={agencyInstagram}
+                  onChange={(e) => setAgencyInstagram(e.target.value)}
+                  placeholder="@suaagencia"
+                  className="h-10 bg-white border-slate-200"
+                />
+              </div>
+            </div>
+
             <div className="space-y-2">
-              <Label htmlFor="cnpj">CNPJ</Label>
+              <Label htmlFor="address">
+                <MapPin className="w-4 h-4 inline mr-2" />
+                Endereço
+              </Label>
               <Input
-                id="cnpj"
-                value={agency?.cnpj || ''}
-                disabled
-                className="bg-muted"
+                id="address"
+                value={agencyAddress}
+                onChange={(e) => setAgencyAddress(e.target.value)}
+                placeholder="Endereço completo"
+                className="h-10 bg-white border-slate-200"
               />
             </div>
           </div>
 
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="email">
-                <Mail className="w-4 h-4 inline mr-2" />
-                Email
-              </Label>
-              <Input
-                id="email"
-                type="email"
-                value={agencyEmail}
-                onChange={(e) => setAgencyEmail(e.target.value)}
-                placeholder="contato@agencia.com"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="phone">
-                <Phone className="w-4 h-4 inline mr-2" />
-                Telefone
-              </Label>
-              <Input
-                id="phone"
-                value={agencyPhone}
-                onChange={(e) => setAgencyPhone(e.target.value)}
-                placeholder="(00) 00000-0000"
-              />
-            </div>
-          </div>
-
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-            <div className="space-y-2">
-              <Label htmlFor="website">
-                <Globe className="w-4 h-4 inline mr-2" />
-                Site
-              </Label>
-              <Input
-                id="website"
-                value={agencyWebsite}
-                onChange={(e) => setAgencyWebsite(e.target.value)}
-                placeholder="https://suaagencia.com.br"
-              />
-            </div>
-            <div className="space-y-2">
-              <Label htmlFor="instagram">
-                <Instagram className="w-4 h-4 inline mr-2" />
-                Instagram
-              </Label>
-              <Input
-                id="instagram"
-                value={agencyInstagram}
-                onChange={(e) => setAgencyInstagram(e.target.value)}
-                placeholder="@suaagencia"
-              />
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <Label htmlFor="address">
-              <MapPin className="w-4 h-4 inline mr-2" />
-              Endereço
-            </Label>
-            <Input
-              id="address"
-              value={agencyAddress}
-              onChange={(e) => setAgencyAddress(e.target.value)}
-              placeholder="Endereço completo"
-            />
-          </div>
-
-          <Separator />
-
-          <div className="space-y-4">
-            <div>
-              <Label className="flex items-center gap-2">
-                <Image className="w-4 h-4" />
-                Logo da Agência
-              </Label>
-              <p className="text-sm text-muted-foreground mt-1">
+          <div className="rounded-2xl border border-slate-100 bg-white p-5 space-y-6">
+            <div className="space-y-1">
+              <p className="text-xs uppercase tracking-wide text-slate-500">Identidade visual</p>
+              <p className="text-sm text-muted-foreground">
                 A logo será exibida no PDF das propostas
               </p>
             </div>
 
-            
-            <div className="flex items-center gap-4">
-              {agencyLogo ? (
-                <div className="relative">
-                  <img 
-                    src={agencyLogo} 
-                    alt="Logo da agência" 
-                    className="h-16 w-auto object-contain rounded border bg-background p-2"
-                  />
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute -top-2 -right-2 h-6 w-6"
-                    onClick={handleRemoveLogo}
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="h-16 w-32 border-2 border-dashed rounded flex items-center justify-center text-muted-foreground">
-                  <Image className="w-6 h-6" />
-                </div>
-              )}
-              
-              <div>
-                <input
-                  type="file"
-                  ref={logoInputRef}
-                  onChange={handleLogoUpload}
-                  className="hidden"
-                  accept="image/*"
-                />
-                <Button 
-                  variant="outline" 
-                  onClick={() => logoInputRef.current?.click()}
-                  disabled={isUploadingLogo}
-                >
-                  {isUploadingLogo ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <Label className="flex items-center gap-2">
+                  <Image className="w-4 h-4" />
+                  Logo da Agência
+                </Label>
+                <div className="flex items-center gap-4">
+                  {agencyLogo ? (
+                    <div className="relative">
+                      <img 
+                        src={agencyLogo} 
+                        alt="Logo da agência" 
+                        className="h-16 w-auto object-contain rounded-2xl border border-slate-200 bg-slate-50 p-3"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6"
+                        onClick={handleRemoveLogo}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
                   ) : (
-                    <Upload className="w-4 h-4 mr-2" />
+                    <div className="h-16 w-32 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-muted-foreground bg-slate-50">
+                      <Image className="w-6 h-6" />
+                    </div>
                   )}
-                  {agencyLogo ? 'Alterar Logo' : 'Enviar Logo'}
-                </Button>
+                  
+                  <div>
+                    <input
+                      type="file"
+                      ref={logoInputRef}
+                      onChange={handleLogoUpload}
+                      className="hidden"
+                      accept="image/*"
+                    />
+                    <Button 
+                      variant="outline" 
+                      onClick={() => logoInputRef.current?.click()}
+                      disabled={isUploadingLogo}
+                      className="h-9"
+                    >
+                      {isUploadingLogo ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4 mr-2" />
+                      )}
+                      {agencyLogo ? 'Alterar Logo' : 'Enviar Logo'}
+                    </Button>
+                  </div>
+                </div>
               </div>
-            </div>
-          </div>
 
-          <Separator />
-
-          <div className="space-y-4">
-            <div>
-              <Label className="flex items-center gap-2">
-                <Image className="w-4 h-4" />
-                Logo mínima
-              </Label>
-              <p className="text-sm text-muted-foreground mt-1">
-                Versão compacta para usos em espaços reduzidos
-              </p>
-            </div>
-
-            <div className="flex items-center gap-4">
-              {agencyMinimalLogo ? (
-                <div className="relative">
-                  <img
-                    src={agencyMinimalLogo}
-                    alt="Logo mínima da agência"
-                    className="h-12 w-12 object-contain rounded border bg-background p-2"
-                  />
-                  <Button
-                    variant="destructive"
-                    size="icon"
-                    className="absolute -top-2 -right-2 h-6 w-6"
-                    onClick={handleRemoveMinimalLogo}
-                  >
-                    <X className="w-3 h-3" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="h-12 w-12 border-2 border-dashed rounded flex items-center justify-center text-muted-foreground">
-                  <Image className="w-5 h-5" />
-                </div>
-              )}
-
-              <div>
-                <input
-                  type="file"
-                  ref={minimalLogoInputRef}
-                  onChange={handleMinimalLogoUpload}
-                  className="hidden"
-                  accept="image/*"
-                />
-                <Button
-                  variant="outline"
-                  onClick={() => minimalLogoInputRef.current?.click()}
-                  disabled={isUploadingMinimalLogo}
-                >
-                  {isUploadingMinimalLogo ? (
-                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+              <div className="space-y-4">
+                <Label className="flex items-center gap-2">
+                  <Image className="w-4 h-4" />
+                  Logo mínima
+                </Label>
+                <div className="flex items-center gap-4">
+                  {agencyMinimalLogo ? (
+                    <div className="relative">
+                      <img
+                        src={agencyMinimalLogo}
+                        alt="Logo mínima da agência"
+                        className="h-12 w-12 object-contain rounded-2xl border border-slate-200 bg-slate-50 p-2"
+                      />
+                      <Button
+                        variant="destructive"
+                        size="icon"
+                        className="absolute -top-2 -right-2 h-6 w-6"
+                        onClick={handleRemoveMinimalLogo}
+                      >
+                        <X className="w-3 h-3" />
+                      </Button>
+                    </div>
                   ) : (
-                    <Upload className="w-4 h-4 mr-2" />
+                    <div className="h-12 w-12 border-2 border-dashed border-slate-200 rounded-2xl flex items-center justify-center text-muted-foreground bg-slate-50">
+                      <Image className="w-5 h-5" />
+                    </div>
                   )}
-                  {agencyMinimalLogo ? 'Alterar Logo mínima' : 'Enviar Logo mínima'}
-                </Button>
+
+                  <div>
+                    <input
+                      type="file"
+                      ref={minimalLogoInputRef}
+                      onChange={handleMinimalLogoUpload}
+                      className="hidden"
+                      accept="image/*"
+                    />
+                    <Button
+                      variant="outline"
+                      onClick={() => minimalLogoInputRef.current?.click()}
+                      disabled={isUploadingMinimalLogo}
+                      className="h-9"
+                    >
+                      {isUploadingMinimalLogo ? (
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                      ) : (
+                        <Upload className="w-4 h-4 mr-2" />
+                      )}
+                      {agencyMinimalLogo ? 'Alterar Logo mínima' : 'Enviar Logo mínima'}
+                    </Button>
+                  </div>
+                </div>
               </div>
             </div>
           </div>

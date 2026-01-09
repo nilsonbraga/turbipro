@@ -102,7 +102,7 @@ export function useStudioTemplates() {
 
     const derivedFormatId = (row.formatId || dataFormat || 'instagram-post') as FormatType;
     const derivedArtTypeId = (row.artTypeId || dataArtType || 'pacote') as ArtType;
-    const derivedTemplateId = row.templateId ?? dataTemplateId ?? 1;
+    const derivedTemplateId = 1;
 
     const mergedColors = { ...parsedColors, ...(dataColors || {}) };
 

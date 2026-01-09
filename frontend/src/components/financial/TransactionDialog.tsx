@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
@@ -29,6 +29,10 @@ import {
 } from "@/components/ui/select";
 import { FinancialTransaction, TransactionInput } from "@/hooks/useFinancialTransactions";
 import { Supplier } from "@/hooks/useSuppliers";
+import { Calendar as CalendarIcon } from "lucide-react";
+import { Popover, PopoverContent, PopoverTrigger } from "@/components/ui/popover";
+import { Calendar } from "@/components/ui/calendar";
+import { cn } from "@/lib/utils";
 
 const transactionSchema = z.object({
   type: z.enum(["income", "expense"]),
@@ -76,6 +80,62 @@ const STATUS_OPTIONS = [
   { value: "cancelled", label: "Cancelado" },
   { value: "overdue", label: "Atrasado" },
 ];
+
+const normalizeDateInput = (value?: string | null) => {
+  if (!value) return "";
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return "";
+  return date.toISOString().slice(0, 10);
+};
+
+const DatePickerField = ({
+  value,
+  onChange,
+  placeholder,
+}: {
+  value: string;
+  onChange: (value: string) => void;
+  placeholder?: string;
+}) => {
+  const [open, setOpen] = useState(false);
+
+  const parseDate = (val?: string) => {
+    if (!val) return undefined;
+    const [y, m, d] = val.split("-").map(Number);
+    if (!y || !m || !d) return undefined;
+    return new Date(Date.UTC(y, m - 1, d, 12));
+  };
+
+  const dateObj = parseDate(value);
+
+  return (
+    <Popover open={open} onOpenChange={setOpen}>
+      <PopoverTrigger asChild>
+        <Button
+          variant="outline"
+          className={cn(
+            "w-full justify-start text-left font-normal h-10",
+            !value && "text-muted-foreground",
+          )}
+        >
+          <CalendarIcon className="mr-2 h-4 w-4" />
+          {dateObj ? format(dateObj, "dd/MM/yyyy") : (placeholder || "Selecionar")}
+        </Button>
+      </PopoverTrigger>
+      <PopoverContent className="w-auto p-0" align="start">
+        <Calendar
+          mode="single"
+          selected={dateObj}
+          onSelect={(day) => {
+            onChange(day ? format(day, "yyyy-MM-dd") : "");
+            setOpen(false);
+          }}
+          initialFocus
+        />
+      </PopoverContent>
+    </Popover>
+  );
+};
 
 const CATEGORIES = {
   income: [
@@ -141,9 +201,9 @@ export function TransactionDialog({
         status: transaction.status,
         installments: transaction.installments || 1,
         current_installment: transaction.current_installment || 1,
-        launch_date: transaction.launch_date,
-        due_date: transaction.due_date || "",
-        payment_date: transaction.payment_date || "",
+        launch_date: normalizeDateInput(transaction.launch_date),
+        due_date: normalizeDateInput(transaction.due_date),
+        payment_date: normalizeDateInput(transaction.payment_date),
         details: transaction.details || "",
       });
     } else {
@@ -414,7 +474,7 @@ export function TransactionDialog({
                   <FormItem>
                     <FormLabel>Data de Lançamento *</FormLabel>
                     <FormControl>
-                      <Input {...field} type="date" />
+                      <DatePickerField value={field.value} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -428,7 +488,7 @@ export function TransactionDialog({
                   <FormItem>
                     <FormLabel>Data de Vencimento</FormLabel>
                     <FormControl>
-                      <Input {...field} type="date" />
+                      <DatePickerField value={field.value} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>
@@ -442,7 +502,7 @@ export function TransactionDialog({
                   <FormItem>
                     <FormLabel>Data de Pagamento</FormLabel>
                     <FormControl>
-                      <Input {...field} type="date" />
+                      <DatePickerField value={field.value} onChange={field.onChange} />
                     </FormControl>
                     <FormMessage />
                   </FormItem>

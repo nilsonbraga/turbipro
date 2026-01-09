@@ -142,9 +142,9 @@ export function UsersManagementCard() {
 
   if (isLoading || loadingCollaborators) {
     return (
-      <Card>
+      <Card className="rounded-2xl border-0 shadow-none bg-white">
         <CardContent className="flex items-center justify-center py-8">
-          <Loader2 className="w-6 h-6 animate-spin" />
+          <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </CardContent>
       </Card>
     );
@@ -152,11 +152,11 @@ export function UsersManagementCard() {
 
   return (
     <>
-      <Card>
-        <CardHeader>
-          <div className="flex items-center justify-between">
+      <Card className="rounded-2xl border-0 shadow-none bg-white overflow-hidden">
+        <CardHeader className="border-b border-slate-100">
+          <div className="flex flex-wrap items-center justify-between gap-3">
             <div>
-              <CardTitle className="flex items-center gap-2">
+              <CardTitle className="flex items-center gap-2 text-lg">
                 <Users className="w-5 h-5" />
                 Usuários da Agência
               </CardTitle>
@@ -164,13 +164,13 @@ export function UsersManagementCard() {
                 Gerencie os usuários que têm acesso à sua agência
               </CardDescription>
             </div>
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               {isSuperAdmin && (
                 <Select
                   value={selectedAgencyId || 'all'}
                   onValueChange={(val) => setSelectedAgencyId(val === 'all' ? '' : val)}
                 >
-                  <SelectTrigger className="w-[220px]">
+                  <SelectTrigger className="w-[220px] h-9 bg-white border-slate-200">
                     <SelectValue placeholder="Filtrar por agência" />
                   </SelectTrigger>
                   <SelectContent>
@@ -190,24 +190,24 @@ export function UsersManagementCard() {
             </div>
           </div>
         </CardHeader>
-        <CardContent>
+        <CardContent className="p-0">
           {users.length === 0 ? (
             <p className="text-muted-foreground text-center py-8">
               Nenhum usuário cadastrado além de você.
             </p>
           ) : (
             <Table>
-              <TableHeader>
+              <TableHeader className="bg-slate-50/80">
                 <TableRow>
-                  <TableHead>Nome</TableHead>
-                  <TableHead>Email</TableHead>
-                  <TableHead>Perfil</TableHead>
-                  <TableHead className="w-[120px]">Ações</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-slate-500">Nome</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-slate-500">Email</TableHead>
+                  <TableHead className="text-xs uppercase tracking-wide text-slate-500">Perfil</TableHead>
+                  <TableHead className="w-[120px]"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
-                {users.map((agencyUser) => (
-                  <TableRow key={agencyUser.id}>
+                {users.map((agencyUser, index) => (
+                  <TableRow key={agencyUser.id} className={index % 2 === 0 ? 'bg-slate-50/60 hover:bg-slate-50' : 'hover:bg-slate-50'}>
                     <TableCell className="font-medium">
                       {agencyUser.name || 'Sem nome'}
                     </TableCell>
@@ -220,7 +220,7 @@ export function UsersManagementCard() {
                         }
                         disabled={!isSuperAdmin && agencyUser.role === 'super_admin'}
                       >
-                        <SelectTrigger className="w-[150px]">
+                        <SelectTrigger className="w-[150px] h-9 bg-white border-slate-200">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -278,7 +278,7 @@ export function UsersManagementCard() {
 
       {/* Create User Dialog - Select from Collaborators */}
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Novo Usuário</DialogTitle>
           </DialogHeader>
@@ -286,7 +286,7 @@ export function UsersManagementCard() {
             <div className="space-y-2">
               <Label>Selecionar Colaborador</Label>
               <Select value={selectedCollaboratorId} onValueChange={setSelectedCollaboratorId}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10 bg-white border-slate-200">
                   <SelectValue placeholder="Selecione um colaborador" />
                 </SelectTrigger>
                 <SelectContent>
@@ -319,12 +319,13 @@ export function UsersManagementCard() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="Mínimo 6 caracteres"
+                className="h-10 bg-white border-slate-200"
               />
             </div>
             <div className="space-y-2">
               <Label>Perfil de Acesso</Label>
               <Select value={role} onValueChange={(v: 'admin' | 'agent') => setRole(v)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10 bg-white border-slate-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
@@ -361,23 +362,23 @@ export function UsersManagementCard() {
 
       {/* Edit User Dialog */}
       <Dialog open={editDialogOpen} onOpenChange={setEditDialogOpen}>
-        <DialogContent>
+        <DialogContent className="max-w-md">
           <DialogHeader>
             <DialogTitle>Editar Usuário</DialogTitle>
           </DialogHeader>
           <div className="space-y-4">
             <div className="space-y-2">
               <Label>Nome</Label>
-              <Input value={userToEdit?.name || ''} disabled />
+              <Input value={userToEdit?.name || ''} disabled className="h-10 bg-slate-100 border-slate-200" />
             </div>
             <div className="space-y-2">
               <Label>Email</Label>
-              <Input value={userToEdit?.email || ''} disabled />
+              <Input value={userToEdit?.email || ''} disabled className="h-10 bg-slate-100 border-slate-200" />
             </div>
             <div className="space-y-2">
               <Label>Perfil de Acesso</Label>
               <Select value={role} onValueChange={(v: 'admin' | 'agent') => setRole(v)}>
-                <SelectTrigger>
+                <SelectTrigger className="h-10 bg-white border-slate-200">
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>

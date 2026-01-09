@@ -276,6 +276,14 @@ const mapDayFeedback = (f: any): ItineraryDayFeedback => ({
   updated_at: f.updatedAt,
 });
 
+const sortFeedbacksByCreatedAt = <T extends { created_at?: string | null }>(feedbacks: T[]) => {
+  return [...feedbacks].sort((a, b) => {
+    const aTime = a.created_at ? new Date(a.created_at).getTime() : 0;
+    const bTime = b.created_at ? new Date(b.created_at).getTime() : 0;
+    return aTime - bTime;
+  });
+};
+
 const mapItineraryInput = (input: CustomItineraryInput & { agency_id?: string }) => ({
   agencyId: input.agency_id,
   clientId: input.client_id ?? null,
@@ -474,9 +482,9 @@ export function useItineraryDetails(itineraryId: string | null) {
             ...mapDay(d),
             items: (d.items || []).map((it: any) => ({
               ...mapItem(it),
-              feedbacks: (it.feedbacks || []).map(mapItemFeedback),
+              feedbacks: sortFeedbacksByCreatedAt((it.feedbacks || []).map(mapItemFeedback)),
             })),
-            feedbacks: (d.feedbacks || []).map(mapDayFeedback),
+            feedbacks: sortFeedbacksByCreatedAt((d.feedbacks || []).map(mapDayFeedback)),
           }))
           .sort((a: ItineraryDay, b: ItineraryDay) => a.sort_order - b.sort_order);
 
@@ -660,14 +668,14 @@ export function usePublicItinerary(token: string | null, accessToken?: string | 
           ...mapDay(d),
           items: (d.items || []).map((it: any) => ({
             ...mapItem(it),
-            feedbacks: (it.feedbacks || []).map(mapItemFeedback),
+            feedbacks: sortFeedbacksByCreatedAt((it.feedbacks || []).map(mapItemFeedback)),
             feedback: (it.feedbacks || []).length
-              ? mapItemFeedback((it.feedbacks || [])[ (it.feedbacks || []).length - 1])
+              ? sortFeedbacksByCreatedAt((it.feedbacks || []).map(mapItemFeedback)).slice(-1)[0]
               : null,
           })),
-          feedbacks: (d.feedbacks || []).map(mapDayFeedback),
+          feedbacks: sortFeedbacksByCreatedAt((d.feedbacks || []).map(mapDayFeedback)),
           feedback: (d.feedbacks || []).length
-            ? mapDayFeedback((d.feedbacks || [])[ (d.feedbacks || []).length - 1])
+            ? sortFeedbacksByCreatedAt((d.feedbacks || []).map(mapDayFeedback)).slice(-1)[0]
             : null,
         })) as (ItineraryDay & { feedback?: ItineraryDayFeedback | null; feedbacks?: ItineraryDayFeedback[] })[];
 

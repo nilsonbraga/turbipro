@@ -33,9 +33,9 @@ export function TrialConfigCard() {
   };
 
   return (
-    <Card>
-      <CardHeader>
-        <CardTitle className="flex items-center gap-2">
+    <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+      <CardHeader className="pb-2">
+        <CardTitle className="flex items-center gap-2 text-lg">
           <Clock className="w-5 h-5" />
           Período de Teste Grátis
         </CardTitle>
@@ -44,7 +44,7 @@ export function TrialConfigCard() {
         </CardDescription>
       </CardHeader>
       <CardContent className="space-y-6">
-        <div className="flex items-center justify-between p-4 bg-muted/50 rounded-lg">
+        <div className="flex items-center justify-between p-4 bg-white rounded-xl border border-slate-100">
           <div>
             <p className="font-medium">Habilitar Teste Grátis</p>
             <p className="text-sm text-muted-foreground">
@@ -69,6 +69,7 @@ export function TrialConfigCard() {
                 value={trialDays}
                 onChange={(e) => setTrialDays(e.target.value)}
                 placeholder="7"
+                className="h-10 bg-white border-slate-200"
               />
               <p className="text-xs text-muted-foreground">
                 Quantos dias dura o período de teste
@@ -83,6 +84,7 @@ export function TrialConfigCard() {
                 value={trialMaxUsers}
                 onChange={(e) => setTrialMaxUsers(e.target.value)}
                 placeholder="2"
+                className="h-10 bg-white border-slate-200"
               />
               <p className="text-xs text-muted-foreground">
                 Limite de usuários durante o trial
@@ -97,6 +99,7 @@ export function TrialConfigCard() {
                 value={trialMaxClients}
                 onChange={(e) => setTrialMaxClients(e.target.value)}
                 placeholder="10"
+                className="h-10 bg-white border-slate-200"
               />
               <p className="text-xs text-muted-foreground">
                 Limite de clientes durante o trial
@@ -111,6 +114,7 @@ export function TrialConfigCard() {
                 value={trialMaxProposals}
                 onChange={(e) => setTrialMaxProposals(e.target.value)}
                 placeholder="10"
+                className="h-10 bg-white border-slate-200"
               />
               <p className="text-xs text-muted-foreground">
                 Limite de propostas durante o trial

@@ -74,6 +74,7 @@ interface TransactionFilters {
   agencyId?: string;
   type?: "income" | "expense";
   status?: string;
+  dueToday?: boolean;
 }
 
 export function useFinancialTransactions(filters: TransactionFilters = {}) {
@@ -81,7 +82,10 @@ export function useFinancialTransactions(filters: TransactionFilters = {}) {
   const { user, isSuperAdmin } = useAuth();
   const queryClient = useQueryClient();
 
-  const mapBackendToFront = (t: any): FinancialTransaction => ({
+  const mapBackendToFront = (t: any): FinancialTransaction => {
+    const proposal = t.proposal ?? t.proposals;
+
+    return {
     id: t.id,
     agency_id: t.agencyId,
     type: t.type,
@@ -107,11 +111,12 @@ export function useFinancialTransactions(filters: TransactionFilters = {}) {
     updated_at: t.updatedAt,
     suppliers: t.supplier ? { id: t.supplier.id, name: t.supplier.name } : undefined,
     clients: t.client ? { id: t.client.id, name: t.client.name, cpf: t.client.cpf } : undefined,
-    proposals: t.proposal
-      ? { id: t.proposal.id, number: t.proposal.number, title: t.proposal.title }
+    proposals: proposal
+      ? { id: proposal.id, number: proposal.number, title: proposal.title }
       : undefined,
     agencies: t.agency ? { id: t.agency.id, name: t.agency.name } : undefined,
-  });
+    };
+  };
 
   const toISODateString = (value?: string) => {
     if (!value) return null;
@@ -158,6 +163,15 @@ export function useFinancialTransactions(filters: TransactionFilters = {}) {
           end.setHours(23, 59, 59, 999);
           (where.launchDate as any).lte = end.toISOString();
         }
+      }
+      if (filters.dueToday) {
+        const now = new Date();
+        const start = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 0, 0, 0, 0));
+        const end = new Date(Date.UTC(now.getFullYear(), now.getMonth(), now.getDate(), 23, 59, 59, 999));
+        where.dueDate = {
+          gte: start.toISOString(),
+          lte: end.toISOString(),
+        };
       }
       if (filters.agencyId && isSuperAdmin) {
         where.agencyId = filters.agencyId;

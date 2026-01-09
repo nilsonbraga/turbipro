@@ -87,29 +87,29 @@ export default function Tags() {
   }
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
         <div>
-          <h1 className="text-2xl font-bold text-foreground">Tags</h1>
-          <p className="text-muted-foreground">Gerencie as tags para categorizar propostas</p>
+          <h1 className="text-2xl font-semibold text-foreground">Tags</h1>
+          <p className="text-sm text-muted-foreground">Gerencie as tags para categorizar propostas</p>
         </div>
-        <Button onClick={openCreateDialog}>
+        <Button size="sm" onClick={openCreateDialog}>
           <Plus className="w-4 h-4 mr-2" />
           Nova Tag
         </Button>
       </div>
 
       {/* Stats */}
-      <Card>
-        <CardContent className="p-6">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 rounded-lg bg-primary/10 flex items-center justify-center">
-              <TagsIcon className="w-6 h-6 text-primary" />
-            </div>
+      <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
+        <CardContent className="p-5">
+          <div className="flex items-center justify-between">
             <div>
-              <p className="text-2xl font-bold">{tags.length}</p>
-              <p className="text-sm text-muted-foreground">Tags cadastradas</p>
+              <p className="text-xs uppercase tracking-wide text-muted-foreground">Tags cadastradas</p>
+              <p className="text-2xl font-semibold">{tags.length}</p>
+            </div>
+            <div className="w-12 h-12 rounded-2xl bg-orange-100 text-orange-600 flex items-center justify-center">
+              <TagsIcon className="w-6 h-6" />
             </div>
           </div>
         </CardContent>
@@ -121,7 +121,7 @@ export default function Tags() {
           <Loader2 className="w-6 h-6 animate-spin text-primary" />
         </div>
       ) : tags.length === 0 ? (
-        <Card>
+        <Card className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
           <CardContent className="p-8 text-center text-muted-foreground">
             Nenhuma tag cadastrada
           </CardContent>
@@ -129,7 +129,7 @@ export default function Tags() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
           {tags.map((tag) => (
-            <Card key={tag.id}>
+            <Card key={tag.id} className="rounded-2xl border-0 shadow-none bg-slate-50/80 backdrop-blur-lg">
               <CardContent className="p-4">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -137,7 +137,7 @@ export default function Tags() {
                       className="w-4 h-4 rounded-full"
                       style={{ backgroundColor: tag.color }}
                     />
-                    <Badge style={{ backgroundColor: `${tag.color}20`, color: tag.color }}>
+                    <Badge className="rounded-full" style={{ backgroundColor: `${tag.color}20`, color: tag.color }}>
                       {tag.name}
                     </Badge>
                   </div>

@@ -15,7 +15,6 @@ import {
   FolderOpen
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { StudioTemplateSelector, TemplateColors } from '@/components/studio/StudioTemplateSelector';
 import { StudioEditor } from '@/components/studio/StudioEditor';
 import { SavedTemplates } from '@/components/studio/SavedTemplates';
 import { useStudioTemplates, SavedTemplate } from '@/hooks/useStudioTemplates';
@@ -64,11 +63,10 @@ export default function Studio() {
     isLoading,
   } = useStudioTemplates();
   const [activeTab, setActiveTab] = useState<'create' | 'saved'>('create');
-  const [step, setStep] = useState<'format' | 'type' | 'template' | 'editor'>('format');
+  const [step, setStep] = useState<'format' | 'type' | 'editor'>('format');
   const [selectedFormat, setSelectedFormat] = useState<FormatOption | null>(null);
   const [selectedArtType, setSelectedArtType] = useState<ArtTypeOption | null>(null);
   const [selectedTemplate, setSelectedTemplate] = useState<number | null>(null);
-  const [selectedTemplateColors, setSelectedTemplateColors] = useState<TemplateColors | null>(null);
   const [loadedTemplate, setLoadedTemplate] = useState<SavedTemplate | null>(null);
 
   const handleFormatSelect = (format: FormatOption) => {
@@ -78,12 +76,7 @@ export default function Studio() {
 
   const handleArtTypeSelect = (artType: ArtTypeOption) => {
     setSelectedArtType(artType);
-    setStep('template');
-  };
-
-  const handleTemplateSelect = (templateId: number, colors: TemplateColors) => {
-    setSelectedTemplate(templateId);
-    setSelectedTemplateColors(colors);
+    setSelectedTemplate(1);
     setStep('editor');
   };
 
@@ -91,13 +84,9 @@ export default function Studio() {
     if (step === 'type') {
       setStep('format');
       setSelectedFormat(null);
-    } else if (step === 'template') {
-      setStep('type');
-      setSelectedArtType(null);
     } else if (step === 'editor') {
-      setStep('template');
+      setStep('type');
       setSelectedTemplate(null);
-      setSelectedTemplateColors(null);
       setLoadedTemplate(null);
     }
   };
@@ -107,7 +96,6 @@ export default function Studio() {
     setSelectedFormat(null);
     setSelectedArtType(null);
     setSelectedTemplate(null);
-    setSelectedTemplateColors(null);
     setLoadedTemplate(null);
   };
 
@@ -127,34 +115,34 @@ export default function Studio() {
   };
 
   return (
-    <div className="p-6 space-y-6">
+    <div className="p-6 space-y-8">
       {/* Header */}
-      <div className="flex items-center justify-between">
-        <div className="flex items-center gap-4">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+        <div className="flex items-start gap-4">
           {step !== 'format' && activeTab === 'create' && (
             <Button variant="ghost" size="icon" onClick={handleBack}>
               <ArrowLeft className="h-5 w-5" />
             </Button>
           )}
           <div>
-            <h1 className="text-3xl font-bold tracking-tight flex items-center gap-3">
-              <Palette className="h-8 w-8 text-primary" />
+            <h1 className="text-2xl font-semibold text-foreground flex items-center gap-3">
+              <Palette className="h-7 w-7 text-primary" />
               Studio
             </h1>
-            <p className="text-muted-foreground">
+            <p className="text-sm text-muted-foreground">
               Crie artes profissionais para suas redes sociais
             </p>
           </div>
         </div>
         {step !== 'format' && activeTab === 'create' && (
-          <div className="flex items-center gap-2">
+          <div className="flex flex-wrap items-center gap-2">
             {selectedFormat && (
-              <Badge variant="secondary" className="text-sm">
+              <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600">
                 {selectedFormat.name}
               </Badge>
             )}
             {selectedArtType && (
-              <Badge variant="secondary" className="text-sm">
+              <Badge variant="secondary" className="rounded-full px-3 py-1 text-xs font-semibold bg-slate-100 text-slate-600">
                 {selectedArtType.name}
               </Badge>
             )}
@@ -164,12 +152,24 @@ export default function Studio() {
 
       {/* Tabs */}
       <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as 'create' | 'saved')}>
-        <TabsList>
-          <TabsTrigger value="create">
+        <TabsList className="flex flex-wrap items-center justify-start gap-4 bg-transparent p-0 border-b border-slate-200 w-full rounded-none h-auto">
+          <TabsTrigger
+            value="create"
+            className={cn(
+              "rounded-none px-1 pb-3 text-sm font-semibold text-slate-500 transition-colors border-b-2 border-transparent shadow-none",
+              "data-[state=active]:text-[#f06a12] data-[state=active]:border-[#f06a12] data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            )}
+          >
             <Palette className="h-4 w-4 mr-2" />
             Criar Arte
           </TabsTrigger>
-          <TabsTrigger value="saved">
+          <TabsTrigger
+            value="saved"
+            className={cn(
+              "rounded-none px-1 pb-3 text-sm font-semibold text-slate-500 transition-colors border-b-2 border-transparent shadow-none",
+              "data-[state=active]:text-[#f06a12] data-[state=active]:border-[#f06a12] data-[state=active]:bg-transparent data-[state=active]:shadow-none"
+            )}
+          >
             <FolderOpen className="h-4 w-4 mr-2" />
             Meus Modelos {savedTemplates.length > 0 && `(${savedTemplates.length})`}
           </TabsTrigger>
@@ -185,18 +185,19 @@ export default function Studio() {
                   <Card 
                     key={format.id}
                     className={cn(
-                      "cursor-pointer transition-all hover:shadow-lg hover:border-primary/50",
-                      "group"
+                      "cursor-pointer rounded-2xl border-0 shadow-none overflow-hidden",
+                      "bg-gradient-to-br from-[#f06a12] via-orange-500 to-amber-400",
+                      "text-white transition-transform hover:-translate-y-0.5 hover:shadow-lg"
                     )}
                     onClick={() => handleFormatSelect(format)}
                   >
                     <CardContent className="p-6 text-center space-y-4">
-                      <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                        <format.icon className="w-8 h-8 text-primary" />
+                      <div className="mx-auto w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center">
+                        <format.icon className="w-8 h-8 text-white" />
                       </div>
                       <div>
-                        <h3 className="font-semibold">{format.name}</h3>
-                        <p className="text-sm text-muted-foreground">{format.dimensions}</p>
+                        <h3 className="font-semibold text-white">{format.name}</h3>
+                        <p className="text-sm text-white/80">{format.dimensions}</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -214,18 +215,19 @@ export default function Studio() {
                   <Card 
                     key={artType.id}
                     className={cn(
-                      "cursor-pointer transition-all hover:shadow-lg hover:border-primary/50",
-                      "group"
+                      "cursor-pointer rounded-2xl border-0 shadow-none overflow-hidden",
+                      "bg-gradient-to-br from-[#f06a12] via-orange-500 to-amber-400",
+                      "text-white transition-transform hover:-translate-y-0.5 hover:shadow-lg"
                     )}
                     onClick={() => handleArtTypeSelect(artType)}
                   >
                     <CardContent className="p-6 text-center space-y-4">
-                      <div className="mx-auto w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center group-hover:bg-primary/20 transition-colors">
-                        <artType.icon className="w-8 h-8 text-primary" />
+                      <div className="mx-auto w-16 h-16 rounded-2xl bg-white/15 flex items-center justify-center">
+                        <artType.icon className="w-8 h-8 text-white" />
                       </div>
                       <div>
-                        <h3 className="font-semibold">{artType.name}</h3>
-                        <p className="text-sm text-muted-foreground">{artType.description}</p>
+                        <h3 className="font-semibold text-white">{artType.name}</h3>
+                        <p className="text-sm text-white/80">{artType.description}</p>
                       </div>
                     </CardContent>
                   </Card>
@@ -234,22 +236,12 @@ export default function Studio() {
             </div>
           )}
 
-          {/* Step: Template Selection */}
-          {step === 'template' && selectedFormat && selectedArtType && (
-            <StudioTemplateSelector
-              format={selectedFormat}
-              artType={selectedArtType}
-              onSelect={handleTemplateSelect}
-            />
-          )}
-
           {/* Step: Editor */}
           {step === 'editor' && selectedFormat && selectedArtType && selectedTemplate !== null && (
             <StudioEditor
               format={selectedFormat}
               artType={selectedArtType}
               templateId={selectedTemplate}
-              templateColors={selectedTemplateColors}
               onReset={handleReset}
               loadedTemplate={loadedTemplate}
               saveTemplate={saveTemplate}
